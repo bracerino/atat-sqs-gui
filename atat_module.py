@@ -945,41 +945,49 @@ def render_atat_sqs_section():
                    #     for elem, count in sorted(element_counts.items())
                    # ])
                    # st.dataframe(element_df, use_container_width=True)
+                    
                     st.write("#### **Element Distribution:**")
-
-                    # Create columns for better layout
                     cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
-
                     for i, (elem, count) in enumerate(sorted(element_counts.items())):
                         percentage = count / len(atoms) * 100
-
                         with cols[i % len(cols)]:
-                            # Choose color based on percentage
-                            if percentage >= 50:
-                                color = "#FF6B6B"  # Red for high concentration
-                            elif percentage >= 20:
-                                color = "#4ECDC4"  # Teal for medium-high
+                            if percentage >= 80:
+                                color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                            elif percentage >= 60:
+                                color = "#4A6741"  # Dark Forest Green for high concentration
+                            elif percentage >= 40:
+                                color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                            elif percentage >= 25:
+                                color = "#FF8C00"  # Dark Orange for medium concentration
+                            elif percentage >= 15:
+                                color = "#4ECDC4"  # Teal for medium-low concentration
                             elif percentage >= 10:
-                                color = "#45B7D1"  # Blue for medium
+                                color = "#45B7D1"  # Blue for low-medium concentration
                             elif percentage >= 5:
-                                color = "#96CEB4"  # Green for low-medium
+                                color = "#96CEB4"  # Green for low concentration
+                            elif percentage >= 2:
+                                color = "#FECA57"  # Yellow for very low concentration
+                            elif percentage >= 1:
+                                color = "#DDA0DD"  # Plum for trace concentration
                             else:
-                                color = "#FECA57"  # Yellow for low
-
+                                color = "#D3D3D3"  # Light Gray for minimal concentration
+                                
                             st.markdown(f"""
                             <div style="
-                                background-color: {color}; 
+                                background: linear-gradient(135deg, {color}, {color}CC);
                                 padding: 20px; 
-                                border-radius: 10px; 
+                                border-radius: 15px; 
                                 text-align: center; 
                                 margin: 10px 0;
-                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                border: 2px solid rgba(255,255,255,0.2);
                             ">
                                 <h1 style="
                                     color: white; 
                                     font-size: 3em; 
                                     margin: 0; 
-                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                    font-weight: bold;
                                 ">{elem}</h1>
                                 <h2 style="
                                     color: white; 
