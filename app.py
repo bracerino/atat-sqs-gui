@@ -189,10 +189,10 @@ def update_file_upload_section():
 st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also the main application **[XRDlicious](xrdlicious.com)** and **[SQS generation using ICET](https://sqs-icet.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
-    " You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-mcsqs-gui.git)** for better performance."
+    " You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-sqs-gui.git)** for better performance."
 )
 
-st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/atat-mcsqs-gui.git", type="primary" )
+st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/atat-sqs-gui.git", type="primary" )
 update_file_upload_section()
 st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
 
@@ -215,7 +215,7 @@ st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsa
 
 #memory_usage = get_memory_usage()
 #st.write(
-#    f"🔍 Current memory usage: **{memory_usage:.2f} MB**. We are now using free hosting by Streamlit Community Cloud servis, which has a limit for RAM memory of 2.6 GBs. For more extensive computations, please compile the application locally from the [GitHub](https://github.com/bracerino/xrdlicious).")
+#    f"🔍 Current memory usage: **{memory_usage:.2f} MB**. We are now using free hosting by Streamlit Community Cloud servis, which has a limit for RAM memory of 2.6 GBs. For more extensive computations, please compile the application locally from the [GitHub](https://github.com/bracerino/atat-sqs-gui.git).")
 st.markdown("""
 **The GUI SQS application is open-source and released under the [MIT License](https://github.com/bracerino/SQS-GUI/blob/main/LICENSE).**
 """)
