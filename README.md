@@ -51,14 +51,53 @@ Open your terminal console and write the following commands (the bold text):
 - Upload crystal structure file (POSCAR, LMP, CIF, XYZ (with lattice)) and select composition mode (whether to change concentration for all atomic site, or for sublattices (based on wyckoff symbol))
 ![Upload crystal structure](images_atat_gui/2.png)
 
+
 - Set supercell size (this also determine the number of atoms for option when not fixing the supercell shape)
 ![Set supercell size, number of atoms](images_atat_gui/3.png)
+
 
 - Set elements and concentrations for atomic sites. The achiavable concentrations are automatically recalculated based on the set supercell (number of atoms)
 ![Set concentrations for atomic sites](images_atat_gui/4.png)
 
+
 - Generate ATAT input files (rndstr.in, sqscell.out)
 ![Generate ATAT input files](images_atat_gui/5.png)
 
-- See the commands to use in the console for running this settings for ATAT mcsqs
+
+- See the commands to use in the console for running this settings in ATAT mcsqs
 ![ATAT commands](images_atat_gui/6.png)
+
+
+- Download the bash script file which will automatically create the set rndstr.in and sqscell.out, and run the ATAT mcsqs with the given settings from this interface. Additionally, it will create a new file with improved time dependent convergence, and shows updated information in the console every 1 minute 
+![Download bash to run it automatically](images_atat_gui/7.png)
+
+
+![Improved console](images_atat_gui/console.png)
+
+
+- Upload the found SQS (bestsqs.out) and convert it to POSCAR, LMP, CIF, or XYZ format
+![Upload SQS and convert it to different formats](images_atat_gui/8.png)
+
+
+![Uploaded structure](images_atat_gui/9.png)
+
+
+- Calculate PRDF for the found SQS (bestsqs.out)
+![Calculate PRDF](images_atat_gui/10.png)
+
+
+- Remove certain atomic element to create ordered vacancies if needed
+![Ordered vacancies](images_atat_gui/11.png)
+
+
+- Upload log file (mcsqs.log) and see the values of objective functions
+![Upload mcsqs.log](images_atat_gui/12.png)
+
+
+- Upload mcsqs_progress.csv (if the ATAT mcsqs was run with the provided bash script) and see the convergence of objective function over time
+![mcsqs_progress.csv](images_atat_gui/13.png)
+
+- Upload multiple log files from the parallel run (mcsqs1.log, mcsqs2.log, ...) and see the values of objective functions and the best and wort found SQS
+![upload multiple mcsqs.log](images_atat_gui/14.png)
+
+![upload multiple mcsqs.log 2](images_atat_gui/15.png)
