@@ -23,13 +23,6 @@ import io
 import re
 from atat_module import *
 
-import icet
-from icet.tools.structure_generation import (
-    generate_sqs,
-    generate_sqs_from_supercells,
-    generate_sqs_by_enumeration
-)
-from icet.input_output.logging_tools import set_log_config
 from ase import Atoms
 from ase.build import make_supercell
 from pymatgen.io.ase import AseAtomsAdaptor
