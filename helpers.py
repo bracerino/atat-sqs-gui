@@ -12,21 +12,6 @@ import re
 import spglib
 
 def calculate_achievable_concentrations(target_concentrations, supercell_multiplier):
-    """
-    Calculates achievable concentrations that are physically realizable in a supercell.
-
-    This function correctly solves this problem by ensuring all final concentrations
-    correspond to an integer number of atoms. It uses the Largest Remainder Method
-    to distribute the integer atom slots as fairly as possible.
-
-    Args:
-        target_concentrations (dict): A dictionary mapping element symbols to their
-                                      target fractional concentrations.
-        supercell_multiplier (int): The supercell multiplication factor (e.g., nx*ny*nz).
-
-    Returns:
-        tuple: A tuple containing valid concentrations and corresponding integer counts.
-    """
     if not isinstance(supercell_multiplier, int) or supercell_multiplier <= 0:
         raise ValueError("supercell_multiplier must be a positive integer.")
     if not target_concentrations:
@@ -63,32 +48,30 @@ def intro_text():
 
     st.markdown("""
 
-     This tool provides GUI for generation of special quasi random (SQS) structure using [ICET python package](https://icet.materialsmodeling.org/index.html).
-     ### 🔄 Global Composition Mode
-     - Specify overall composition for the entire structure
-     - Elements can occupy any crystallographic site
-     - Currently, only option with the specified supercell is integrated 
-     - If the specified atomic concentrations cannot be achieved within the given supercell, they are automatically adjusted to the closest possible values compatible with that cell.
-
-     ### 🎯 Sublattice-Specific Mode
-     - Control which elements can occupy which atomic site
-     - Set different compositions for different crystallographic sites
-
+     This tool provides GUI for generation of input files (rndstr.in, sqscell.out) for creating SQS (special quasi-random structure)
+     using ATAT (Alloy Theoretic Automated Toolkit) mcsqs. 
+     
      ### Key Features:
-     **🔬 ICET Integration**
-     **🎯 Sublattice Control**
-     **📊 (P)RDF Calculation**
-     **💾 Download SQS**
-
-     ### How to Use:
-
-     1. Upload a structure file (CIF, POSCAR, LMP, XYZ (with lattice)) or retrieve structure from the search interface within MP, AFLOW, or COD databases
-     2. Choose between Global or Sublattice-Specific mode
-     3. **For Sublattice Mode**: Configure you can configure composition for different atomic sites
-     4. **For Global Mode**: Set overall target composition
-     5. Select ICET algorithm and parameters
-     6. Generate and download your SQS structure
+    🔬 Upload or retrieve crystal structures from MP, AFLOW, or COD databases
+    
+    🎯 Set supercell size and target sublattice concentrations
+    
+    📊 Recalculate feasible concentrations based on the chosen supercell size
+    
+    💾 Generate rndstr.in and sqscell.out input files automatically
+    
+    🛠️ Generate a bash script to automate the creation of input files and run mcsqs with optional parallelization and real-time convergence monitoring
+    
+    📤 Upload bestsqs.out to convert to POSCAR, LMP, CIF, or XYZ formats
+    
+    📥 Upload log files (mcsqs.log, mcsqs1.log, ..., mcsqs_progress.csv) for convergence analysis and best run detection
+    
+    📈 Calculate the PRDF (pair radial distribution function) for the uploaded bestsqs.out structure
+    
+    🧹 Create ordered vacancies by removing specific elements from the bestsqs.out SQS structure
+     
      """)
+
 
 
 import streamlit.components.v1 as components
@@ -328,7 +311,6 @@ def sqs_visualization(result):
                     'color': color
                 })
 
-        # Automatically show lattice vectors and unit cell
         show_lattice_vectors = True
         show_unit_cell = True
 
@@ -343,15 +325,11 @@ def sqs_visualization(result):
 
         cell_3dmol = structure_ase.get_cell()
 
-        # Add unit cell box if requested
         if show_unit_cell and np.linalg.det(cell_3dmol) > 1e-6:
             add_box(view, cell_3dmol, color='black', linewidth=2)
-
-        # Add lattice vectors if requested
         if show_lattice_vectors and np.linalg.det(cell_3dmol) > 1e-6:
             a, b, c = cell_3dmol[0], cell_3dmol[1], cell_3dmol[2]
 
-            # Add lattice vector arrows
             view.addArrow({
                 'start': {'x': 0, 'y': 0, 'z': 0},
                 'end': {'x': a[0], 'y': a[1], 'z': a[2]},
@@ -371,7 +349,7 @@ def sqs_visualization(result):
                 'radius': 0.1
             })
 
-            # Add lattice parameter labels
+
             a_norm = np.linalg.norm(a)
             b_norm = np.linalg.norm(b)
             c_norm = np.linalg.norm(c)
@@ -401,7 +379,6 @@ def sqs_visualization(result):
         html_string = view._make_html()
         components.html(html_string, height=420, width=620)
 
-        # Create element legend
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
         legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
         for elem in unique_elements:
@@ -770,7 +747,6 @@ def render_site_sublattice_selector(working_structure, all_sites):
             chemical_symbols.append([original_element])
         else:
             # Assigned site - use specified elements
-            # Filter out 'X' (vacancy) for chemical symbols and SORT ALPHABETICALLY
             # valid_elements = [elem for elem in site_elements if elem != 'X']
             # if not valid_elements:
             #    valid_elements = ['H']  # Dummy for vacancy-only
@@ -778,17 +754,14 @@ def render_site_sublattice_selector(working_structure, all_sites):
             valid_elements = sorted(site_elements)
             chemical_symbols.append(valid_elements)
 
-            if len(site_elements) > 1:  # Only multi-element sites form sublattices
-                # SORT ELEMENTS ALPHABETICALLY TO MATCH ICET
+            if len(site_elements) > 1:
                 sorted_site_elements = sorted(site_elements)
                 elements_signature = frozenset(sorted_site_elements)
 
-                # Check if this is the first occurrence of this element combination
                 if elements_signature not in sublattice_compositions:
                     sublattice_compositions[elements_signature] = site_concentrations.copy()
                     first_occurrence_order.append(elements_signature)
 
-    # Create sublattice labels based on ALPHABETICAL ORDER OF FIRST ELEMENT (matching ICET's logic)
     target_concentrations = {}
     sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
@@ -798,10 +771,8 @@ def render_site_sublattice_selector(working_structure, all_sites):
         first_element = elements_list[0]  # First element alphabetically
         sorted_sublattices.append((first_element, elements_signature))
 
-    # Sort by first element alphabetically
     sorted_sublattices.sort(key=lambda x: x[0])
 
-    # Assign sublattice letters in alphabetical order of first element
     for i, (first_element, elements_signature) in enumerate(sorted_sublattices):
         if i < len(sublattice_letters):
             sublattice_id = sublattice_letters[i]
@@ -894,7 +865,7 @@ def calculate_achievable_concentrations_sublattice(target_concentrations, chemic
     achievable_concentrations = {}
     adjustment_info = []
 
-    sublattice_mapping = {}  # {sublattice_letter: {'elements': set, 'site_indices': list}}
+    sublattice_mapping = {}
     sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
     unique_combinations = {}  # {frozenset(elements): [site_indices]}
@@ -1032,7 +1003,6 @@ def calculate_global_concentrations_from_sublattices(target_concentrations, chem
             if found_sublattice:
                 sites_in_supercell = supercell_factor
                 for element, concentration in achievable_concentrations[found_sublattice].items():
-                    # Use the EXACT atom count from achievable concentrations
                     element_count = concentration * sites_in_supercell
                     if element in global_element_counts:
                         global_element_counts[element] += element_count
@@ -1064,7 +1034,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
         supercell_factor = int(transformation_matrix[0][0]) * int(transformation_matrix[1][1]) * int(
             transformation_matrix[2][2])
 
-        sublattice_mapping = {}  # {sublattice_letter: {'elements': set, 'site_indices': list}}
+        sublattice_mapping = {}
         sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
         unique_combinations = {}  # {frozenset(elements): [site_indices]}
@@ -1083,7 +1053,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
             first_element = elements_list[0]
             sorted_combinations.append((first_element, elements_signature, site_indices))
 
-        sorted_combinations.sort(key=lambda x: x[0])  # Sort by first element
+        sorted_combinations.sort(key=lambda x: x[0])
 
         for i, (first_element, elements_signature, site_indices) in enumerate(sorted_combinations):
             if i < len(sublattice_letters):
