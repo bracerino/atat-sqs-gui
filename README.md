@@ -1,5 +1,6 @@
 # Interactive interface for ATAT mcsqs input files and output analysis of SQS
  Online application for generating and analyzing (SQS) (Special Quasi-Random Structures) using the ATAT mcsqs (Alloy Theoretic Automated Toolkit).
+ Access the application online here: https://atat-sqs.streamlit.app/
 
 
 ![1](images_atat_gui/1.png)
