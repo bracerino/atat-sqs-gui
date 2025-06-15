@@ -4209,7 +4209,7 @@ def analyze_ordering_from_correlations(correlation_data):
         recommendation = "Structure is highly disordered and ideal for calculations"
     elif strong_deviations == 0 and max_abs_difference <= 0.1:
         overall_status = "Good SQS"
-        recommendation = "Structure is well-disordered and suitable for most calculations"
+        recommendation = "Structure is well-disordered and should be suitable for most calculations"
     elif strong_deviations <= len(correlation_data) * 0.2:
         overall_status = "Fair SQS"
         recommendation = "Structure has some ordering - consider longer mcsqs run"
