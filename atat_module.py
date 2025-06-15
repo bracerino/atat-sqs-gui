@@ -9,19 +9,14 @@ from helpers import *
 
 
 def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
-    """
-    Calculate partial radial distribution function for SQS structure.
-    """
     try:
         from pymatgen.analysis.local_env import VoronoiNN
         from matminer.featurizers.structure import PartialRadialDistributionFunction
         from itertools import combinations
         from collections import defaultdict
 
-        # Get unique elements
         elements = list(set([site.specie.symbol for site in structure if site.is_ordered]))
 
-        # Create species combinations
         species_combinations = list(combinations(elements, 2)) + [(s, s) for s in elements]
 
         # Calculate PRDF using matminer
@@ -31,7 +26,6 @@ def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
         prdf_data = prdf_featurizer.featurize(structure)
         feature_labels = prdf_featurizer.feature_labels()
 
-        # Parse results
         prdf_dict = defaultdict(list)
         distance_dict = {}
 
@@ -54,9 +48,6 @@ def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
 
 
 def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
-    """
-    Calculate and display PRDF analysis for SQS structure.
-    """
     try:
         with st.expander("📊 PRDF Analysis of Generated SQS", expanded=True):
             with st.spinner("Calculating PRDF..."):
@@ -229,7 +220,7 @@ def render_atat_sqs_section():
                 "🔄 Global Composition",
                 "🎯 Sublattice-Specific"
             ],
-            index=0,
+            index=1,
             key="atat_composition_mode_radio",
             help="Global: Specify overall composition. Sublattice: Control each atomic position separately."
         )
@@ -251,9 +242,6 @@ def render_atat_sqs_section():
 
             ---
             **Global** treats all sites equally, while **Sublattice-Specific** allows site-dependent element distributions.
-
-            - **Choose Global** for: binary/ternary alloys, solid solutions, when all sites are equivalent
-            - **Choose Sublattice** for: intermetallic compounds, ceramics, when different sites have chemical preferences
             """)
 
     st.markdown(
@@ -298,7 +286,6 @@ def render_atat_sqs_section():
     chem_symbols = None
     otrs = None
 
-    # Calculate the supercell multiplicity for concentration constraints
     supercell_multiplicity = nx * ny * nz
     total_supercell_atoms = len(supercell_preview)
 
@@ -347,7 +334,6 @@ def render_atat_sqs_section():
 
         composition_input = ", ".join(element_list)
 
-        # For global mode, concentration constraints are based on supercell multiplicity
         st.info(f"""
         **Global Mode Concentration Constraints:**
         - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
@@ -363,7 +349,6 @@ def render_atat_sqs_section():
         remaining = 1.0
         for j, elem in enumerate(element_list[:-1]):
             with cols[j]:
-                # Calculate valid concentration steps for global mode
                 min_step = 1.0 / supercell_multiplicity
                 frac_val = st.slider(
                     f"{elem}:",
@@ -383,29 +368,24 @@ def render_atat_sqs_section():
             with cols[-1]:
                 st.write(f"**{last_elem}: {target_concentrations[last_elem]:.6f}**")
 
-        # Validate and correct concentrations to ensure they're multiples of 1/supercell_multiplicity
         corrected_concentrations = {}
         corrections_made = False
 
         for elem, frac in target_concentrations.items():
-            # Round to nearest valid step
             nearest_step = round(frac * supercell_multiplicity) / supercell_multiplicity
             corrected_concentrations[elem] = nearest_step
             if abs(frac - nearest_step) > 1e-6:
                 corrections_made = True
                 st.warning(f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
 
-        # Ensure total still equals 1.0 after corrections
         total_corrected = sum(corrected_concentrations.values())
         if abs(total_corrected - 1.0) > 1e-6:
-            # Adjust the largest component to make total = 1.0
             largest_elem = max(corrected_concentrations.keys(), key=lambda x: corrected_concentrations[x])
             adjustment = 1.0 - total_corrected
             corrected_concentrations[largest_elem] += adjustment
             if corrections_made:
                 st.info(f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
 
-        # Use corrected concentrations
         target_concentrations = corrected_concentrations
 
         if corrections_made:
@@ -413,7 +393,6 @@ def render_atat_sqs_section():
                 supercell_multiplicity, 1/supercell_multiplicity))
 
     else:
-        # Sublattice mode - only show unique Wyckoff positions
         element_list = [2, 2]
         composition_input = []
         chem_symbols, target_concentrations, otrs = render_site_sublattice_selector_fixed(
@@ -422,7 +401,6 @@ def render_atat_sqs_section():
 
     if composition_mode == "🔄 Global Composition":
         try:
-            # For global mode, calculate achievable concentrations based on supercell multiplicity
             achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
                 target_concentrations, supercell_multiplicity)
 
@@ -433,7 +411,6 @@ def render_atat_sqs_section():
                 achievable_count = achievable_counts_global.get(element, 0)
                 status = "✅ Exact" if abs(target_frac - achievable_frac) < 1e-6 else "⚠️ Rounded"
 
-                # Calculate total atoms for this element across entire supercell
                 total_element_atoms = achievable_count * len(working_structure)
 
                 conc_data.append({
@@ -446,8 +423,6 @@ def render_atat_sqs_section():
                 })
             conc_df = pd.DataFrame(conc_data)
             st.dataframe(conc_df, use_container_width=True)
-
-            # Show that all sites will have the same concentrations
             st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
 
             preview_data = []
@@ -568,7 +543,6 @@ def render_atat_sqs_section():
     if generate_atat_button:
         try:
             if composition_mode == "🔄 Global Composition":
-                # Use supercell multiplicity for global mode
                 achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
                     target_concentrations, supercell_multiplicity)
 
@@ -621,8 +595,6 @@ def render_atat_sqs_section():
         except Exception as e:
             st.error(f"Error generating ATAT input files: {str(e)}")
             st.exception(e)
-
-    # Rest of the function for displaying results (keeping the original code)
     if st.session_state.atat_results is not None:
         results = st.session_state.atat_results
 
@@ -696,7 +668,7 @@ def render_atat_sqs_section():
                ```bash
                mcsqs -rc
                ```
-               OR specify atom count directly:
+               OR specify atom count directly (will find the most randomized supercell that can accomodate {results['total_atoms']} atoms - distorts the original cell shape):
                ```bash
                mcsqs -n {results['total_atoms']}
                ```
@@ -706,16 +678,9 @@ def render_atat_sqs_section():
                - Check `mcsqs.log` for objective function progress
                - Stop when correlation functions are acceptable (Ctrl+C)
 
-            6. **Convert to POSCAR** (optional):
-               ```bash
-               sqs2poscar bestsqs.out
-               sed -i '2s/.*/YOUR_LATTICE_CONSTANT/' bestsqs.out-POSCAR
-               ```
-
             ### Expected Output Files:
             - **bestsqs.out** - Best SQS structure found
             - **bestcorr.out** - Correlation functions (monitor this!)
-            - **sqscell.out** - Supercell information  
             - **mcsqs.log** - Progress log
 
             ### Tips:
@@ -757,10 +722,10 @@ def render_atat_sqs_section():
 
         # Add bestsqs.out converter section
         st.markdown("---")
-        st.subheader("🔄 Convert ATAT Output to VASP")
+        st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
         st.info("Upload your ATAT output files to convert and analyze the results.")
 
-        # Create tabs for different file types
+
         file_tab1, file_tab2 = st.tabs(["📁 Structure Converter", "📊 Optimization Analysis"])
 
         with file_tab1:
@@ -774,10 +739,8 @@ def render_atat_sqs_section():
 
             if uploaded_bestsqs is not None:
                 try:
-                    # Read and validate the uploaded file
                     bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
 
-                    # Validate file format
                     is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
 
                     if not is_valid:
@@ -786,8 +749,6 @@ def render_atat_sqs_section():
                         return
 
                     st.success(f"✅ Valid ATAT file detected: {validation_message}")
-
-                    # Convert to VASP format
                     vasp_content, conversion_info = convert_bestsqs_to_vasp(
                         bestsqs_content,
                         working_structure,
@@ -795,30 +756,26 @@ def render_atat_sqs_section():
                         results['structure_name']
                     )
 
-                    # Also create pymatgen structure for PRDF analysis
                     sqs_pymatgen_structure = convert_atat_to_pymatgen_structure(
                         bestsqs_content, working_structure, transformation_matrix
                     )
 
                     st.success("✅ Successfully converted bestsqs.out to VASP format!")
-
-                    # Display conversion information
                     col_conv1, col_conv2 = st.columns(2)
                     with col_conv1:
-                        st.write("**Conversion Summary:**")
+                        st.write("#### **Conversion Summary:**")
                         for key, value in conversion_info.items():
                             st.write(f"- **{key}:** {value}")
 
                     with col_conv2:
-                        st.write("**VASP POSCAR Preview:**")
+                        st.write("#### **VASP POSCAR Preview:**")
                         preview_lines = vasp_content.split('\n')[:15]
                         st.code('\n'.join(preview_lines) + '\n...', language="text")
                     sqs_result = {
                         'structure': sqs_pymatgen_structure
                     }
 
-                    # Call your existing visualization function
-                    st.write("**3D Structure Visualization:**")
+                    st.write("#### **3D Structure Visualization:**")
                     sqs_visualization(sqs_result)
 
                     # Download buttons with multiple format options
@@ -845,7 +802,6 @@ def render_atat_sqs_section():
                         )
 
                     with col_down3:
-                        # Generate and download additional format
                         if st.button("📄 Generate & Download", key="generate_additional_format"):
                             try:
                                 additional_content, additional_filename = generate_additional_format(
@@ -856,14 +812,13 @@ def render_atat_sqs_section():
                                     data=additional_content,
                                     file_name=additional_filename,
                                     mime=get_mime_type(additional_format),
-                                    type="secondary",
+                                    type="primary",
                                     key=f"download_{additional_format.lower()}"
                                 )
                                 st.success(f"✅ {additional_format} file generated!")
                             except Exception as e:
                                 st.error(f"Error generating {additional_format}: {str(e)}")
 
-                    # Complete package download
                     st.write("**Complete Package:**")
                     zip_buffer_complete = create_complete_atat_zip(
                         results, vasp_content, bestsqs_content
@@ -874,7 +829,7 @@ def render_atat_sqs_section():
                         data=zip_buffer_complete,
                         file_name=f"ATAT_SQS_Complete_{results['structure_name'].split('.')[0]}.zip",
                         mime="application/zip",
-                        type="secondary",
+                        type="primary",
                         key="download_complete_package"
                     )
 
@@ -884,12 +839,62 @@ def render_atat_sqs_section():
                     for _, _, _, element in atoms:
                         element_counts[element] = element_counts.get(element, 0) + 1
 
-                    st.write("**Element Distribution:**")
-                    element_df = pd.DataFrame([
-                        {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
-                        for elem, count in sorted(element_counts.items())
-                    ])
-                    st.dataframe(element_df, use_container_width=True)
+                   # st.write("**Element Distribution:**")
+                   # element_df = pd.DataFrame([
+                   #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
+                   #     for elem, count in sorted(element_counts.items())
+                   # ])
+                   # st.dataframe(element_df, use_container_width=True)
+                    st.write("#### **Element Distribution:**")
+
+                    # Create columns for better layout
+                    cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
+
+                    for i, (elem, count) in enumerate(sorted(element_counts.items())):
+                        percentage = count / len(atoms) * 100
+
+                        with cols[i % len(cols)]:
+                            # Choose color based on percentage
+                            if percentage >= 50:
+                                color = "#FF6B6B"  # Red for high concentration
+                            elif percentage >= 20:
+                                color = "#4ECDC4"  # Teal for medium-high
+                            elif percentage >= 10:
+                                color = "#45B7D1"  # Blue for medium
+                            elif percentage >= 5:
+                                color = "#96CEB4"  # Green for low-medium
+                            else:
+                                color = "#FECA57"  # Yellow for low
+
+                            st.markdown(f"""
+                            <div style="
+                                background-color: {color}; 
+                                padding: 20px; 
+                                border-radius: 10px; 
+                                text-align: center; 
+                                margin: 10px 0;
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                            ">
+                                <h1 style="
+                                    color: white; 
+                                    font-size: 3em; 
+                                    margin: 0; 
+                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                                ">{elem}</h1>
+                                <h2 style="
+                                    color: white; 
+                                    font-size: 2em; 
+                                    margin: 10px 0 0 0;
+                                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                ">{percentage:.1f}%</h2>
+                                <p style="
+                                    color: white; 
+                                    font-size: 1.8em; 
+                                    margin: 5px 0 0 0;
+                                    opacity: 0.9;
+                                ">{count} atoms</p>
+                            </div>
+                            """, unsafe_allow_html=True)
 
 
                     st.markdown("---")
@@ -922,12 +927,8 @@ def render_atat_sqs_section():
                         )
 
                     if calculate_prdf_btn:
-                        # Use the already converted pymatgen structure for PRDF
                         try:
-                            # First convert to POSCAR-like ordered structure for PRDF calculation
                             prdf_structure = prepare_structure_for_prdf(sqs_pymatgen_structure)
-
-                            # Calculate and display PRDF using the POSCAR-prepared structure
                             calculate_and_display_sqs_prdf(prdf_structure, prdf_cutoff, prdf_bin_size)
 
                         except Exception as prdf_error:
@@ -935,7 +936,6 @@ def render_atat_sqs_section():
                             st.info("PRDF calculation requires a valid structure with multiple element types.")
                             import traceback
                             st.error(f"Debug: {traceback.format_exc()}")
-                        # Create a result dictionary compatible with your sqs_visualization function
                     render_vacancy_creation_section(sqs_pymatgen_structure)
 
                 except UnicodeDecodeError:
@@ -951,10 +951,6 @@ def render_atat_sqs_section():
 
 
 def prepare_structure_for_prdf(structure):
-    """
-    Prepare structure for PRDF calculation by ensuring all sites are ordered.
-    Converts any disordered sites to ordered sites by selecting the dominant species.
-    """
     from pymatgen.core import Structure
 
     new_species = []
@@ -964,21 +960,15 @@ def prepare_structure_for_prdf(structure):
         if site.is_ordered:
             new_species.append(site.specie)
         else:
-            # For disordered sites, select the species with highest occupancy
             dominant_species = max(site.species.items(), key=lambda x: x[1])[0]
             new_species.append(dominant_species)
 
         new_coords.append(site.frac_coords)
-
-    # Create new ordered structure
     ordered_structure = Structure(structure.lattice, new_species, new_coords)
     return ordered_structure
 
 
 def generate_additional_format(structure, file_format, structure_name):
-    """
-    Generate structure file in additional formats (CIF, LAMMPS, XYZ).
-    """
     from io import StringIO
     from pymatgen.io.ase import AseAtomsAdaptor
     from ase.io import write
@@ -988,14 +978,12 @@ def generate_additional_format(structure, file_format, structure_name):
     if file_format == "CIF":
         from pymatgen.io.cif import CifWriter
 
-        # Ensure structure is ordered for CIF export
         ordered_structure = prepare_structure_for_prdf(structure)
 
         file_content = CifWriter(ordered_structure, symprec=0.1).__str__()
         filename = f"SQS_{base_name}.cif"
 
     elif file_format == "LAMMPS":
-        # Convert to ASE for LAMMPS export
         ordered_structure = prepare_structure_for_prdf(structure)
         ase_structure = AseAtomsAdaptor.get_atoms(ordered_structure)
 
@@ -1013,7 +1001,6 @@ def generate_additional_format(structure, file_format, structure_name):
         filename = f"SQS_{base_name}.lmp"
 
     elif file_format == "XYZ":
-        # Generate extended XYZ with lattice information
         ordered_structure = prepare_structure_for_prdf(structure)
 
         lattice_vectors = ordered_structure.lattice.matrix
@@ -1047,7 +1034,6 @@ def generate_additional_format(structure, file_format, structure_name):
 
 
 def get_mime_type(file_format):
-    """Get appropriate MIME type for file format."""
     mime_types = {
         "CIF": "chemical/x-cif",
         "LAMMPS": "text/plain",
@@ -1055,48 +1041,22 @@ def get_mime_type(file_format):
     }
     return mime_types.get(file_format, "text/plain")
 def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, transformation_matrix):
-    """
-    Convert ATAT bestsqs.out format to a pymatgen Structure object.
-
-    This corrected version uses the lattice from the provided 'original_structure'
-    as the definitive basis for conversion, bypassing any ambiguity in the
-    ATAT output file's header.
-
-    - The 'original_structure' provides the true basis vectors (A).
-    - Lines 4-6 of bestsqs.out provide the transformation matrix (B).
-    - Lines 7+ of bestsqs.out provide atomic coordinates (C) expressed in basis A.
-
-    Conversion:
-    - Final SQS Lattice = B * A
-    - Final Atomic Positions (Cartesian) = C * A
-    """
     from pymatgen.core import Structure
     import numpy as np
 
-    # Step 1: Get the true basis vectors (A) from the uploaded original structure.
-    # This is the most reliable source for the initial lattice.
     A_basis = original_structure.lattice.matrix
 
-    # Step 2: Parse the bestsqs.out file ONLY for the transformation matrix (B)
-    # and the atomic coordinates (C).
     _, B_transform, atoms_in_A_coords = parse_atat_bestsqs_format(bestsqs_content)
     B = np.array(B_transform)
 
-    # Step 3: Calculate the final SQS lattice vectors in Cartesian coordinates.
     final_lattice_vectors = np.dot(B, A_basis)
-
-    # Step 4: Calculate the final atomic positions in Cartesian coordinates.
     cartesian_coords = []
     species = []
     for x, y, z, element in atoms_in_A_coords:
-        # The atomic coordinates (C) are fractional with respect to basis A.
-        # To get Cartesian coordinates, we perform the dot product: C * A.
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         cartesian_coords.append(cart_pos)
         species.append(element)
-
-    # Step 5: Create the Pymatgen Structure object using Cartesian coordinates.
     sqs_structure = Structure(
         lattice=final_lattice_vectors,
         species=species,
@@ -1107,9 +1067,6 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
     return sqs_structure
 
 def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
-    """
-    Calculate and display PRDF analysis for SQS structure.
-    """
     try:
         with st.expander("📊 PRDF Analysis of Generated SQS", expanded=True):
             with st.spinner("Calculating PRDF..."):
@@ -1196,33 +1153,22 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
         st.error(f"Error calculating PRDF: {e}")
         return False
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
-    """
-    Convert an ATAT bestsqs.out file to VASP POSCAR format.
-
-    This corrected version uses the 'original_structure' lattice as the
-    authoritative basis for all calculations to ensure correct final lattice parameters.
-    """
     from pymatgen.core import Lattice
     import numpy as np
 
-    # Step 1: Get the true basis vectors (A) from the uploaded original structure.
+
     A_basis = original_structure.lattice.matrix
 
-    # Step 2: Parse bestsqs.out for the transformation matrix (B) and atomic data (C).
     _, B_transform, atoms_in_A_coords = parse_atat_bestsqs_format(bestsqs_content)
     B = np.array(B_transform)
 
-    # Step 3: Calculate final lattice vectors (L_final = B * A).
     final_lattice_vectors = np.dot(B, A_basis)
 
-    # Step 4: Calculate atomic positions in Cartesian coordinates (P_cart = C * A).
     atom_data = []
     for x, y, z, element in atoms_in_A_coords:
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         atom_data.append({'element': element, 'cart_pos': cart_pos})
-
-    # Step 5: Sort atoms by element type, as required by the VASP format.
     unique_elements = sorted(list(set(atom['element'] for atom in atom_data)))
 
     sorted_atoms_cart = []
@@ -1232,11 +1178,8 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
         sorted_atoms_cart.extend(atoms_of_element)
         element_counts.append(len(atoms_of_element))
 
-    # Step 6: Convert the sorted Cartesian coordinates to fractional ("Direct") coordinates.
     inv_final_lattice = np.linalg.inv(final_lattice_vectors)
     fractional_coords = [np.dot(pos, inv_final_lattice) for pos in sorted_atoms_cart]
-
-    # Step 7: Assemble the VASP POSCAR file content.
     poscar_lines = [f"SQS from {structure_name} via ATAT", "1.0"]
     for vec in final_lattice_vectors:
         poscar_lines.append(f"  {vec[0]:15.9f} {vec[1]:15.9f} {vec[2]:15.9f}")
@@ -1264,9 +1207,6 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
 
 
 def debug_atat_conversion_step_by_step(bestsqs_content, original_structure):
-    """
-    Debug function showing the step-by-step ATAT conversion process.
-    """
     import numpy as np
     from pymatgen.core import Lattice
 
@@ -1295,7 +1235,7 @@ def debug_atat_conversion_step_by_step(bestsqs_content, original_structure):
         print(
             f"  Atom {i + 1} ({element}): [{x:.6f}, {y:.6f}, {z:.6f}] → [{cart_pos[0]:.6f}, {cart_pos[1]:.6f}, {cart_pos[2]:.6f}]")
 
-    # Create lattice and show parameters
+
     supercell_lattice = Lattice(lattice_vectors)
     print(f"\nResulting lattice parameters:")
     print(f"  a = {supercell_lattice.a:.6f} Å")
@@ -1305,7 +1245,6 @@ def debug_atat_conversion_step_by_step(bestsqs_content, original_structure):
     print(f"  β = {supercell_lattice.beta:.1f}°")
     print(f"  γ = {supercell_lattice.gamma:.1f}°")
 
-    # Show original for comparison
     if original_structure:
         orig_lattice = original_structure.lattice
         print(f"\nOriginal structure lattice parameters:")
@@ -1325,9 +1264,6 @@ def debug_atat_conversion_step_by_step(bestsqs_content, original_structure):
 
 
 def debug_atat_conversion_with_original(bestsqs_content, original_structure):
-    """
-    Debug function to understand the ATAT conversion process with original structure scaling.
-    """
     import numpy as np
     from pymatgen.core import Lattice
 
@@ -1342,7 +1278,6 @@ def debug_atat_conversion_with_original(bestsqs_content, original_structure):
     for i, row in enumerate(lattice2):
         print(f"  [{i}] {row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
 
-    # Show original structure lattice
     orig_lattice = original_structure.lattice
     print(f"\nOriginal structure lattice matrix:")
     for i, row in enumerate(orig_lattice.matrix):
@@ -1356,7 +1291,6 @@ def debug_atat_conversion_with_original(bestsqs_content, original_structure):
     print(f"  β = {orig_lattice.beta:.1f}°")
     print(f"  γ = {orig_lattice.gamma:.1f}°")
 
-    # Use original lattice matrix for conversion
     dArrVec1 = orig_lattice.matrix
     dArrVec2 = np.array(lattice2)
     dArrLatVec = np.dot(dArrVec2, dArrVec1)
@@ -1365,7 +1299,6 @@ def debug_atat_conversion_with_original(bestsqs_content, original_structure):
     for i, row in enumerate(dArrLatVec):
         print(f"  [{i}] {row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
 
-    # Create lattice and show parameters
     supercell_lattice = Lattice(dArrLatVec)
     print(f"\nResulting supercell lattice parameters:")
     print(f"  a = {supercell_lattice.a:.6f} Å  (expected: {3 * orig_lattice.a:.6f})")
@@ -1378,9 +1311,6 @@ def debug_atat_conversion_with_original(bestsqs_content, original_structure):
     return supercell_lattice
 
 def create_complete_atat_zip(results, vasp_content, bestsqs_content):
-    """
-    Create a comprehensive ZIP file with all ATAT files and converted VASP structure.
-    """
     import zipfile
     from io import BytesIO
 
@@ -1435,17 +1365,8 @@ Generated by ATAT SQS Input File Generator
 
 
 def parse_atat_bestsqs_format(content):
-    """
-    Parse ATAT bestsqs.out file format.
-
-    Format:
-    - Lines 1-3: First lattice matrix
-    - Lines 4-6: Second lattice matrix (supercell)
-    - Lines 7+: Atomic positions and elements (x y z element)
-    """
     lines = content.strip().split('\n')
 
-    # Parse lattice matrices
     lattice1 = []
     lattice2 = []
 
@@ -1455,7 +1376,6 @@ def parse_atat_bestsqs_format(content):
     for i in range(3, 6):
         lattice2.append([float(x) for x in lines[i].split()])
 
-    # Parse atomic positions
     atoms = []
     for i in range(6, len(lines)):
         line = lines[i].strip()
@@ -1470,17 +1390,12 @@ def parse_atat_bestsqs_format(content):
 
 
 def validate_bestsqs_file(content):
-    """
-    Validate that the uploaded file is a valid ATAT bestsqs.out format.
-    """
     try:
         lines = content.strip().split('\n')
 
-        # Check minimum number of lines
         if len(lines) < 7:
             return False, "File too short - needs at least 6 lattice lines + atomic positions"
 
-        # Check lattice matrix lines (first 6 lines should be numbers)
         for i in range(6):
             parts = lines[i].split()
             if len(parts) != 3:
@@ -1490,7 +1405,6 @@ def validate_bestsqs_file(content):
             except ValueError:
                 return False, f"Line {i + 1} contains non-numeric values"
 
-        # Check atomic position lines
         atom_count = 0
         for i in range(6, len(lines)):
             line = lines[i].strip()
@@ -1514,9 +1428,6 @@ def validate_bestsqs_file(content):
 
 
 def parse_mcsqs_log(log_content):
-    """
-    Parse ATAT mcsqs.log file to extract objective function values and correlation data.
-    """
     import re
 
     lines = log_content.strip().split('\n')
@@ -1525,21 +1436,15 @@ def parse_mcsqs_log(log_content):
 
     for line in lines:
         line = line.strip()
-
-        # Look for objective function lines
         if "Objective_function=" in line:
-            # Extract the objective function value
             match = re.search(r'Objective_function=\s*([-+]?\d*\.?\d+)', line)
             if match:
                 objective_values.append(float(match.group(1)))
 
-        # Look for correlation mismatch lines
         if "Correlations_mismatch=" in line:
-            # Extract correlation values (numbers between = and >)
             match = re.search(r'Correlations_mismatch=\s*(.*?)\s*>', line)
             if match:
                 correlation_str = match.group(1)
-                # Split by whitespace and convert to floats
                 try:
                     correlations = [float(x) for x in correlation_str.split() if x.strip()]
                     correlation_data.append(correlations)
@@ -1550,29 +1455,21 @@ def parse_mcsqs_log(log_content):
 
 
 def create_optimization_plot(objective_values):
-    """
-    Create a Plotly plot showing the ATAT optimization progress.
-    """
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
     steps = list(range(1, len(objective_values) + 1))
-
-    # Create the main plot
     fig = go.Figure()
-
-    # Add the objective function trace
     fig.add_trace(go.Scatter(
         x=steps,
         y=objective_values,
         mode='lines+markers',
         name='Objective Function',
         line=dict(color='#1f77b4', width=2),
-        marker=dict(size=4, color='#1f77b4'),
+        marker=dict(size=8, color='#1f77b4'),
         hovertemplate='<b>Step:</b> %{x}<br><b>Objective Function:</b> %{y:.6f}<extra></extra>'
     ))
 
-    # Add horizontal line for best value
     best_value = min(objective_values)
     fig.add_hline(
         y=best_value,
@@ -1582,7 +1479,6 @@ def create_optimization_plot(objective_values):
         annotation_position="top right"
     )
 
-    # Add improvement trend line (moving average)
     if len(objective_values) > 10:
         window_size = max(5, len(objective_values) // 20)
         moving_avg = []
@@ -1596,38 +1492,40 @@ def create_optimization_plot(objective_values):
             y=moving_avg,
             mode='lines',
             name=f'Moving Average ({window_size} steps)',
-            line=dict(color='orange', width=1, dash='dot'),
+            line=dict(color='orange', width=2, dash='dot'),
             hovertemplate='<b>Step:</b> %{x}<br><b>Moving Avg:</b> %{y:.6f}<extra></extra>'
         ))
 
-    # Update layout
     fig.update_layout(
         title=dict(
             text="ATAT SQS Optimization Progress",
-            font=dict(size=18, family="Arial Black")
+            font=dict(size=24, family="Arial Black")  # Increased from 18
         ),
         xaxis_title="Optimization Step",
         yaxis_title="Objective Function Value",
         hovermode='x unified',
-        height=500,
+        height=650,
         showlegend=True,
         legend=dict(
             yanchor="top",
             y=0.99,
             xanchor="left",
-            x=0.01
+            x=0.01,
+            font=dict(size=16)
         ),
-        font=dict(size=12, family="Arial"),
+        font=dict(size=20, family="Arial"),
         plot_bgcolor='white',
         xaxis=dict(
             gridcolor='lightgray',
             gridwidth=1,
-            title_font=dict(size=14, family="Arial Black")
+            title_font=dict(size=20, family="Arial Black"),
+            tickfont=dict(size=16)
         ),
         yaxis=dict(
             gridcolor='lightgray',
             gridwidth=1,
-            title_font=dict(size=14, family="Arial Black")
+            title_font=dict(size=20, family="Arial Black"),
+            tickfont=dict(size=16)
         )
     )
 
@@ -1635,9 +1533,6 @@ def create_optimization_plot(objective_values):
 
 
 def analyze_convergence(objective_values):
-    """
-    Analyze the convergence of ATAT optimization.
-    """
     if len(objective_values) < 10:
         return {
             "Convergence Status": "❓ Insufficient Data",
@@ -1646,21 +1541,17 @@ def analyze_convergence(objective_values):
             "Recommendation": "Run longer optimization"
         }
 
-    # Calculate metrics for convergence analysis
     total_steps = len(objective_values)
     final_quarter = objective_values[-total_steps // 4:]
 
-    # Calculate standard deviation of final quarter
     final_std = np.std(final_quarter)
     final_mean = np.mean(final_quarter)
 
-    # Calculate overall improvement
     total_improvement = objective_values[-1] - objective_values[0]
 
-    # Calculate recent improvement (last 25% of steps)
+
     recent_improvement = final_quarter[-1] - final_quarter[0] if len(final_quarter) > 1 else 0
 
-    # Determine convergence status
     if final_std < 0.001 and abs(recent_improvement) < 0.001:
         convergence_status = "✅ Converged"
         recommendation = "Optimization complete - SQS ready for use"
@@ -1674,7 +1565,7 @@ def analyze_convergence(objective_values):
         convergence_status = "📊 Stable"
         recommendation = "Appears stable - likely converged"
 
-    # Assess stability
+
     if final_std < 0.0001:
         stability = "Very Stable"
     elif final_std < 0.001:
@@ -1684,7 +1575,6 @@ def analyze_convergence(objective_values):
     else:
         stability = "Unstable"
 
-    # Determine final trend
     if abs(recent_improvement) < 0.0001:
         final_trend = "Flat (converged)"
     elif recent_improvement < -0.001:
@@ -1706,23 +1596,18 @@ def analyze_convergence(objective_values):
 
 
 def validate_mcsqs_log(log_content):
-    """
-    Validate that the uploaded file is a valid ATAT mcsqs.log format.
-    """
     try:
         lines = log_content.strip().split('\n')
 
         if len(lines) < 3:
             return False, "File too short - not a valid mcsqs.log"
 
-        # Look for characteristic ATAT log patterns
         has_objective = any("Objective_function=" in line for line in lines)
         has_correlations = any("Correlations_mismatch=" in line for line in lines)
 
         if not has_objective:
             return False, "No 'Objective_function=' lines found"
 
-        # Count objective function lines
         objective_count = sum(1 for line in lines if "Objective_function=" in line)
 
         return True, f"Valid mcsqs.log with {objective_count} optimization steps"
@@ -1871,11 +1756,6 @@ def find_optimal_atom_distribution_sublattice(achievable_concentrations, chem_sy
 
 def generate_atat_rndstr_content_corrected(structure, achievable_concentrations, use_sublattice_mode,
                                            chem_symbols, transformation_matrix):
-    """
-    Generates the content for rndstr.in file.
-    For Global mode, it applies the same concentration to all sites.
-    For Sublattice mode, it calculates per-site concentrations.
-    """
     lattice = structure.lattice
     max_param = max(lattice.a, lattice.b, lattice.c) if max(lattice.a, lattice.b, lattice.c) > 0 else 1
     lines = [
@@ -1884,7 +1764,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
     ]
 
     if use_sublattice_mode:
-        # Sublattice mode uses complex per-site assignments
         site_assignments = calculate_atat_valid_concentrations(
             achievable_concentrations, use_sublattice_mode, chem_symbols,
             transformation_matrix, structure
@@ -1899,7 +1778,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                         conc_parts.append(f"{element}={conc:.6f}")
             lines.append(f"{coord_str} {','.join(conc_parts)}")
     else:
-        # Global mode applies the SAME concentration string to ALL sites
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
             if conc > 1e-6:
@@ -2128,16 +2006,17 @@ def integrate_atat_option():
 
 
 def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity):
-    """
-    Fixed sublattice selector that only shows unique Wyckoff positions and automatically
-    applies settings to equivalent sites.
-    """
-    st.markdown("---")
-    st.subheader("4️⃣ Step 4: Configure Sublattices (Unique Wyckoff Positions Only)")
+    st.markdown(
+        """
+        <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
+        """,
+        unsafe_allow_html=True
+    )
+    st.subheader("🔵3️⃣ Step 3: Configure Sublattices (Unique Wyckoff Positions Only)")
 
     st.info(f"""
     **Sublattice Mode - Wyckoff Position Control:**
-    - Each supercell replication creates {supercell_multiplicity} copies per primitive site
+    - Each supercell (in each direction) replication creates {supercell_multiplicity} copies per primitive site
     - Only unique Wyckoff positions are shown below
     - Settings automatically apply to all equivalent sites
     - Concentration constraints are per Wyckoff position
@@ -2159,8 +2038,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     chem_symbols = [[] for _ in range(len(working_structure))]
     sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
-    # Group unique sites by their element and Wyckoff position
-    # Only sites with the same element AND Wyckoff letter are considered equivalent
+
     unique_wyckoff_groups = {}
 
     for site_info in unique_sites:
@@ -2169,7 +2047,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             unique_wyckoff_groups[key] = []
         unique_wyckoff_groups[key].append(site_info)
 
-    # First, collect all sublattice data
+
     sublattice_data = []
     temp_sublattice_index = 0
 
@@ -2185,7 +2063,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         if temp_sublattice_index < len(sublattice_letters):
             sublattice_letter = sublattice_letters[temp_sublattice_index]
 
-            # Store sublattice data
             sublattice_data.append({
                 'sublattice_letter': sublattice_letter,
                 'element': element,
@@ -2198,7 +2075,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
             temp_sublattice_index += 1
 
-    # Create tabs for each sublattice
     if sublattice_data:
         tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
         tabs = st.tabs(tab_names)
@@ -2217,7 +2093,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         '''
 
         st.markdown(css, unsafe_allow_html=True)
-        # Process each sublattice in its own tab
         for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
             with tab:
                 sublattice_letter = data['sublattice_letter']
@@ -2241,7 +2116,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                 col_elem, col_conc = st.columns([1, 2])
 
                 with col_elem:
-                    # Get current element as default
                     current_elements = [element]
 
                     selected_elements = st.multiselect(
@@ -2262,7 +2136,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                     sublattice_concentrations = {}
                     remaining = 1.0
 
-                    # Create concentration inputs
                     for i, elem in enumerate(selected_elements[:-1]):
                         frac_val = st.slider(
                             f"{elem} fraction:",
@@ -2276,30 +2149,26 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                         sublattice_concentrations[elem] = frac_val
                         remaining -= frac_val
 
-                    # Last element gets remaining fraction
                     if selected_elements:
                         last_elem = selected_elements[-1]
                         sublattice_concentrations[last_elem] = max(0.0, remaining)
                         st.write(f"**{last_elem}: {sublattice_concentrations[last_elem]:.6f}** (automatic)")
 
-                    # Validation
+
                     total_frac = sum(sublattice_concentrations.values())
                     if abs(total_frac - 1.0) > 1e-6:
                         st.error(f"Total fraction = {total_frac:.6f}, should be 1.0")
                     else:
                         st.success(f"✅ Total fraction = {total_frac:.6f}")
 
-                    # Show atom counts
                     st.write("**Resulting atom counts:**")
                     for elem, frac in sublattice_concentrations.items():
                         atom_count = frac * atoms_per_wyckoff_in_supercell
                         st.write(f"- {elem}: {atom_count:.1f} atoms")
 
-                # Store the concentrations for this sublattice (only if valid)
                 if len(selected_elements) >= 2:
                     target_concentrations[sublattice_letter] = sublattice_concentrations
 
-                    # Apply to all equivalent sites in the structure
                     for site_idx in all_equivalent_indices:
                         chem_symbols[site_idx] = selected_elements.copy()
 
@@ -2308,29 +2177,22 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
 def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
                                      unique_sites):
-    """
-    Fixed preview that shows sublattice assignments correctly.
-    """
+
     try:
         nx, ny, nz = transformation_matrix[0, 0], transformation_matrix[1, 1], transformation_matrix[2, 2]
         supercell_multiplicity = nx * ny * nz
 
         st.write("**Sublattice Configuration Preview:**")
-
-        # Create mapping from sublattice letter to site information
         sublattice_info = {}
 
         for sublattice_letter, concentrations in target_concentrations.items():
-            # Find which sites belong to this sublattice
             sublattice_sites = []
             for i, site_elements in enumerate(chem_symbols):
                 if len(site_elements) > 1:  # Only mixed sites
-                    # Check if this site's elements match the sublattice
                     if set(site_elements) == set(concentrations.keys()):
                         sublattice_sites.append(i)
 
             if sublattice_sites:
-                # Find corresponding unique site info
                 for site_info in unique_sites:
                     if any(idx in site_info['equivalent_indices'] for idx in sublattice_sites):
                         multiplicity = len([idx for idx in site_info['equivalent_indices'] if idx in sublattice_sites])
@@ -2344,7 +2206,6 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
                         }
                         break
 
-        # Display preview table
         preview_data = []
         for sublattice_letter, info in sublattice_info.items():
             conc_parts = []
@@ -2367,11 +2228,9 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
         else:
             st.warning("No mixed sublattices configured yet.")
 
-        # Show sites that remain pure
         pure_sites = []
         for i, site_elements in enumerate(chem_symbols):
             if len(site_elements) == 1:
-                # Find the corresponding unique site info
                 for site_info in unique_sites:
                     if i in site_info['equivalent_indices']:
                         pure_sites.append({
@@ -2392,9 +2251,7 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
 
 def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, chem_symbols, transformation_matrix,
                                                          working_structure, unique_sites):
-    """
-    Fixed calculation for sublattice mode that properly handles Wyckoff positions.
-    """
+
     nx, ny, nz = transformation_matrix[0, 0], transformation_matrix[1, 1], transformation_matrix[2, 2]
     supercell_multiplicity = nx * ny * nz
 
@@ -2402,16 +2259,13 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
     adjustment_info = []
 
     for sublattice_letter, target_fractions in target_concentrations.items():
-        # Find the multiplicity for this sublattice from unique_sites
         sublattice_multiplicity = 0
 
-        # Find sites belonging to this sublattice
         sublattice_site_indices = []
         for i, site_elements in enumerate(chem_symbols):
             if len(site_elements) > 1 and set(site_elements) == set(target_fractions.keys()):
                 sublattice_site_indices.append(i)
 
-        # Get multiplicity from unique_sites
         for site_info in unique_sites:
             if any(idx in site_info['equivalent_indices'] for idx in sublattice_site_indices):
                 relevant_indices = [idx for idx in site_info['equivalent_indices'] if idx in sublattice_site_indices]
@@ -2422,7 +2276,6 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
 
         total_atoms_in_sublattice_supercell = sublattice_multiplicity * supercell_multiplicity
 
-        # Calculate achievable concentrations for this sublattice
         achievable_fractions = {}
         target_atom_counts = {}
 
@@ -2431,19 +2284,15 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
             rounded_atoms = round(target_atoms)
             target_atom_counts[element] = rounded_atoms
 
-        # Ensure total adds up correctly
         total_target = sum(target_atom_counts.values())
         if total_target != total_atoms_in_sublattice_supercell:
-            # Adjust the largest component
             diff = total_atoms_in_sublattice_supercell - total_target
             largest_element = max(target_atom_counts.keys(), key=lambda x: target_atom_counts[x])
             target_atom_counts[largest_element] += diff
 
-        # Convert back to fractions
         for element, atom_count in target_atom_counts.items():
             achievable_fractions[element] = atom_count / total_atoms_in_sublattice_supercell
 
-            # Check if adjustment was needed
             original_frac = target_fractions[element]
             if abs(original_frac - achievable_fractions[element]) > 1e-6:
                 adjustment_info.append({
@@ -2459,41 +2308,31 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
     return achievable_concentrations, adjustment_info
 
 
-# Helper functions to support the existing functionality
 
 def calculate_achievable_concentrations(target_concentrations, total_atoms):
-    """
-    Calculate achievable concentrations that result in integer atom counts.
-    """
     achievable_concentrations = {}
     achievable_counts = {}
 
-    # Convert target fractions to target atom counts
     target_atom_counts = {}
     for element, frac in target_concentrations.items():
         target_atom_counts[element] = frac * total_atoms
 
-    # Round to nearest integers
     rounded_counts = {}
     for element, count in target_atom_counts.items():
         rounded_counts[element] = round(count)
 
-    # Ensure total adds up correctly
     total_rounded = sum(rounded_counts.values())
     diff = total_atoms - total_rounded
 
     if diff != 0:
-        # Distribute the difference to elements with largest rounding errors
         errors = {}
         for element in target_atom_counts:
             original = target_atom_counts[element]
             rounded = rounded_counts[element]
             errors[element] = abs(original - rounded)
 
-        # Sort by error (largest first)
         sorted_elements = sorted(errors.keys(), key=lambda x: errors[x], reverse=True)
 
-        # Adjust elements one by one
         for i in range(abs(diff)):
             element = sorted_elements[i % len(sorted_elements)]
             if diff > 0:
@@ -2501,7 +2340,6 @@ def calculate_achievable_concentrations(target_concentrations, total_atoms):
             else:
                 rounded_counts[element] = max(0, rounded_counts[element] - 1)
 
-    # Convert back to fractions
     for element, count in rounded_counts.items():
         achievable_concentrations[element] = count / total_atoms
         achievable_counts[element] = count
@@ -2511,11 +2349,7 @@ def calculate_achievable_concentrations(target_concentrations, total_atoms):
 
 def generate_atat_rndstr_content_corrected(structure, achievable_concentrations, use_sublattice_mode, chem_symbols,
                                            transformation_matrix):
-    """
-    Generates the content for rndstr.in file.
-    For Global mode, it applies the same concentration to all sites.
-    For Sublattice mode, it calculates per-site concentrations.
-    """
+
     lattice = structure.lattice
     max_param = max(lattice.a, lattice.b, lattice.c) if max(lattice.a, lattice.b, lattice.c) > 0 else 1
     lines = [
@@ -2524,7 +2358,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
     ]
 
     if use_sublattice_mode:
-        # Sublattice mode: use per-site assignments based on chem_symbols
         for i, site in enumerate(structure):
             coords = site.frac_coords
             coord_str = f"{coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}"
@@ -2532,7 +2365,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
             site_elements = chem_symbols[i] if i < len(chem_symbols) else []
 
             if len(site_elements) > 1:
-                # This is a mixed site - find the corresponding sublattice
                 conc_parts = []
                 for sublattice_letter, sublattice_concentrations in achievable_concentrations.items():
                     if set(site_elements) == set(sublattice_concentrations.keys()):
@@ -2544,21 +2376,17 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                 if conc_parts:
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
                 else:
-                    # Fallback to original element
                     lines.append(f"{coord_str} {site.specie.symbol}")
             else:
-                # Pure site - keep original element
                 if site.is_ordered:
                     lines.append(f"{coord_str} {site.specie.symbol}")
                 else:
-                    # Handle disordered sites
                     conc_parts = []
                     for sp, occ in site.species.items():
                         if occ > 1e-6:
                             conc_parts.append(f"{sp.symbol}={occ:.6f}")
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
     else:
-        # Global mode: apply the SAME concentration string to ALL sites
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
             if conc > 1e-6:
@@ -2574,7 +2402,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
 
 
 def generate_atat_sqscell_content(nx, ny, nz):
-    """Generate sqscell.out content for ATAT."""
     lines = []
     lines.append("1")
     lines.append("")
@@ -2585,10 +2412,9 @@ def generate_atat_sqscell_content(nx, ny, nz):
 
 
 def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
-    """Generate command sequence for running ATAT."""
     commands = []
     commands.append("# Step 1: Generate cluster information")
-    cluster_cmd = f"corrdump -l=rndstr.in -ro -noe -nop -clus -2={pair_cutoff}"
+    cluster_cmd = f"corrdump -l=rndstr.in -ro -noe -nop -clus -2={round(pair_cutoff, 3)}"
 
     if triplet_cutoff is not None:
         cluster_cmd += f" -3={triplet_cutoff}"
@@ -2604,7 +2430,7 @@ def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutof
     commands.append("# Option A: Use predefined supercell from sqscell.out")
     commands.append("mcsqs -rc")
     commands.append("")
-    commands.append("# Option B: Specify number of atoms directly")
+    commands.append("# Option B: Specify number of atoms directly (will search for the most randomized supercell - distorts the original cell shape)")
     commands.append(f"mcsqs -n {total_atoms}")
     commands.append("")
     commands.append("# Step 4: (Optional) Parallel execution for faster results")
@@ -2621,11 +2447,8 @@ def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutof
 def generate_atat_input_files_corrected(structure, target_concentrations, transformation_matrix,
                                         use_sublattice_mode, chem_symbols, nx, ny, nz,
                                         pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
-    """
-    Generate all ATAT input files with corrected concentration handling.
-    """
     if use_sublattice_mode:
-        achievable_concentrations = target_concentrations  # Already processed in sublattice mode
+        achievable_concentrations = target_concentrations
         adjustment_info = []
     else:
         achievable_concentrations, achievable_counts = calculate_achievable_concentrations(
@@ -2653,26 +2476,19 @@ def generate_atat_input_files_corrected(structure, target_concentrations, transf
 
 
 def parse_mcsqs_progress_csv(csv_content):
-    """
-    Parse ATAT mcsqs_progress.csv file to extract optimization data.
-    """
     from io import StringIO
 
     try:
-        # Parse CSV content
         df = pd.read_csv(StringIO(csv_content))
 
-        # Validate required columns
         required_columns = ['Minute', 'Objective_Function']
         for col in required_columns:
             if col not in df.columns:
                 raise ValueError(f"Missing required column: {col}")
 
-        # Extract data
         minutes = df['Minute'].tolist()
         objective_values = df['Objective_Function'].tolist()
 
-        # Extract additional data if available
         additional_data = {}
         optional_columns = ['Step_Count', 'First_Correlation', 'Total_Correlations', 'Status', 'Timestamp']
         for col in optional_columns:
@@ -2686,27 +2502,21 @@ def parse_mcsqs_progress_csv(csv_content):
 
 
 def create_optimization_plot_csv(minutes, objective_values, additional_data=None):
-    """
-    Create a Plotly plot showing ATAT optimization progress from CSV data.
-    """
     import plotly.graph_objects as go
-    import numpy as np
 
-    # Create the main plot
     fig = go.Figure()
 
-    # Add the objective function trace
     fig.add_trace(go.Scatter(
         x=minutes,
         y=objective_values,
-        mode='lines+markers',
+        mode='lines',
         name='Objective Function',
         line=dict(color='#1f77b4', width=2),
         marker=dict(size=4, color='#1f77b4'),
         hovertemplate='<b>Minute:</b> %{x}<br><b>Objective Function:</b> %{y:.6f}<extra></extra>'
     ))
 
-    # Add horizontal line for best value
+
     best_value = min(objective_values)
     fig.add_hline(
         y=best_value,
@@ -2716,7 +2526,6 @@ def create_optimization_plot_csv(minutes, objective_values, additional_data=None
         annotation_position="top right"
     )
 
-    # Add improvement trend line (moving average) if enough data points
     if len(objective_values) > 5:
         window_size = max(3, len(objective_values) // 10)
         moving_avg = []
@@ -2730,62 +2539,62 @@ def create_optimization_plot_csv(minutes, objective_values, additional_data=None
             y=moving_avg,
             mode='lines',
             name=f'Moving Average ({window_size} points)',
-            line=dict(color='orange', width=1, dash='dot'),
+            line=dict(color='orange', width=2, dash='dot'),
             hovertemplate='<b>Minute:</b> %{x}<br><b>Moving Avg:</b> %{y:.6f}<extra></extra>'
         ))
 
-    # Add step count as secondary y-axis if available
     if additional_data and 'Step_Count' in additional_data:
         fig.add_trace(go.Scatter(
             x=minutes,
             y=additional_data['Step_Count'],
-            mode='lines+markers',
+            mode='lines',
             name='Step Count',
-            line=dict(color='green', width=1),
-            marker=dict(size=3, color='green'),
+            line=dict(color='green', width=2),
+            #marker=dict(size=3, color='green'),
             yaxis='y2',
             hovertemplate='<b>Minute:</b> %{x}<br><b>Steps:</b> %{y}<extra></extra>'
         ))
 
-        # Update layout for secondary y-axis
         fig.update_layout(
             yaxis2=dict(
                 title="Step Count",
                 overlaying='y',
                 side='right',
-                title_font=dict(size=14, family="Arial Black", color='green'),
+                title_font=dict(size=18, family="Arial Black", color='green'),
                 tickfont=dict(color='green')
             )
         )
 
-    # Update layout
     fig.update_layout(
         title=dict(
             text="ATAT SQS Optimization Progress (CSV Data)",
-            font=dict(size=18, family="Arial Black")
+            font=dict(size=24, family="Arial Black")
         ),
         xaxis_title="Time (Minutes)",
         yaxis_title="Objective Function Value",
         hovermode='x unified',
-        height=500,
+        height=650,
         showlegend=True,
         legend=dict(
             yanchor="top",
             y=0.99,
             xanchor="left",
-            x=0.01
+            x=0.01,
+            font=dict(size=16)
         ),
-        font=dict(size=12, family="Arial"),
+        font=dict(size=20, family="Arial"),
         plot_bgcolor='white',
         xaxis=dict(
             gridcolor='lightgray',
             gridwidth=1,
-            title_font=dict(size=14, family="Arial Black")
+            title_font=dict(size=20, family="Arial Black"),
+            tickfont=dict(size=16)
         ),
         yaxis=dict(
             gridcolor='lightgray',
             gridwidth=1,
-            title_font=dict(size=14, family="Arial Black")
+            title_font=dict(size=20, family="Arial Black"),
+            tickfont=dict(size=16)
         )
     )
 
@@ -2793,9 +2602,6 @@ def create_optimization_plot_csv(minutes, objective_values, additional_data=None
 
 
 def analyze_convergence_csv(minutes, objective_values, additional_data=None):
-    """
-    Analyze the convergence of ATAT optimization from CSV data.
-    """
     import numpy as np
 
     if len(objective_values) < 5:
@@ -2806,21 +2612,16 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
             "Recommendation": "Continue optimization"
         }
 
-    # Calculate metrics for convergence analysis
     total_minutes = len(minutes)
     final_quarter = objective_values[-total_minutes // 4:] if total_minutes >= 4 else objective_values[-2:]
 
-    # Calculate standard deviation of final quarter
     final_std = np.std(final_quarter)
     final_mean = np.mean(final_quarter)
 
-    # Calculate overall improvement
     total_improvement = objective_values[-1] - objective_values[0]
 
-    # Calculate recent improvement (last 25% of time or last few points)
     recent_improvement = final_quarter[-1] - final_quarter[0] if len(final_quarter) > 1 else 0
 
-    # Determine convergence status
     if final_std < 0.001 and abs(recent_improvement) < 0.001:
         convergence_status = "✅ Converged"
         recommendation = "Optimization complete - SQS ready for use"
@@ -2834,7 +2635,6 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         convergence_status = "📊 Stable"
         recommendation = "Appears stable - likely converged"
 
-    # Assess stability
     if final_std < 0.0001:
         stability = "Very Stable"
     elif final_std < 0.001:
@@ -2844,7 +2644,6 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
     else:
         stability = "Unstable"
 
-    # Determine final trend
     if abs(recent_improvement) < 0.0001:
         final_trend = "Flat (converged)"
     elif recent_improvement < -0.001:
@@ -2854,7 +2653,6 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
     else:
         final_trend = "Minor fluctuations"
 
-    # Calculate rate of improvement (per minute)
     if len(minutes) > 1:
         time_span = minutes[-1] - minutes[0]
         improvement_rate = total_improvement / time_span if time_span > 0 else 0
@@ -2873,7 +2671,6 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         "Recommendation": recommendation
     }
 
-    # Add step information if available
     if additional_data and 'Step_Count' in additional_data:
         step_counts = additional_data['Step_Count']
         if step_counts:
@@ -2887,38 +2684,33 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
 
 
 def validate_mcsqs_progress_csv(csv_content):
-    """
-    Validate that the uploaded file is a valid ATAT mcsqs_progress.csv format.
-    """
+
     from io import StringIO
 
     try:
-        # Try to parse as CSV
+
         df = pd.read_csv(StringIO(csv_content))
 
-        # Check for required columns
         required_columns = ['Minute', 'Objective_Function']
         missing_columns = [col for col in required_columns if col not in df.columns]
 
         if missing_columns:
             return False, f"Missing required columns: {', '.join(missing_columns)}"
 
-        # Check if we have data
+
         if len(df) == 0:
             return False, "CSV file is empty"
 
-        # Validate data types
+
         try:
             df['Minute'] = pd.to_numeric(df['Minute'])
             df['Objective_Function'] = pd.to_numeric(df['Objective_Function'])
         except ValueError as e:
             return False, f"Invalid numeric data: {str(e)}"
 
-        # Check for reasonable data ranges
         if df['Minute'].min() < 0:
             return False, "Minute values cannot be negative"
 
-        # Count data points
         data_points = len(df)
         time_span = df['Minute'].max() - df['Minute'].min()
 
@@ -2929,12 +2721,8 @@ def validate_mcsqs_progress_csv(csv_content):
 
 
 def render_extended_optimization_analysis_tab():
-    """
-    Extended version of file_tab2 that handles .log, .csv files, and parallel runs analysis
-    """
-    st.write("**Upload optimization files to analyze progress:**")
 
-    # Create sub-tabs for different file types - ADD the new parallel_tab here
+    st.write("**Upload optimization files to analyze progress:**")
     log_tab, csv_tab, parallel_tab = st.tabs([
         "📊 mcsqs.log Analysis",
         "📈 mcsqs_progress.csv Analysis",
@@ -2942,7 +2730,6 @@ def render_extended_optimization_analysis_tab():
     ])
 
     with log_tab:
-        # Your existing log tab code stays the same
         st.write("**Upload mcsqs.log file to analyze optimization progress:**")
         uploaded_mcsqs_log = st.file_uploader(
             "Upload mcsqs.log file:",
@@ -2953,10 +2740,7 @@ def render_extended_optimization_analysis_tab():
 
         if uploaded_mcsqs_log is not None:
             try:
-                # Read and parse the log file
                 log_content = uploaded_mcsqs_log.read().decode('utf-8')
-
-                # Parse objective function values
                 objective_values, correlation_data = parse_mcsqs_log(log_content)
 
                 if not objective_values:
@@ -2966,11 +2750,9 @@ def render_extended_optimization_analysis_tab():
 
                 st.success(f"✅ Successfully parsed {len(objective_values)} optimization steps!")
 
-                # Create optimization plot
                 fig = create_optimization_plot(objective_values)
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Display optimization statistics
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
 
                 with col_stats1:
@@ -2990,31 +2772,30 @@ def render_extended_optimization_analysis_tab():
                     st.metric("Best at Step", best_step)
 
                 # Convergence analysis
-                st.subheader("📈 Convergence Analysis")
+               # st.subheader("📈 Convergence Analysis")
 
                 # Calculate convergence metrics
-                convergence_info = analyze_convergence(objective_values)
+                #convergence_info = analyze_convergence(objective_values)
 
-                col_conv_info1, col_conv_info2 = st.columns(2)
+                #col_conv_info1, col_conv_info2 = st.columns(2)
 
-                with col_conv_info1:
-                    st.write("**Convergence Metrics:**")
-                    for key, value in convergence_info.items():
-                        st.write(f"- **{key}:** {value}")
+                #with col_conv_info1:
+                #    st.write("**Convergence Metrics:**")
+                #    for key, value in convergence_info.items():
+                #        st.write(f"- **{key}:** {value}")
 
-                with col_conv_info2:
+                #with col_conv_info2:
                     # Create convergence assessment
-                    if convergence_info['Convergence Status'] == "✅ Converged":
-                        st.success("🎯 **Optimization Status: CONVERGED**")
-                        st.info("The objective function has stabilized. This SQS is ready for use.")
-                    elif convergence_info['Convergence Status'] == "⚠️ Improving":
-                        st.warning("📈 **Optimization Status: STILL IMPROVING**")
-                        st.info("Consider running ATAT longer for better results.")
-                    else:
-                        st.warning("🔄 **Optimization Status: FLUCTUATING**")
-                        st.info("The optimization may need more steps or different parameters.")
+                #    if convergence_info['Convergence Status'] == "✅ Converged":
+                #        st.success("🎯 **Optimization Status: CONVERGED**")
+                #        st.info("The objective function has stabilized. This SQS is ready for use.")
+                #    elif convergence_info['Convergence Status'] == "⚠️ Improving":
+                #        st.warning("📈 **Optimization Status: STILL IMPROVING**")
+                #        st.info("Consider running ATAT longer for better results.")
+                #    else:
+                #        st.warning("🔄 **Optimization Status: FLUCTUATING**")
+                #        st.info("The optimization may need more steps or different parameters.")
 
-                # Detailed data table
                 with st.expander("📊 Detailed Optimization Data", expanded=False):
                     # Create DataFrame with step numbers and objective values
                     data_df = pd.DataFrame({
@@ -3026,7 +2807,6 @@ def render_extended_optimization_analysis_tab():
 
                     st.dataframe(data_df, use_container_width=True)
 
-                    # Download optimization data as CSV
                     csv_data = data_df.to_csv(index=False)
                     st.download_button(
                         label="📥 Download Optimization Data (CSV)",
@@ -3044,7 +2824,6 @@ def render_extended_optimization_analysis_tab():
                 st.error(f"Debug info: {traceback.format_exc()}")
 
     with csv_tab:
-        # Your existing CSV tab code stays the same
         st.write("**Upload mcsqs_progress.csv file for time-based analysis:**")
         uploaded_progress_csv = st.file_uploader(
             "Upload mcsqs_progress.csv file:",
@@ -3055,10 +2834,7 @@ def render_extended_optimization_analysis_tab():
 
         if uploaded_progress_csv is not None:
             try:
-                # Read and validate the CSV file
                 csv_content = uploaded_progress_csv.read().decode('utf-8')
-
-                # Validate file format
                 is_valid, validation_message = validate_mcsqs_progress_csv(csv_content)
 
                 if not is_valid:
@@ -3067,17 +2843,13 @@ def render_extended_optimization_analysis_tab():
                     return
 
                 st.success(f"✅ Valid CSV file: {validation_message}")
-
-                # Parse CSV data
                 minutes, objective_values, additional_data = parse_mcsqs_progress_csv(csv_content)
 
                 st.success(f"✅ Successfully parsed {len(objective_values)} data points!")
-
-                # Create optimization plot
                 fig = create_optimization_plot_csv(minutes, objective_values, additional_data)
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Display optimization statistics
+
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
 
                 with col_stats1:
@@ -3096,10 +2868,10 @@ def render_extended_optimization_analysis_tab():
                     st.metric("Best Value", f"{best_value:.6f}")
                     st.metric("Runtime", f"{runtime:.0f} min")
 
-                # Convergence analysis
+
                 st.subheader("📈 Time-Based Convergence Analysis")
 
-                # Calculate convergence metrics
+
                 convergence_info = analyze_convergence_csv(minutes, objective_values, additional_data)
 
                 col_conv_info1, col_conv_info2 = st.columns(2)
@@ -3110,7 +2882,7 @@ def render_extended_optimization_analysis_tab():
                         st.write(f"- **{key}:** {value}")
 
                 with col_conv_info2:
-                    # Create convergence assessment
+
                     if convergence_info['Convergence Status'] == "✅ Converged":
                         st.success("🎯 **Optimization Status: CONVERGED**")
                         st.info("The objective function has stabilized. This SQS is ready for use.")
@@ -3121,11 +2893,9 @@ def render_extended_optimization_analysis_tab():
                         st.warning("🔄 **Optimization Status: FLUCTUATING**")
                         st.info("The optimization may need more time or different parameters.")
 
-                # Show additional data if available
+
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
-
-                        # Create comprehensive DataFrame
                         data_dict = {
                             'Minute': minutes,
                             'Objective_Function': objective_values
@@ -3138,7 +2908,6 @@ def render_extended_optimization_analysis_tab():
                         df_display = pd.DataFrame(data_dict)
                         st.dataframe(df_display, use_container_width=True)
 
-                        # Download enhanced data as CSV
                         csv_data = df_display.to_csv(index=False)
                         st.download_button(
                             label="📥 Download Analysis Data (CSV)",
@@ -3148,22 +2917,19 @@ def render_extended_optimization_analysis_tab():
                             key="download_progress_csv"
                         )
 
-                # Show raw data table
-                with st.expander("📊 Raw CSV Data", expanded=False):
+               #with st.expander("📊 Raw CSV Data", expanded=False):
 
-                    # Create DataFrame from parsed data
-                    display_data = {
-                        'Minute': minutes,
-                        'Objective_Function': objective_values
-                    }
+               #     display_data = {
+               #         'Minute': minutes,
+               #         'Objective_Function': objective_values
+               #     }
 
-                    # Add additional columns if available
-                    for key, values in additional_data.items():
-                        if len(values) == len(minutes):
-                            display_data[key] = values
+               #     for key, values in additional_data.items():
+               #         if len(values) == len(minutes):
+               #             display_data[key] = values
 
-                    df_raw = pd.DataFrame(display_data)
-                    st.dataframe(df_raw, use_container_width=True)
+               #     df_raw = pd.DataFrame(display_data)
+               #     st.dataframe(df_raw, use_container_width=True)
 
             except UnicodeDecodeError:
                 st.error("Error reading CSV file. Please ensure the file is a text file with UTF-8 encoding.")
@@ -3172,7 +2938,6 @@ def render_extended_optimization_analysis_tab():
                 import traceback
                 st.error(f"Debug info: {traceback.format_exc()}")
 
-    # NEW PARALLEL RUNS ANALYSIS TAB
     with parallel_tab:
         st.write("**Upload multiple log files from parallel ATAT runs:**")
         st.info("""
@@ -3191,8 +2956,6 @@ def render_extended_optimization_analysis_tab():
         if uploaded_parallel_logs and len(uploaded_parallel_logs) > 1:
             try:
                 parallel_results = []
-
-                # Process each uploaded log file
                 for i, log_file in enumerate(uploaded_parallel_logs):
                     try:
                         log_content = log_file.read().decode('utf-8')
@@ -3204,9 +2967,14 @@ def render_extended_optimization_analysis_tab():
                             total_steps = len(objective_values)
                             improvement = final_objective - objective_values[0] if len(objective_values) > 1 else 0
 
+                            run_match = re.search(r'(\d+)', log_file.name)
+                            run_number = int(run_match.group(1)) if run_match else i + 1
+
                             parallel_results.append({
                                 'File': log_file.name,
-                                'Run': i + 1,
+                               # 'Run': i + 1,
+                                'Run': run_number,
+                                'BestSQS': f'bestsqs{run_number}.out',
                                 'Final_Objective': final_objective,
                                 'Best_Objective': best_objective,
                                 'Total_Steps': total_steps,
@@ -3261,23 +3029,22 @@ def render_extended_optimization_analysis_tab():
                         st.metric("Objective Range", f"{max_final - min_final:.6f}")
                         st.metric("Best Run", f"{best_run['File']}")
 
-                    # Best and worst run details
                     st.subheader("🏆 Best vs Worst Runs")
 
                     col_best, col_worst = st.columns(2)
 
                     with col_best:
-                        st.success(f"**🥇 Best Performing Run: {best_run['File']}**")
+                        st.success(f"**🥇 Best Performing Run:\t\t{best_run['File']}** ({best_run['BestSQS']})")
                         st.write(f"**File:** {best_run['File']}")
-                        st.write(f"**Final Objective:** {best_run['Final_Objective']:.6f}")
+                        #st.write(f"**Final Objective:** {best_run['Final_Objective']:.6f}")
                         st.write(f"**Best Objective:** {best_run['Best_Objective']:.6f}")
                         st.write(f"**Total Steps:** {best_run['Total_Steps']}")
                         st.write(f"**Total Improvement:** {best_run['Total_Improvement']:.6f}")
 
                     with col_worst:
-                        st.error("f **🥉 Worst Performing Run: {worst_run['File']}**")
+                        st.error(f"**🥉 Worst Performing Run:\t\t{worst_run['File']}** ({worst_run['BestSQS']})")
                         st.write(f"**File:** {worst_run['File']}")
-                        st.write(f"**Final Objective:** {worst_run['Final_Objective']:.6f}")
+                        #st.write(f"**Final Objective:** {worst_run['Final_Objective']:.6f}")
                         st.write(f"**Best Objective:** {worst_run['Best_Objective']:.6f}")
                         st.write(f"**Total Steps:** {worst_run['Total_Steps']}")
                         st.write(f"**Total Improvement:** {worst_run['Total_Improvement']:.6f}")
@@ -3290,7 +3057,7 @@ def render_extended_optimization_analysis_tab():
                         comparison_data.append({
                             "File": result['File'],
                             "Run #": result['Run'],
-                            "Final Objective": f"{result['Final_Objective']:.6f}",
+                            #"Final Objective": f"{result['Final_Objective']:.6f}",
                             "Best Objective": f"{result['Best_Objective']:.6f}",
                             "Total Steps": result['Total_Steps'],
                             "Improvement": f"{result['Total_Improvement']:.6f}",
@@ -3329,19 +3096,30 @@ def render_extended_optimization_analysis_tab():
                     fig.update_layout(
                         title=dict(
                             text="Parallel Runs Comparison",
-                            font=dict(size=18, family="Arial Black")
+                            font=dict(size=24, family="Arial Black")
                         ),
                         xaxis_title="Optimization Step",
                         yaxis_title="Objective Function Value",
                         hovermode='x unified',
-                        height=500,
+                        height=650,
                         legend=dict(
                             yanchor="top",
                             y=0.99,
                             xanchor="left",
-                            x=0.01
+                            x=0.01,
+                            font=dict(size=16)
+                        ),
+                        font=dict(size=20, family="Arial"),
+                        xaxis=dict(
+                            title_font=dict(size=20, family="Arial Black"),
+                            tickfont=dict(size=16)
+                        ),
+                        yaxis=dict(
+                            title_font=dict(size=20, family="Arial Black"),
+                            tickfont=dict(size=16)
                         )
                     )
+
 
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -3661,9 +3439,6 @@ echo "================================================"
 
 
 def render_monitor_script_section(results):
-    """
-    Render the monitor script download section in Streamlit.
-    """
     st.subheader("🖥️ Advanced Monitoring Script")
     st.info("""
     **Download a complete monitoring script** that:
@@ -3709,30 +3484,26 @@ def render_monitor_script_section(results):
 
     with col_opt3:
         st.write("**Cluster Settings:**")
-        # Get the cutoff values from results
         pair_cutoff = results.get('pair_cutoff', 1.1)
         triplet_cutoff = results.get('triplet_cutoff', None)
         quadruplet_cutoff = results.get('quadruplet_cutoff', None)
 
-        st.write(f"Pair cutoff: {pair_cutoff}")
+        st.write(f"Pair cutoff: {round(pair_cutoff,3)}")
         if triplet_cutoff:
             st.write(f"Triplet cutoff: {triplet_cutoff}")
         if quadruplet_cutoff:
             st.write(f"Quadruplet cutoff: {quadruplet_cutoff}")
 
-    # Show command preview
     if enable_parallel:
-        cmd_preview = f"mcsqs {'(-n ' + str(results['total_atoms']) + ')' if use_atom_count else '(-rc)'} with {parallel_runs} parallel instances"
+        cmd_preview = f"mcsqs {'-n ' + str(results['total_atoms']) if use_atom_count else '-rc'} # with {parallel_runs} parallel instances"
         log_info = "Will monitor mcsqs1.log for parallel execution"
     else:
-        cmd_preview = f"mcsqs {'(-n ' + str(results['total_atoms']) + ')' if use_atom_count else '(-rc)'} single instance"
+        cmd_preview = f"mcsqs {'-n ' + str(results['total_atoms']) if use_atom_count else '-rc'} # single run"
         log_info = "Will monitor mcsqs.log for single execution"
 
     st.write("**Command Preview:**")
     st.code(cmd_preview, language="bash")
     st.caption(log_info)
-
-    # Generate and provide download
     col_download, col_info = st.columns([1, 1])
 
     with col_download:
@@ -3781,9 +3552,9 @@ def render_monitor_script_section(results):
             ### What the script does:
             - 🔧 **Auto-creates** `rndstr.in` and `sqscell.out` 
             - 🔧 **Runs corrdump** with your cluster settings
-            - 🚀 **Starts mcsqs** {'in parallel' if enable_parallel else 'single instance'}
+            - 🚀 **Starts mcsqs** in single instance (or in parallel if enabled)
             - 📊 **Monitors progress** every minute
-            - 📁 **Saves data** to `mcsqs_progress.csv`
+            - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
 
             ### Output files:
             - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
@@ -3794,41 +3565,18 @@ def render_monitor_script_section(results):
             ### Configuration:
             - **Execution**: {cmd_preview}
             - **Monitoring**: Every 1 minute
-            - **Cleanup**: Automatic on Ctrl+C
+            - **Stop the run**: Automatic on Ctrl+C
 
-            💡 **Tip**: The generated CSV file can be uploaded back to this tool for analysis!
+             **The generated CSV file can be uploaded back to this tool for analysis!**
             """)
 
 
 def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
-    """
-    Create vacancies in SQS structure by removing atoms of selected elements.
-
-    Parameters:
-    -----------
-    sqs_structure : pymatgen.core.Structure
-        The original SQS structure
-    elements_to_remove : list
-        List of element symbols to remove (e.g., ['O', 'Li'])
-
-    Returns:
-    --------
-    vacancy_structure : pymatgen.core.Structure
-        New structure with specified atoms removed
-    removal_info : dict
-        Information about the removal process
-    """
-    from pymatgen.core import Structure
-    import numpy as np
-
-    # Ensure structure is ordered for processing
     ordered_structure = prepare_structure_for_prdf(sqs_structure)
 
-    # Track original composition
     original_composition = ordered_structure.composition
     original_total_atoms = len(ordered_structure)
 
-    # Find indices of atoms to keep (not in elements_to_remove)
     sites_to_keep = []
     sites_removed = []
     removal_counts = {}
@@ -3850,7 +3598,6 @@ def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
     if not sites_to_keep:
         raise ValueError("Cannot remove all atoms from the structure!")
 
-    # Create new structure with only the sites to keep
     new_lattice = ordered_structure.lattice
     new_species = []
     new_coords = []
@@ -3860,7 +3607,6 @@ def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
         new_species.append(site.specie)
         new_coords.append(site.frac_coords)
 
-    # Create the new structure with vacancies
     vacancy_structure = Structure(
         lattice=new_lattice,
         species=new_species,
@@ -3868,11 +3614,8 @@ def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
         coords_are_cartesian=False
     )
 
-    # Calculate removal statistics
     total_removed = len(sites_removed)
     removal_percentage = (total_removed / original_total_atoms) * 100
-
-    # Create removal info dictionary
     removal_info = {
         'original_composition': str(original_composition),
         'original_atom_count': original_total_atoms,
@@ -3889,14 +3632,6 @@ def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
 
 
 def render_vacancy_creation_section(sqs_pymatgen_structure):
-    """
-    Render Streamlit interface for creating vacancies in SQS structure.
-
-    Parameters:
-    -----------
-    sqs_pymatgen_structure : pymatgen.core.Structure
-        The SQS structure to modify
-    """
     st.markdown("---")
     st.subheader("🕳️ Create Vacancies in SQS Structure")
     st.info("""
@@ -3904,7 +3639,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
     This is useful for studying vacancy formation, ion diffusion, or defect structures.
     """)
 
-    # Get unique elements in the structure
     structure_elements = []
     element_counts = {}
 
@@ -3915,7 +3649,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 structure_elements.append(element)
             element_counts[element] = element_counts.get(element, 0) + 1
         else:
-            # Handle disordered sites
             for sp in site.species:
                 element = sp.symbol
                 if element not in structure_elements:
@@ -3923,8 +3656,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 element_counts[element] = element_counts.get(element, 0) + site.species[sp]
 
     structure_elements.sort()
-
-    # Display current composition
     st.write("**Current Structure Composition:**")
     comp_cols = st.columns(min(len(structure_elements), 4))
     for i, element in enumerate(structure_elements):
@@ -3934,7 +3665,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
 
     st.write(f"**Total atoms:** {len(sqs_pymatgen_structure)}")
 
-    # Element selection for removal
     col_select, col_preview = st.columns([1, 1])
 
     with col_select:
@@ -3967,8 +3697,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
     with col_preview:
         if elements_to_remove and len(elements_to_remove) > 0:
             st.write("**Vacancy Creation Preview:**")
-
-            # Calculate preview statistics
             total_to_remove = sum(int(element_counts[element]) for element in elements_to_remove)
             remaining_atoms = len(sqs_pymatgen_structure) - total_to_remove
             vacancy_percentage = (total_to_remove / len(sqs_pymatgen_structure)) * 100
@@ -3982,7 +3710,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
             preview_df = pd.DataFrame(preview_data)
             st.dataframe(preview_df, use_container_width=True, hide_index=True)
 
-    # Create vacancies button
     create_vacancies_btn = st.button(
         "🕳️ Create Vacancy Structure",
         disabled=not elements_to_remove or remaining_atoms <= 0,
@@ -3998,8 +3725,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 )
 
             st.success("✅ Vacancy structure created successfully!")
-
-            # Display removal information
             st.subheader("📊 Vacancy Creation Results")
 
             col_info1, col_info2, col_info3 = st.columns(3)
@@ -4016,7 +3741,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 st.metric("Density Change", removal_info['density_change'])
                 st.write(f"**Elements removed:** {', '.join(elements_to_remove)}")
 
-            # Show detailed removal counts
             st.write("**Detailed Removal Information:**")
             removal_data = []
             for element, count in removal_info['removal_counts'].items():
@@ -4031,7 +3755,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
             removal_df = pd.DataFrame(removal_data)
             st.dataframe(removal_df, use_container_width=True, hide_index=True)
 
-            # Show composition comparison
             st.write("**Composition Comparison:**")
             comp_comparison = pd.DataFrame({
                 "Property": ["Original", "With Vacancies"],
@@ -4040,18 +3763,15 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
             })
             st.dataframe(comp_comparison, use_container_width=True, hide_index=True)
 
-            # Visualize the vacancy structure
             st.subheader("🔍 Vacancy Structure Visualization")
             sqs_result_with_vacancies = {'structure': vacancy_structure}
             sqs_visualization(sqs_result_with_vacancies)
 
-            # Download options for vacancy structure
             st.subheader("📥 Download Vacancy Structure")
 
             col_dl1, col_dl2, col_dl3 = st.columns(3)
 
             with col_dl1:
-                # Generate VASP POSCAR for vacancy structure
                 vacancy_poscar = generate_poscar_from_structure(
                     vacancy_structure,
                     f"Vacancy_SQS_{'-'.join(elements_to_remove)}_removed"
@@ -4066,7 +3786,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 )
 
             with col_dl2:
-                # Generate CIF for vacancy structure
                 try:
                     vacancy_cif, _ = generate_additional_format(
                         vacancy_structure, "CIF", f"vacancy_{'-'.join(elements_to_remove)}"
@@ -4087,7 +3806,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                     )
 
             with col_dl3:
-                # Generate summary report
                 summary_report = generate_vacancy_summary_report(removal_info, elements_to_remove)
 
                 st.download_button(
@@ -4097,8 +3815,6 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                     mime="text/plain",
                     key="download_vacancy_report"
                 )
-
-            # Store vacancy structure in session state for potential further processing
             if 'vacancy_structures' not in st.session_state:
                 st.session_state.vacancy_structures = {}
 
@@ -4116,23 +3832,18 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
 
 
 def generate_poscar_from_structure(structure, comment="Generated Structure"):
-    """
-    Generate VASP POSCAR content from a pymatgen Structure.
-    """
+
     from pymatgen.io.vasp import Poscar
 
-    # Ensure structure is ordered
     ordered_structure = prepare_structure_for_prdf(structure)
 
-    # Create POSCAR
+
     poscar = Poscar(ordered_structure, comment=comment)
     return str(poscar)
 
 
 def generate_vacancy_summary_report(removal_info, elements_removed):
-    """
-    Generate a text summary report of the vacancy creation process.
-    """
+
     report_lines = [
         "VACANCY STRUCTURE CREATION REPORT",
         "=" * 40,
