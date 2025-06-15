@@ -779,19 +779,54 @@ def render_atat_sqs_section():
                     sqs_visualization(sqs_result)
 
                     # Download buttons with multiple format options
+                    # Download buttons with multiple format options
                     st.write("**Download Converted Structure:**")
                     col_down1, col_down2, col_down3 = st.columns(3)
 
                     with col_down1:
-                        # VASP POSCAR download
-                        st.download_button(
-                            label="📥 Download POSCAR",
-                            data=vasp_content,
-                            file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
-                            mime="text/plain",
-                            type="primary",
-                            key="download_converted_poscar"
-                        )
+                        # VASP POSCAR download with options
+                        st.markdown("**VASP Options:**")
+                        use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
+                                                     value=True,
+                                                     key="poscar_fractional")
+
+                        from ase.constraints import FixAtoms
+                        use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
+                                                             value=False, key="poscar_sd")
+
+                        # Generate VASP content with options
+                        try:
+                            grouped_data = sqs_pymatgen_structure.copy() if 'sqs_pymatgen_structure' in locals() else None
+                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+
+                            # Add atoms to structure (simplified version)
+                            for site in sqs_pymatgen_structure:
+                                new_struct.append(
+                                    species=site.species,
+                                    coords=site.frac_coords,
+                                    coords_are_cartesian=False,
+                                )
+
+                            out = StringIO()
+                            current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
+
+                            if use_selective_dynamics:
+                                constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
+                                current_ase_structure.set_constraint(constraint)
+
+                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=True)
+                            vasp_content_with_options = out.getvalue()
+
+                            st.download_button(
+                                label="📥 Download POSCAR",
+                                data=vasp_content_with_options,
+                                file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
+                                mime="text/plain",
+                                type="primary",
+                                key="download_converted_poscar"
+                            )
+                        except Exception as e:
+                            st.error(f"Error generating VASP file: {str(e)}")
 
                     with col_down2:
                         # Additional format selector
@@ -801,21 +836,86 @@ def render_atat_sqs_section():
                             key="additional_format_selector"
                         )
 
+                        # Show LAMMPS options if LAMMPS is selected
+                        if additional_format == "LAMMPS":
+                            st.markdown("**LAMMPS Export Options**")
+                            atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
+                                                      key="lammps_atom_style")
+                            units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
+                            include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
+                            force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
+
                     with col_down3:
                         if st.button("📄 Generate & Download", key="generate_additional_format"):
                             try:
-                                additional_content, additional_filename = generate_additional_format(
-                                    sqs_pymatgen_structure, additional_format, results['structure_name']
-                                )
+                                if additional_format == "CIF":
+                                    from pymatgen.io.cif import CifWriter
+
+                                    # Create structure for CIF
+                                    grouped_data = sqs_pymatgen_structure.copy()
+                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+
+                                    for site in sqs_pymatgen_structure:
+                                        species_dict = {}
+                                        for element, occupancy in site.species.items():
+                                            species_dict[element] = float(occupancy)
+
+                                        new_struct.append(
+                                            species=species_dict,
+                                            coords=site.frac_coords,
+                                            coords_are_cartesian=False,
+                                        )
+
+                                    file_content = CifWriter(new_struct, symprec=0.1,
+                                                             write_site_properties=True).__str__()
+                                    download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
+                                    mime_type = "chemical/x-cif"
+
+                                elif additional_format == "LAMMPS":
+                                    # Create structure for LAMMPS
+                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+
+                                    for site in sqs_pymatgen_structure:
+                                        new_struct.append(
+                                            species=site.species,
+                                            coords=site.frac_coords,
+                                            coords_are_cartesian=False,
+                                        )
+
+                                    current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
+                                    out = StringIO()
+                                    write(
+                                        out,
+                                        current_ase_structure,
+                                        format="lammps-data",
+                                        atom_style=atom_style,
+                                        units=units,
+                                        masses=include_masses,
+                                        force_skew=force_skew
+                                    )
+                                    file_content = out.getvalue()
+                                    download_file_name = f"{results['structure_name'].split('.')[0]}.lmp"
+                                    mime_type = "text/plain"
+
+                                elif additional_format == "XYZ":
+                                    # Generate XYZ format (you'll need to implement this)
+                                    additional_content, additional_filename = generate_additional_format(
+                                        sqs_pymatgen_structure, additional_format, results['structure_name']
+                                    )
+                                    file_content = additional_content
+                                    download_file_name = additional_filename
+                                    mime_type = get_mime_type(additional_format)
+
                                 st.download_button(
                                     label=f"📥 Download {additional_format}",
-                                    data=additional_content,
-                                    file_name=additional_filename,
-                                    mime=get_mime_type(additional_format),
+                                    data=file_content,
+                                    file_name=download_file_name,
+                                    mime=mime_type,
                                     type="primary",
                                     key=f"download_{additional_format.lower()}"
                                 )
                                 st.success(f"✅ {additional_format} file generated!")
+
                             except Exception as e:
                                 st.error(f"Error generating {additional_format}: {str(e)}")
 
@@ -2413,7 +2513,7 @@ def generate_atat_sqscell_content(nx, ny, nz):
 
 def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
     commands = []
-    commands.append("# Step 1: Generate cluster information")
+    commands.append("# Step 1: Generate cluster information, -noe: not including empty cluster, -nop: not including point cluster(s)")
     cluster_cmd = f"corrdump -l=rndstr.in -ro -noe -nop -clus -2={round(pair_cutoff, 3)}"
 
     if triplet_cutoff is not None:
