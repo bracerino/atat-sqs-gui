@@ -826,11 +826,6 @@ import random
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from icet.tools.structure_generation import (
-    generate_sqs,
-    generate_sqs_from_supercells,
-    generate_sqs_by_enumeration
-)
 from ase import Atoms
 
 
