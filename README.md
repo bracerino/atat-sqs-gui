@@ -2,6 +2,7 @@
  Online application for generating and analyzing (SQS) (Special Quasi-Random Structures) using the ATAT mcsqs (Alloy Theoretic Automated Toolkit).
 
 
+![1](images_atat_gui/1.png)
 
  
 # **How to compile and run the ATAT SQS GUI locally:** 
