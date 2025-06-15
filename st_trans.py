@@ -698,16 +698,40 @@ if "prdf_structure_key" not in st.session_state:
 
 def render_sqs_module():
 
-    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
-    st.markdown(
-        f"**Article for ICET (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
+    st.title("🎲 Generate input and analyze output files for ATAT mcsqs to create special quasi-random structures (SQS)")
+
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
         """,
         unsafe_allow_html=True
     )
+    how_cite = st.checkbox(f"📚 How to **cite**"
+                           )
+    if how_cite:
+        with st.expander("How to cite", icon="📚", expanded=True):
+            st.markdown("""
+             Please cite the following sources
+             
+             - **ATAT mcsqs method** - [VAN DE WALLE, Axel, et al. Efficient stochastic generation of special quasirandom structures. Calphad, 2013](https://www.sciencedirect.com/science/article/pii/S0364591613000540?casa_token=i1iog7eW3lQAAAAA:wxlTn-9Twj38XFx1lMfSazPb6r0JrDV7NPxeums5-2qFXHWItT2ZVu9E-IfuBjRsr7f1BEzcSw).
+             - **ATAT** - [VAN DE WALLE, Axel; ASTA, Mark; CEDER, Gerbrand. The alloy theoretic automated toolkit: A user guide. Calphad, 2002](https://www.sciencedirect.com/science/article/abs/pii/S0364591602800062).
+             - **[XRDlicious, 2025](https://rdf-xrd-calculator.streamlit.app/)** – for the interface.
+        """)
 
+    read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
+                           )
+    if read_more:
+        with st.expander("Read more", icon="📖", expanded=True):
+            st.markdown("""
+            ### Read More About SQS and ATAT
+             Please see the following useful resources
+            - [User guide how to compile ATAT mcsqs (by IMPLANT team)](https://implant.fs.cvut.cz/atat-mcsqs/).
+            - [Tutorial explaining how to use SQS for disordered materials and generate them using ATAT mcsqs](https://cniu.me/2017/08/05/SQS.html#generate-sqs).
+            - [Tutorial explaining how to generate SQS using ATAT](https://github.com/CMSLabIITK/SQS_generation).
+            - [User guide for ATAT](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual.pdf).
+            - [User guide specifically for ATAT mcsqs](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual/node48.html).
+            - [C++ code for converting bestsqs.out into POSCAR format](https://github.com/c-niu/sqs2poscar). 
+        """)
     # -------------- DATABASE ----------
     show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
                                        value=False,
