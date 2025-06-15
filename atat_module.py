@@ -2116,7 +2116,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
     st.info(f"""
     **Sublattice Mode - Wyckoff Position Control:**
-    - Each supercell (in each direction) replication creates {supercell_multiplicity} copies per primitive site
+    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site
     - Only unique Wyckoff positions are shown below
     - Settings automatically apply to all equivalent sites
     - Concentration constraints are per Wyckoff position
