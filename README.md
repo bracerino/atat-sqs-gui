@@ -11,7 +11,7 @@
  - Create Vacancy Structures: Generate ordered defects by selectively removing specific element from the SQS 
 
  
-# **How to compile and run the ATAT-SQS-GUI locally:** 
+# **How to compile and run the ATAT SQS GUI locally:** 
 
 ### **Prerequisities**: 
 - Python 3.x (Tested 3.12)
@@ -27,19 +27,19 @@ Open your terminal console and write the following commands (the bold text):
       **sudo apt install git**    
       
 1) Download the XRDlicious code from GitHub (or download it manually without Git on the following link by clicking on 'Code' and 'Download ZIP', then extract the ZIP. With Git, it is automatically extracted):  
-      **git clone https://github.com/bracerino/xrdlicious.git**
+      **git clone https://github.com/bracerino/atat-sqs-gui.git**
 
 2) Navigate to the downloaded project folder:  
-      **cd xrdlicious/**
+      **cd atat-sqs-gui/**
 
 3) Create a Python virtual environment to prevent possible conflicts between packages:  
-      **python3 -m venv xrdlicious_env**
+      **python3 -m venv atat-sqs_env**
 
 4) Activate the Python virtual environment (before activating, make sure you are inside the xrdlicious folder):  
-      **source xrdlicious_env/bin/activate**
+      **source atat-sqs_env/bin/activate**
    
 5) Install all the necessary Python packages:  
       **pip install -r requirements.txt**
 
-6) Run the XRDlicious app (always before running it, make sure to activate its Python virtual environment (Step 4):  
+6) Run the ATAT SQS GUI app (always before running it, make sure to activate its Python virtual environment (Step 4):  
       **streamlit run app.py**
