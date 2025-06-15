@@ -818,7 +818,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from ase.build import make_supercell
-import icet
 import logging
 import threading
 import queue
