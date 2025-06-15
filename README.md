@@ -38,11 +38,27 @@ Open your terminal console and write the following commands (the bold text):
 6) Run the ATAT SQS GUI app (always before running it, make sure to activate its Python virtual environment (Step 4):  
       **streamlit run app.py**
 
- ## Workflow
+ ## Workflow overview
  - Upload crystal structures or retrieved them from implemented search interface in MP, AFLOW, and COD databases.
  - Generate ATAT Input Files: Create rndstr.in and sqscell.out files with global or sublattice-specific composition control. The concentrations are automatically recalculated for the achiavable concentrations given the total number of atoms in supercell.
  - Generate complete bash script that will create the rndstr.in and sqscell.out and run the ATAT mcsqs with improved monitoring and creating the mcsqs_progress.csv
  - Convert ATAT Output: Transform bestsqs.out files to VASP, CIF, LAMMPS, and XYZ formats with 3D visualization
  - Monitor Optimization: Analyze ATAT convergence from log files (mcsqs.log or at once for parallel run with mcsqs1.log, mcsqs2.log, ...) and CSV time progress file (mcsqs_progress.csv) data with interactive plots and main information. For parallel run, it will automatically identify the best performing optimization
  - Calculate PRDF: Compute Partial Radial Distribution Functions for SQS
- - Create Vacancy Structures: Generate ordered defects by selectively removing specific element from the SQS 
+ - Create Vacancy Structures: Generate ordered defects by selectively removing specific element from the SQS
+
+## Workflow steps
+- Upload crystal structure file (POSCAR, LMP, CIF, XYZ (with lattice)) and select composition mode (whether to change concentration for all atomic site, or for sublattices (based on wyckoff symbol))
+![Upload crystal structure](images_atat_gui/2.png)
+
+- Set supercell size (this also determine the number of atoms for option when not fixing the supercell shape)
+![Set supercell size, number of atoms](images_atat_gui/3.png)
+
+- Set elements and concentrations for atomic sites. The achiavable concentrations are automatically recalculated based on the set supercell (number of atoms)
+![Set concentrations for atomic sites](images_atat_gui/4.png)
+
+- Generate ATAT input files (rndstr.in, sqscell.out)
+![Generate ATAT input files](images_atat_gui/5.png)
+
+- See the commands to use in the console for running this settings for ATAT mcsqs
+![ATAT commands](images_atat_gui/6.png)
