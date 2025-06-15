@@ -186,12 +186,13 @@ def update_file_upload_section():
         for filename in st.session_state.full_structures.keys():
             st.sidebar.text(f"• {filename}")
 
+st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
-    "Try also the main application **[XRDlicious](xrdlicious.com)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
-    "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
+    "Try also the main application **[XRDlicious](xrdlicious.com)** and **[SQS generation using ICET](https://sqs-icet.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
+    " You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-mcsqs-gui.git)** for better performance."
 )
 
-st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/SQS-GUI.git", type="primary" )
+st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/atat-mcsqs-gui.git", type="primary" )
 update_file_upload_section()
 st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
 
