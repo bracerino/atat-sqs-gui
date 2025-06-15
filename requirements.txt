@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+pymatgen
+ase
+matminer
+plotly
+matplotlib
+mp-api==0.45.3
+aflow
+py3Dmol
