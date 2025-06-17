@@ -7,6 +7,7 @@ st.set_page_config(
 
 from pymatgen.core import Structure
 import io
+import streamlit.components.v1 as components
 import os
 import re
 from pymatgen.io.cif import CifWriter
