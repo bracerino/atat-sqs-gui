@@ -15,7 +15,6 @@ import pandas as pd
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
-st.set_page_config(layout="wide")
 
 #import pkg_resources
 #installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
