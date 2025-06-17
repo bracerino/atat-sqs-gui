@@ -218,6 +218,14 @@ st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsa
 #    mem_info = process.memory_info()
 #    return mem_info.rss / (1024 ** 2)  # in MB
 
+components.html(
+    """
+    <head>
+        <meta name="description" content="ATAT SQS GUI: Create Input Files for Generation of SQS using ATAT mcsqs and Analyse Its Outputs">
+    </head>
+    """,
+    height=0,
+)
 
 #memory_usage = get_memory_usage()
 #st.write(
