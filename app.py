@@ -1,4 +1,10 @@
 import streamlit as st
+
+st.set_page_config(
+    page_title="ATAT SQS GUI: Create Input Files for Generation of SQS using ATAT and Analyse Its Outputs",
+    layout="wide"
+)
+
 from pymatgen.core import Structure
 import io
 import os
