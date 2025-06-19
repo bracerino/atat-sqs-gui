@@ -41,6 +41,20 @@ Open your terminal console and write the following commands (the **bold text**):
 6) Run the ATAT SQS GUI app (always before running it, make sure to activate its Python virtual environment (Step 4):  
       **streamlit run app.py**
 
+### Tested Python packages  
+Python 3.12.3  
+- streamlit==1.45.1  
+- pandas==2.3.0  
+- numpy==2.2.6  
+- pymatgen==2025.5.28  
+- ase==3.25.0  
+- matminer==0.9.3  
+- plotly==6.1.2  
+- matplotlib==3.10.3  
+- mp-api==0.45.3  
+- aflow==0.0.11  
+- py3Dmol==2.4.2  
+
  ## Workflow overview
  - Upload crystal structures or retrieved them from implemented search interface in MP, AFLOW, and COD databases.
  - Generate ATAT Input Files: Create rndstr.in and sqscell.out files with global or sublattice-specific composition control. The concentrations are automatically recalculated for the achiavable concentrations given the total number of atoms in supercell.
