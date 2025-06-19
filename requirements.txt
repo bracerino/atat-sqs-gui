@@ -1,6 +1,6 @@
 streamlit==1.45.1
 pandas==2.3.0
-numpy==1.26.4
+numpy==2.2.6
 pymatgen==2025.5.28
 ase==3.10.3
 matminer==0.9.3
