@@ -117,5 +117,5 @@ Python 3.12.3
 
 - Upload multiple log files from the parallel run (mcsqs1.log, mcsqs2.log, ...) and see the values of objective functions and the best and wort found SQS
 ![upload multiple mcsqs.log](images_atat_gui/14.png)
-
+---
 ![upload multiple mcsqs.log 2](images_atat_gui/15.png)
