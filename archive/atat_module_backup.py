@@ -7,7 +7,6 @@ from ase.build import make_supercell
 from helpers import *
 
 
-
 def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
     try:
         from pymatgen.analysis.local_env import VoronoiNN
@@ -133,6 +132,7 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
     except Exception as e:
         st.error(f"Error calculating PRDF: {e}")
         return False
+
 
 def render_atat_sqs_section():
     if 'full_structures' not in st.session_state or not st.session_state['full_structures']:
@@ -338,7 +338,7 @@ def render_atat_sqs_section():
         **Global Mode Concentration Constraints:**
         - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
         - Valid concentrations must be multiples of 1/{supercell_multiplicity}
-        - Minimum step: 1/{supercell_multiplicity} = {1/supercell_multiplicity:.6f}
+        - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
         - Each concentration applies to ALL atomic sites equally
         """)
 
@@ -376,7 +376,8 @@ def render_atat_sqs_section():
             corrected_concentrations[elem] = nearest_step
             if abs(frac - nearest_step) > 1e-6:
                 corrections_made = True
-                st.warning(f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
+                st.warning(
+                    f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
 
         total_corrected = sum(corrected_concentrations.values())
         if abs(total_corrected - 1.0) > 1e-6:
@@ -384,13 +385,14 @@ def render_atat_sqs_section():
             adjustment = 1.0 - total_corrected
             corrected_concentrations[largest_elem] += adjustment
             if corrections_made:
-                st.info(f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
+                st.info(
+                    f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
 
         target_concentrations = corrected_concentrations
 
         if corrections_made:
             st.success("✅ All concentrations are now valid multiples of 1/{} = {:.6f}".format(
-                supercell_multiplicity, 1/supercell_multiplicity))
+                supercell_multiplicity, 1 / supercell_multiplicity))
 
     else:
         element_list = [2, 2]
@@ -444,11 +446,77 @@ def render_atat_sqs_section():
             preview_df = pd.DataFrame(preview_data)
             st.dataframe(preview_df, use_container_width=True)
             st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
+            st.write("#### **Overall Expected Element Distribution in Supercell:**")
+
+
+            total_element_counts = {}
+            for elem, per_site_count in achievable_counts_global.items():
+                total_element_counts[elem] = per_site_count * len(working_structure)
+
+            if total_element_counts:
+                cols = st.columns(min(len(total_element_counts), 4))
+                for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
+                    percentage = (count / total_supercell_atoms) * 100 if total_supercell_atoms > 0 else 0
+                    with cols[i % len(cols)]:
+                        if percentage >= 80:
+                            color = "#2E4057"  # Dark Blue-Gray
+                        elif percentage >= 60:
+                            color = "#4A6741"  # Dark Forest Green
+                        elif percentage >= 40:
+                            color = "#6B73FF"  # Purple-Blue
+                        elif percentage >= 25:
+                            color = "#FF8C00"  # Dark Orange
+                        elif percentage >= 15:
+                            color = "#4ECDC4"  # Teal
+                        elif percentage >= 10:
+                            color = "#45B7D1"  # Blue
+                        elif percentage >= 5:
+                            color = "#96CEB4"  # Green
+                        elif percentage >= 2:
+                            color = "#FECA57"  # Yellow
+                        elif percentage >= 1:
+                            color = "#DDA0DD"  # Plum
+                        else:
+                            color = "#D3D3D3"  # Light Gray
+
+                        st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, {color}, {color}CC);
+                            padding: 20px;
+                            border-radius: 15px;
+                            text-align: center;
+                            margin: 10px 0;
+                            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                            border: 2px solid rgba(255,255,255,0.2);
+                        ">
+                            <h1 style="
+                                color: white;
+                                font-size: 3em;
+                                margin: 0;
+                                text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                font-weight: bold;
+                            ">{elem}</h1>
+                            <h2 style="
+                                color: white;
+                                font-size: 2em;
+                                margin: 10px 0 0 0;
+                                text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                            ">{percentage:.1f}%</h2>
+                            <p style="
+                                color: white;
+                                font-size: 1.8em;
+                                margin: 5px 0 0 0;
+                                opacity: 0.9;
+                            ">{int(count)} atoms</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                st.write(f"**Total expected atoms in supercell:** {int(total_supercell_atoms)}")
 
         except Exception as e:
             st.error(f"Error creating concentration preview: {e}")
     else:
-        display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure, unique_sites)
+        display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
+                                         unique_sites)
 
     st.markdown(
         """
@@ -639,11 +707,8 @@ def render_atat_sqs_section():
                 key="atat_download_sqscell_persistent"
             )
 
-
-
         st.subheader("🖥️ ATAT Commands to Run")
         st.code(results['atat_commands'], language="bash")
-
 
         with st.expander("📖 How to use these files with ATAT", expanded=False):
 
@@ -709,8 +774,6 @@ def render_atat_sqs_section():
 
         render_monitor_script_section(results)
 
-
-
         st.markdown("---")
         col_status1, col_status2, col_status3 = st.columns(3)
         with col_status1:
@@ -724,7 +787,6 @@ def render_atat_sqs_section():
         st.markdown("---")
         st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
         st.info("Upload your ATAT output files to convert and analyze the results.")
-
 
         file_tab1, file_tab2 = st.tabs(["📁 Structure Converter", "📊 Optimization Analysis"])
 
@@ -939,47 +1001,55 @@ def render_atat_sqs_section():
                     for _, _, _, element in atoms:
                         element_counts[element] = element_counts.get(element, 0) + 1
 
-                   # st.write("**Element Distribution:**")
-                   # element_df = pd.DataFrame([
-                   #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
-                   #     for elem, count in sorted(element_counts.items())
-                   # ])
-                   # st.dataframe(element_df, use_container_width=True)
+                    # st.write("**Element Distribution:**")
+                    # element_df = pd.DataFrame([
+                    #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
+                    #     for elem, count in sorted(element_counts.items())
+                    # ])
+                    # st.dataframe(element_df, use_container_width=True)
+
                     st.write("#### **Element Distribution:**")
-
-                    # Create columns for better layout
                     cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
-
                     for i, (elem, count) in enumerate(sorted(element_counts.items())):
                         percentage = count / len(atoms) * 100
-
                         with cols[i % len(cols)]:
-                            # Choose color based on percentage
-                            if percentage >= 50:
-                                color = "#FF6B6B"  # Red for high concentration
-                            elif percentage >= 20:
-                                color = "#4ECDC4"  # Teal for medium-high
+                            if percentage >= 80:
+                                color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                            elif percentage >= 60:
+                                color = "#4A6741"  # Dark Forest Green for high concentration
+                            elif percentage >= 40:
+                                color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                            elif percentage >= 25:
+                                color = "#FF8C00"  # Dark Orange for medium concentration
+                            elif percentage >= 15:
+                                color = "#4ECDC4"  # Teal for medium-low concentration
                             elif percentage >= 10:
-                                color = "#45B7D1"  # Blue for medium
+                                color = "#45B7D1"  # Blue for low-medium concentration
                             elif percentage >= 5:
-                                color = "#96CEB4"  # Green for low-medium
+                                color = "#96CEB4"  # Green for low concentration
+                            elif percentage >= 2:
+                                color = "#FECA57"  # Yellow for very low concentration
+                            elif percentage >= 1:
+                                color = "#DDA0DD"  # Plum for trace concentration
                             else:
-                                color = "#FECA57"  # Yellow for low
+                                color = "#D3D3D3"  # Light Gray for minimal concentration
 
                             st.markdown(f"""
                             <div style="
-                                background-color: {color}; 
+                                background: linear-gradient(135deg, {color}, {color}CC);
                                 padding: 20px; 
-                                border-radius: 10px; 
+                                border-radius: 15px; 
                                 text-align: center; 
                                 margin: 10px 0;
-                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                border: 2px solid rgba(255,255,255,0.2);
                             ">
                                 <h1 style="
                                     color: white; 
                                     font-size: 3em; 
                                     margin: 0; 
-                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                    font-weight: bold;
                                 ">{elem}</h1>
                                 <h2 style="
                                     color: white; 
@@ -995,7 +1065,6 @@ def render_atat_sqs_section():
                                 ">{count} atoms</p>
                             </div>
                             """, unsafe_allow_html=True)
-
 
                     st.markdown("---")
                     st.subheader("📊 PRDF Analysis of SQS Structure")
@@ -1140,6 +1209,8 @@ def get_mime_type(file_format):
         "XYZ": "chemical/x-xyz"
     }
     return mime_types.get(file_format, "text/plain")
+
+
 def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, transformation_matrix):
     from pymatgen.core import Structure
     import numpy as np
@@ -1165,6 +1236,7 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
     )
 
     return sqs_structure
+
 
 def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
     try:
@@ -1252,10 +1324,11 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
     except Exception as e:
         st.error(f"Error calculating PRDF: {e}")
         return False
+
+
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
     from pymatgen.core import Lattice
     import numpy as np
-
 
     A_basis = original_structure.lattice.matrix
 
@@ -1335,7 +1408,6 @@ def debug_atat_conversion_step_by_step(bestsqs_content, original_structure):
         print(
             f"  Atom {i + 1} ({element}): [{x:.6f}, {y:.6f}, {z:.6f}] → [{cart_pos[0]:.6f}, {cart_pos[1]:.6f}, {cart_pos[2]:.6f}]")
 
-
     supercell_lattice = Lattice(lattice_vectors)
     print(f"\nResulting lattice parameters:")
     print(f"  a = {supercell_lattice.a:.6f} Å")
@@ -1410,6 +1482,7 @@ def debug_atat_conversion_with_original(bestsqs_content, original_structure):
 
     return supercell_lattice
 
+
 def create_complete_atat_zip(results, vasp_content, bestsqs_content):
     import zipfile
     from io import BytesIO
@@ -1428,7 +1501,6 @@ def create_complete_atat_zip(results, vasp_content, bestsqs_content):
         # Converted VASP file
         zip_file.writestr("3_VASP_CONVERTED/POSCAR", vasp_content)
 
-        # Create a README file with instructions
         readme_content = f"""
 # ATAT SQS Complete Package
 
@@ -1649,7 +1721,6 @@ def analyze_convergence(objective_values):
 
     total_improvement = objective_values[-1] - objective_values[0]
 
-
     recent_improvement = final_quarter[-1] - final_quarter[0] if len(final_quarter) > 1 else 0
 
     if final_std < 0.001 and abs(recent_improvement) < 0.001:
@@ -1664,7 +1735,6 @@ def analyze_convergence(objective_values):
     else:
         convergence_status = "📊 Stable"
         recommendation = "Appears stable - likely converged"
-
 
     if final_std < 0.0001:
         stability = "Very Stable"
@@ -1853,6 +1923,7 @@ def find_optimal_atom_distribution_sublattice(achievable_concentrations, chem_sy
             site_assignments[site_idx] = {element: supercell_multiplicity}
 
     return site_assignments
+
 
 def generate_atat_rndstr_content_corrected(structure, achievable_concentrations, use_sublattice_mode,
                                            chem_symbols, transformation_matrix):
@@ -2138,7 +2209,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     chem_symbols = [[] for _ in range(len(working_structure))]
     sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
-
     unique_wyckoff_groups = {}
 
     for site_info in unique_sites:
@@ -2146,7 +2216,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         if key not in unique_wyckoff_groups:
             unique_wyckoff_groups[key] = []
         unique_wyckoff_groups[key].append(site_info)
-
 
     sublattice_data = []
     temp_sublattice_index = 0
@@ -2254,7 +2323,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                         sublattice_concentrations[last_elem] = max(0.0, remaining)
                         st.write(f"**{last_elem}: {sublattice_concentrations[last_elem]:.6f}** (automatic)")
 
-
                     total_frac = sum(sublattice_concentrations.values())
                     if abs(total_frac - 1.0) > 1e-6:
                         st.error(f"Total fraction = {total_frac:.6f}, should be 1.0")
@@ -2275,75 +2343,211 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     return chem_symbols, target_concentrations, None
 
 
+import streamlit as st
+import pandas as pd
+import numpy as np
+from pymatgen.core import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from ase.build import make_supercell
+
+
+# Assuming helpers module contains necessary functions like pymatgen_to_ase, get_unique_sites, get_all_sites, structure_preview, sqs_visualization
+# from helpers import * # Removed the above line as I don't have access to your helpers.py,
+# but the structure_preview and sqs_visualization are critical for context.
+
+
 def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
                                      unique_sites):
-
     try:
         nx, ny, nz = transformation_matrix[0, 0], transformation_matrix[1, 1], transformation_matrix[2, 2]
         supercell_multiplicity = nx * ny * nz
+        total_primitive_sites = len(working_structure)
 
         st.write("**Sublattice Configuration Preview:**")
-        sublattice_info = {}
+        sublattice_display_info = {}
+
+        unique_site_map = {}
+        for u_site_info in unique_sites:
+            for idx in u_site_info['equivalent_indices']:
+                unique_site_map[idx] = u_site_info
 
         for sublattice_letter, concentrations in target_concentrations.items():
-            sublattice_sites = []
-            for i, site_elements in enumerate(chem_symbols):
-                if len(site_elements) > 1:  # Only mixed sites
-                    if set(site_elements) == set(concentrations.keys()):
-                        sublattice_sites.append(i)
+            first_associated_original_site_idx = -1
+            for i, site_elements_at_idx in enumerate(chem_symbols):
+                if len(site_elements_at_idx) > 1 and set(site_elements_at_idx) == set(concentrations.keys()):
+                    first_associated_original_site_idx = i
+                    break
 
-            if sublattice_sites:
-                for site_info in unique_sites:
-                    if any(idx in site_info['equivalent_indices'] for idx in sublattice_sites):
-                        multiplicity = len([idx for idx in site_info['equivalent_indices'] if idx in sublattice_sites])
+            if first_associated_original_site_idx != -1:
+                u_site_info = unique_site_map.get(first_associated_original_site_idx)
+                if u_site_info:
+                    total_atoms_in_this_sublattice_supercell = u_site_info['multiplicity'] * supercell_multiplicity
 
-                        sublattice_info[sublattice_letter] = {
-                            'wyckoff_letter': site_info['wyckoff_letter'],
-                            'element': site_info['element'],
-                            'multiplicity': multiplicity,
-                            'concentrations': concentrations,
-                            'total_atoms_in_supercell': multiplicity * supercell_multiplicity
-                        }
-                        break
+                    conc_parts = []
+                    for element, frac in sorted(concentrations.items()):
+                        if frac > 1e-6:
+                            conc_parts.append(f"{element}={frac:.6f}")
+
+                    sublattice_display_info[sublattice_letter] = {
+                        "Wyckoff Position": f"{u_site_info['element']} @ {u_site_info['wyckoff_letter']}",
+                        "Multiplicity": u_site_info['multiplicity'],
+                        "Supercell Atoms": total_atoms_in_this_sublattice_supercell,
+                        "Element Assignments": ", ".join(conc_parts)
+                    }
 
         preview_data = []
-        for sublattice_letter, info in sublattice_info.items():
-            conc_parts = []
-            for element, frac in sorted(info['concentrations'].items()):
-                if frac > 1e-6:
-                    atom_count = frac * info['total_atoms_in_supercell']
-                    conc_parts.append(f"{element}={frac:.6f} ({atom_count:.0f} atoms)")
-
-            preview_data.append({
-                "Sublattice": sublattice_letter,
-                "Wyckoff Position": f"{info['element']} @ {info['wyckoff_letter']}",
-                "Multiplicity": info['multiplicity'],
-                "Supercell Atoms": info['total_atoms_in_supercell'],
-                "Element Assignments": ", ".join(conc_parts)
-            })
+        for s_letter in sorted(sublattice_display_info.keys()):
+            preview_data.append({"Sublattice": s_letter, **sublattice_display_info[s_letter]})
 
         if preview_data:
             preview_df = pd.DataFrame(preview_data)
             st.dataframe(preview_df, use_container_width=True)
         else:
             st.warning("No mixed sublattices configured yet.")
-
-        pure_sites = []
-        for i, site_elements in enumerate(chem_symbols):
-            if len(site_elements) == 1:
-                for site_info in unique_sites:
-                    if i in site_info['equivalent_indices']:
-                        pure_sites.append({
-                            "Wyckoff Position": f"{site_info['element']} @ {site_info['wyckoff_letter']}",
-                            "Multiplicity": site_info['multiplicity'],
-                            "Status": f"Pure {site_elements[0]} (unchanged)"
-                        })
+        pure_sites_data = []
+        for u_site_info in unique_sites:
+            original_site_index = u_site_info['equivalent_indices'][0]
+            if original_site_index < len(chem_symbols) and len(chem_symbols[original_site_index]) == 1:
+                is_part_of_mixed_sublattice = False
+                for target_concs_dict in target_concentrations.values():
+                    if set(chem_symbols[original_site_index]) == set(target_concs_dict.keys()):
+                        is_part_of_mixed_sublattice = True
                         break
 
-        if pure_sites:
+                if not is_part_of_mixed_sublattice:
+                    pure_element = chem_symbols[original_site_index][0]
+                    pure_sites_data.append({
+                        "Wyckoff Position": f"{pure_element} @ {u_site_info['wyckoff_letter']}",
+                        "Multiplicity": u_site_info['multiplicity'],
+                        "Supercell Atoms": u_site_info['multiplicity'] * supercell_multiplicity,
+                        "Status": f"Pure {pure_element} (unchanged)"
+                    })
+
+        if pure_sites_data:
             st.write("**Pure (Unchanged) Sites:**")
-            pure_df = pd.DataFrame(pure_sites)
+            pure_df = pd.DataFrame(pure_sites_data)
             st.dataframe(pure_df, use_container_width=True)
+
+        st.markdown(
+            """
+            <hr style="border: none; height: 3px; background-color: #555; border-radius: 8px; margin: 20px 0;">
+            """,
+            unsafe_allow_html=True
+        )
+        st.write("#### **Overall Expected Element Distribution in Supercell:**")
+
+        total_element_counts = {}
+        for i in range(total_primitive_sites):
+            u_site_info = unique_site_map.get(i)
+            if not u_site_info:
+                continue
+
+            site_multiplicity_in_primitive = 1
+            site_multiplicity_in_supercell = site_multiplicity_in_primitive * supercell_multiplicity
+            site_elements_list = chem_symbols[i]
+
+            current_site_composition = {}
+            if len(site_elements_list) == 1:  # Pure site.
+                is_now_mixed = False
+                for t_concs in target_concentrations.values():
+                    if set(site_elements_list) == set(t_concs.keys()):
+                        current_site_composition = t_concs
+                        is_now_mixed = True
+                        break
+                if not is_now_mixed:
+                    current_site_composition = {site_elements_list[0]: 1.0}  # Pure element, 100% occupancy
+            else:
+                found_sublattice_config = False
+                for t_concs in target_concentrations.values():
+                    if set(site_elements_list) == set(t_concs.keys()):
+                        current_site_composition = t_concs
+                        found_sublattice_config = True
+                        break
+                if not found_sublattice_config:
+                   # st.warning(
+                   #     f"Warning: Site {i} has multiple elements {site_elements_list} but no matching sublattice configuration. Defaulting to original fractional occupancies if available.")
+                    if working_structure[i].is_ordered:
+                        current_site_composition = {working_structure[i].specie.symbol: 1.0}
+                    else:
+                        current_site_composition = {str(sp): occ for sp, occ in working_structure[i].species.items()}
+
+            for element, fraction in current_site_composition.items():
+                atom_count_at_this_site_in_supercell = fraction * site_multiplicity_in_supercell
+                total_element_counts[element] = total_element_counts.get(element,
+                                                                         0) + atom_count_at_this_site_in_supercell
+
+        total_atoms_in_overall_supercell = sum(total_element_counts.values())
+
+        ase_atoms = pymatgen_to_ase(working_structure)
+        supercell_preview_atoms = make_supercell(ase_atoms, transformation_matrix)
+        expected_total_atoms = len(supercell_preview_atoms)
+
+        if abs(total_atoms_in_overall_supercell - expected_total_atoms) > 1e-6 and total_atoms_in_overall_supercell > 0:
+            correction_factor = expected_total_atoms / total_atoms_in_overall_supercell
+            for elem in total_element_counts:
+                total_element_counts[elem] *= correction_factor
+            total_atoms_in_overall_supercell = expected_total_atoms
+
+        if total_element_counts:
+            cols = st.columns(min(len(total_element_counts), 4))
+            for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
+                percentage = (
+                                     count / total_atoms_in_overall_supercell) * 100 if total_atoms_in_overall_supercell > 0 else 0
+                with cols[i % len(cols)]:
+                    if percentage >= 80:
+                        color = "#2E4057"
+                    elif percentage >= 60:
+                        color = "#4A6741"
+                    elif percentage >= 40:
+                        color = "#6B73FF"
+                    elif percentage >= 25:
+                        color = "#FF8C00"
+                    elif percentage >= 15:
+                        color = "#4ECDC4"  # Teal
+                    elif percentage >= 10:
+                        color = "#45B7D1"  # Blue
+                    elif percentage >= 5:
+                        color = "#96CEB4"  # Green
+                    elif percentage >= 2:
+                        color = "#FECA57"  # Yellow
+                    elif percentage >= 1:
+                        color = "#DDA0DD"  # Plum
+                    else:
+                        color = "#D3D3D3"  # Light Gray
+
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(135deg, {color}, {color}CC);
+                        padding: 20px;
+                        border-radius: 15px;
+                        text-align: center;
+                        margin: 10px 0;
+                        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                        border: 2px solid rgba(255,255,255,0.2);
+                    ">
+                        <h1 style="
+                            color: white;
+                            font-size: 3em;
+                            margin: 0;
+                            text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                            font-weight: bold;
+                        ">{elem}</h1>
+                        <h2 style="
+                            color: white;
+                            font-size: 2em;
+                            margin: 10px 0 0 0;
+                            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                        ">{percentage:.1f}%</h2>
+                        <p style="
+                            color: white;
+                            font-size: 1.8em;
+                            margin: 5px 0 0 0;
+                            opacity: 0.9;
+                        ">{int(count)} atoms</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+            st.write(f"**Total expected atoms in supercell:** {int(total_atoms_in_overall_supercell)}")
 
     except Exception as e:
         st.error(f"Error creating sublattice preview: {e}")
@@ -2351,7 +2555,6 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
 
 def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, chem_symbols, transformation_matrix,
                                                          working_structure, unique_sites):
-
     nx, ny, nz = transformation_matrix[0, 0], transformation_matrix[1, 1], transformation_matrix[2, 2]
     supercell_multiplicity = nx * ny * nz
 
@@ -2408,7 +2611,6 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
     return achievable_concentrations, adjustment_info
 
 
-
 def calculate_achievable_concentrations(target_concentrations, total_atoms):
     achievable_concentrations = {}
     achievable_counts = {}
@@ -2449,7 +2651,6 @@ def calculate_achievable_concentrations(target_concentrations, total_atoms):
 
 def generate_atat_rndstr_content_corrected(structure, achievable_concentrations, use_sublattice_mode, chem_symbols,
                                            transformation_matrix):
-
     lattice = structure.lattice
     max_param = max(lattice.a, lattice.b, lattice.c) if max(lattice.a, lattice.b, lattice.c) > 0 else 1
     lines = [
@@ -2513,7 +2714,8 @@ def generate_atat_sqscell_content(nx, ny, nz):
 
 def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
     commands = []
-    commands.append("# Step 1: Generate cluster information, -noe: not including empty cluster, -nop: not including point cluster(s)")
+    commands.append(
+        "# Step 1: Generate cluster information, -noe: not including empty cluster, -nop: not including point cluster(s)")
     cluster_cmd = f"corrdump -l=rndstr.in -ro -noe -nop -clus -2={round(pair_cutoff, 3)}"
 
     if triplet_cutoff is not None:
@@ -2530,7 +2732,8 @@ def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutof
     commands.append("# Option A: Use predefined supercell from sqscell.out")
     commands.append("mcsqs -rc")
     commands.append("")
-    commands.append("# Option B: Specify number of atoms directly (will search for the most randomized supercell - distorts the original cell shape)")
+    commands.append(
+        "# Option B: Specify number of atoms directly (will search for the most randomized supercell - distorts the original cell shape)")
     commands.append(f"mcsqs -n {total_atoms}")
     commands.append("")
     commands.append("# Step 4: (Optional) Parallel execution for faster results")
@@ -2616,7 +2819,6 @@ def create_optimization_plot_csv(minutes, objective_values, additional_data=None
         hovertemplate='<b>Minute:</b> %{x}<br><b>Objective Function:</b> %{y:.6f}<extra></extra>'
     ))
 
-
     best_value = min(objective_values)
     fig.add_hline(
         y=best_value,
@@ -2650,7 +2852,7 @@ def create_optimization_plot_csv(minutes, objective_values, additional_data=None
             mode='lines',
             name='Step Count',
             line=dict(color='green', width=2),
-            #marker=dict(size=3, color='green'),
+            # marker=dict(size=3, color='green'),
             yaxis='y2',
             hovertemplate='<b>Minute:</b> %{x}<br><b>Steps:</b> %{y}<extra></extra>'
         ))
@@ -2784,7 +2986,6 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
 
 
 def validate_mcsqs_progress_csv(csv_content):
-
     from io import StringIO
 
     try:
@@ -2797,10 +2998,8 @@ def validate_mcsqs_progress_csv(csv_content):
         if missing_columns:
             return False, f"Missing required columns: {', '.join(missing_columns)}"
 
-
         if len(df) == 0:
             return False, "CSV file is empty"
-
 
         try:
             df['Minute'] = pd.to_numeric(df['Minute'])
@@ -2821,12 +3020,12 @@ def validate_mcsqs_progress_csv(csv_content):
 
 
 def render_extended_optimization_analysis_tab():
-
     st.write("**Upload optimization files to analyze progress:**")
-    log_tab, csv_tab, parallel_tab = st.tabs([
+    log_tab, csv_tab, parallel_tab, correlation_tab = st.tabs([
         "📊 mcsqs.log Analysis",
         "📈 mcsqs_progress.csv Analysis",
-        "🔄 Parallel Runs Analysis"
+        "🔄 Parallel Runs Analysis",
+        "🔗 bestcorr.out Analysis"
     ])
 
     with log_tab:
@@ -2872,20 +3071,20 @@ def render_extended_optimization_analysis_tab():
                     st.metric("Best at Step", best_step)
 
                 # Convergence analysis
-               # st.subheader("📈 Convergence Analysis")
+                # st.subheader("📈 Convergence Analysis")
 
                 # Calculate convergence metrics
-                #convergence_info = analyze_convergence(objective_values)
+                # convergence_info = analyze_convergence(objective_values)
 
-                #col_conv_info1, col_conv_info2 = st.columns(2)
+                # col_conv_info1, col_conv_info2 = st.columns(2)
 
-                #with col_conv_info1:
+                # with col_conv_info1:
                 #    st.write("**Convergence Metrics:**")
                 #    for key, value in convergence_info.items():
                 #        st.write(f"- **{key}:** {value}")
 
-                #with col_conv_info2:
-                    # Create convergence assessment
+                # with col_conv_info2:
+                # Create convergence assessment
                 #    if convergence_info['Convergence Status'] == "✅ Converged":
                 #        st.success("🎯 **Optimization Status: CONVERGED**")
                 #        st.info("The objective function has stabilized. This SQS is ready for use.")
@@ -2949,7 +3148,6 @@ def render_extended_optimization_analysis_tab():
                 fig = create_optimization_plot_csv(minutes, objective_values, additional_data)
                 st.plotly_chart(fig, use_container_width=True)
 
-
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
 
                 with col_stats1:
@@ -2968,9 +3166,7 @@ def render_extended_optimization_analysis_tab():
                     st.metric("Best Value", f"{best_value:.6f}")
                     st.metric("Runtime", f"{runtime:.0f} min")
 
-
                 st.subheader("📈 Time-Based Convergence Analysis")
-
 
                 convergence_info = analyze_convergence_csv(minutes, objective_values, additional_data)
 
@@ -2992,7 +3188,6 @@ def render_extended_optimization_analysis_tab():
                     else:
                         st.warning("🔄 **Optimization Status: FLUCTUATING**")
                         st.info("The optimization may need more time or different parameters.")
-
 
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
@@ -3017,19 +3212,19 @@ def render_extended_optimization_analysis_tab():
                             key="download_progress_csv"
                         )
 
-               #with st.expander("📊 Raw CSV Data", expanded=False):
+            # with st.expander("📊 Raw CSV Data", expanded=False):
 
-               #     display_data = {
-               #         'Minute': minutes,
-               #         'Objective_Function': objective_values
-               #     }
+            #     display_data = {
+            #         'Minute': minutes,
+            #         'Objective_Function': objective_values
+            #     }
 
-               #     for key, values in additional_data.items():
-               #         if len(values) == len(minutes):
-               #             display_data[key] = values
+            #     for key, values in additional_data.items():
+            #         if len(values) == len(minutes):
+            #             display_data[key] = values
 
-               #     df_raw = pd.DataFrame(display_data)
-               #     st.dataframe(df_raw, use_container_width=True)
+            #     df_raw = pd.DataFrame(display_data)
+            #     st.dataframe(df_raw, use_container_width=True)
 
             except UnicodeDecodeError:
                 st.error("Error reading CSV file. Please ensure the file is a text file with UTF-8 encoding.")
@@ -3072,7 +3267,7 @@ def render_extended_optimization_analysis_tab():
 
                             parallel_results.append({
                                 'File': log_file.name,
-                               # 'Run': i + 1,
+                                # 'Run': i + 1,
                                 'Run': run_number,
                                 'BestSQS': f'bestsqs{run_number}.out',
                                 'Final_Objective': final_objective,
@@ -3136,7 +3331,7 @@ def render_extended_optimization_analysis_tab():
                     with col_best:
                         st.success(f"**🥇 Best Performing Run:\t\t{best_run['File']}** ({best_run['BestSQS']})")
                         st.write(f"**File:** {best_run['File']}")
-                        #st.write(f"**Final Objective:** {best_run['Final_Objective']:.6f}")
+                        # st.write(f"**Final Objective:** {best_run['Final_Objective']:.6f}")
                         st.write(f"**Best Objective:** {best_run['Best_Objective']:.6f}")
                         st.write(f"**Total Steps:** {best_run['Total_Steps']}")
                         st.write(f"**Total Improvement:** {best_run['Total_Improvement']:.6f}")
@@ -3144,11 +3339,10 @@ def render_extended_optimization_analysis_tab():
                     with col_worst:
                         st.error(f"**🥉 Worst Performing Run:\t\t{worst_run['File']}** ({worst_run['BestSQS']})")
                         st.write(f"**File:** {worst_run['File']}")
-                        #st.write(f"**Final Objective:** {worst_run['Final_Objective']:.6f}")
+                        # st.write(f"**Final Objective:** {worst_run['Final_Objective']:.6f}")
                         st.write(f"**Best Objective:** {worst_run['Best_Objective']:.6f}")
                         st.write(f"**Total Steps:** {worst_run['Total_Steps']}")
                         st.write(f"**Total Improvement:** {worst_run['Total_Improvement']:.6f}")
-
 
                     st.subheader("📋 Detailed Comparison")
 
@@ -3157,7 +3351,7 @@ def render_extended_optimization_analysis_tab():
                         comparison_data.append({
                             "File": result['File'],
                             "Run #": result['Run'],
-                            #"Final Objective": f"{result['Final_Objective']:.6f}",
+                            # "Final Objective": f"{result['Final_Objective']:.6f}",
                             "Best Objective": f"{result['Best_Objective']:.6f}",
                             "Total Steps": result['Total_Steps'],
                             "Improvement": f"{result['Total_Improvement']:.6f}",
@@ -3167,9 +3361,7 @@ def render_extended_optimization_analysis_tab():
                     comparison_df = pd.DataFrame(comparison_data)
                     st.dataframe(comparison_df, use_container_width=True)
 
-
                     st.subheader("📈 Combined Optimization Progress")
-
 
                     import plotly.graph_objects as go
 
@@ -3219,7 +3411,6 @@ def render_extended_optimization_analysis_tab():
                             tickfont=dict(size=16)
                         )
                     )
-
 
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -3286,11 +3477,12 @@ def render_extended_optimization_analysis_tab():
             st.info("For single file analysis, use the 'mcsqs.log Analysis' tab instead.")
         else:
             st.info("Upload multiple log files from parallel ATAT runs to see comparison analysis.")
+    with correlation_tab:
+        render_correlation_analysis_tab()
 
 
 def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1, pair_cutoff=1.1, triplet_cutoff=None,
                                  quadruplet_cutoff=None):
-
     if use_atom_count:
         mcsqs_base_cmd = f"mcsqs -n {results['total_atoms']}"
     else:
@@ -3306,7 +3498,7 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
         mcsqs_commands = []
         for i in range(1, parallel_runs + 1):
             mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} &")
-        mcsqs_execution = "\n".join(mcsqs_commands) #+ "\nwait"
+        mcsqs_execution = "\n".join(mcsqs_commands)  # + "\nwait"
         log_file = "mcsqs1.log"  # Use mcsqs1.log for parallel runs
         mcsqs_display_cmd = f"{mcsqs_base_cmd} -ip=1 & {mcsqs_base_cmd} -ip=2 & ... (parallel execution)"
     else:
@@ -3588,7 +3780,7 @@ def render_monitor_script_section(results):
         triplet_cutoff = results.get('triplet_cutoff', None)
         quadruplet_cutoff = results.get('quadruplet_cutoff', None)
 
-        st.write(f"Pair cutoff: {round(pair_cutoff,3)}")
+        st.write(f"Pair cutoff: {round(pair_cutoff, 3)}")
         if triplet_cutoff:
             st.write(f"Triplet cutoff: {triplet_cutoff}")
         if quadruplet_cutoff:
@@ -3932,18 +4124,15 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
 
 
 def generate_poscar_from_structure(structure, comment="Generated Structure"):
-
     from pymatgen.io.vasp import Poscar
 
     ordered_structure = prepare_structure_for_prdf(structure)
-
 
     poscar = Poscar(ordered_structure, comment=comment)
     return str(poscar)
 
 
 def generate_vacancy_summary_report(removal_info, elements_removed):
-
     report_lines = [
         "VACANCY STRUCTURE CREATION REPORT",
         "=" * 40,
@@ -3981,3 +4170,352 @@ def generate_vacancy_summary_report(removal_info, elements_removed):
     ])
 
     return "\n".join(report_lines)
+
+
+# Correlation
+
+def render_correlation_analysis_tab():
+    st.write("**Upload bestcorr.out file to analyze correlation functions:**")
+    uploaded_bestcorr = st.file_uploader(
+        "Upload bestcorr.out file:",
+        type=['out', 'txt'],
+        help="Upload the bestcorr.out file generated by ATAT mcsqs optimization",
+        key="bestcorr_uploader"
+    )
+
+    if uploaded_bestcorr is not None:
+        try:
+            file_content = uploaded_bestcorr.read().decode('utf-8')
+            correlation_data, objective_function = parse_bestcorr_file(file_content)
+
+            if not correlation_data:
+                st.warning("No correlation data found in the file.")
+                st.info("Please ensure the file contains correlation function data.")
+                return
+
+            st.success(f"✅ Successfully parsed {len(correlation_data)} correlation functions!")
+
+            if objective_function is not None:
+                st.metric("Objective Function", f"{objective_function:.6f}")
+
+            st.subheader("🎯 SQS Quality Assessment")
+
+            ordering_analysis = analyze_ordering_from_correlations(correlation_data)
+
+            col_status1, col_status2 = st.columns([1, 1])
+
+            with col_status1:
+                status = ordering_analysis['overall_status']
+                recommendation = ordering_analysis['recommendation']
+
+                if status == "Excellent SQS":
+                    st.success(f"🎯 **{status}**")
+                    st.success(f"✅ **{recommendation}**")
+                elif status == "Good SQS":
+                    st.success(f"✅ **{status}**")
+                    st.info(f"ℹ️ **{recommendation}**")
+                elif status == "Fair SQS":
+                    st.warning(f"⚠️ **{status}**")
+                    st.warning(f"⚠️ **{recommendation}**")
+                else:
+                    st.error(f"❌ **{status}**")
+                    st.error(f"🔄 **{recommendation}**")
+
+            with col_status2:
+                st.write("**Detailed Assessment:**")
+                st.write(f"• **Randomness Score:** {ordering_analysis['randomness_score']:.3f}/1.0")
+                st.write(f"• **Max Deviation:** {ordering_analysis['max_abs_difference']:.4f}")
+                st.write(f"• **Average Deviation:** {ordering_analysis['avg_abs_difference']:.4f}")
+                if ordering_analysis['perfect_matches'] > 0:
+                    st.write(f"• **Perfect Matches:** {ordering_analysis['perfect_matches']}")
+
+            col_metrics1, col_metrics2, col_metrics3 = st.columns(3)
+
+            with col_metrics1:
+                st.metric("Strong Deviations", ordering_analysis['strong_deviations'])
+                st.metric("Moderate Deviations", ordering_analysis['moderate_deviations'])
+
+            with col_metrics2:
+                st.metric("Weak Deviations", ordering_analysis['weak_deviations'])
+                st.metric("Perfect Matches", ordering_analysis['perfect_matches'])
+
+            with col_metrics3:
+                st.metric("Total Correlations", ordering_analysis['total_correlations'])
+                st.metric("Max Distance", f"{ordering_analysis['max_distance']:.3f} Å")
+
+            st.subheader("📈 Correlation Analysis")
+            correlation_plot = create_correlation_distance_plot(correlation_data)
+            st.plotly_chart(correlation_plot, use_container_width=True)
+
+            col_interpretation1, col_interpretation2 = st.columns(2)
+
+            with col_interpretation1:
+                st.subheader("🔍 Interpretation Guide")
+                st.write("**Understanding Correlations:**")
+                st.write("• **Target**: Expected value for perfect random alloy")
+                st.write("• **SQS**: Actual value in your structure")
+                st.write("• **Difference**: How far you are from ideal randomness")
+                st.write("")
+                st.write("**Deviation Categories:**")
+                st.write("• **Strong (>0.1)**: Significant ordering/clustering")
+                st.write("• **Moderate (0.05-0.1)**: Some non-random behavior")
+                st.write("• **Weak (<0.05)**: Nearly random (good!)")
+                st.write("• **Perfect (=0.0)**: Exact match to target")
+
+            with col_interpretation2:
+                st.subheader("📋 Distance Analysis")
+                distance_analysis = analyze_correlations_by_distance(correlation_data)
+
+                for distance, data in list(distance_analysis.items())[:5]:
+                    with st.expander(f"Distance {distance:.3f} Å ({data['count']} correlations)", expanded=False):
+                        st.write(f"**Average SQS correlation:** {data['avg_sqs_correlation']:.4f}")
+                        st.write(f"**Max |difference|:** {data['max_abs_difference']:.4f}")
+                        st.write(f"**Standard deviation:** {data['std_difference']:.4f}")
+
+                        if data['max_abs_difference'] > 0.1:
+                            st.error("❌ Significant deviations at this distance")
+                        elif data['max_abs_difference'] > 0.05:
+                            st.warning("⚠️ Moderate deviations at this distance")
+                        else:
+                            st.success("✅ Good randomness at this distance")
+
+            st.subheader("📊 Detailed Correlation Data")
+
+            correlation_df = pd.DataFrame(correlation_data)
+            correlation_df['Abs_Target_Correlation'] = correlation_df['Target_Correlation'].abs()
+            correlation_df['Abs_SQS_Correlation'] = correlation_df['SQS_Correlation'].abs()
+            correlation_df['Difference'] = correlation_df['SQS_Correlation'] - correlation_df['Target_Correlation']
+            correlation_df['Abs_Difference'] = correlation_df['Difference'].abs()
+
+            correlation_df['Quality'] = correlation_df['Abs_Difference'].apply(
+                lambda x: "Perfect" if x < 0.001 else "Weak" if x <= 0.05 else "Moderate" if x <= 0.1 else "Strong"
+            )
+
+            correlation_df = correlation_df.round(6)
+
+            st.dataframe(correlation_df, use_container_width=True)
+
+            col_stats1, col_stats2 = st.columns(2)
+
+            with col_stats1:
+                st.write("**Statistical Summary:**")
+                st.write(f"• **Total correlations:** {len(correlation_data)}")
+                st.write(f"• **Average |SQS correlation|:** {correlation_df['Abs_SQS_Correlation'].mean():.4f}")
+                st.write(f"• **Average |difference|:** {correlation_df['Abs_Difference'].mean():.4f}")
+                st.write(f"• **Max |difference|:** {correlation_df['Abs_Difference'].max():.4f}")
+
+            with col_stats2:
+                strong_count = len(correlation_df[correlation_df['Abs_Difference'] > 0.1])
+                moderate_count = len(correlation_df[(correlation_df['Abs_Difference'] > 0.05) &
+                                                    (correlation_df['Abs_Difference'] <= 0.1)])
+                weak_count = len(correlation_df[(correlation_df['Abs_Difference'] > 0.001) &
+                                                (correlation_df['Abs_Difference'] <= 0.05)])
+                perfect_count = len(correlation_df[correlation_df['Abs_Difference'] <= 0.001])
+
+                st.write("**Deviation Distribution:**")
+                st.write(f"• **Strong deviations (>0.1):** {strong_count}")
+                st.write(f"• **Moderate deviations (0.05-0.1):** {moderate_count}")
+                st.write(f"• **Weak deviations (<0.05):** {weak_count}")
+                st.write(f"• **Perfect matches (<0.001):** {perfect_count}")
+
+            csv_data = correlation_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Correlation Analysis (CSV)",
+                data=csv_data,
+                file_name="correlation_analysis.csv",
+                mime="text/csv",
+                key="download_correlation_csv"
+            )
+
+        except UnicodeDecodeError:
+            st.error("Error reading bestcorr.out file. Please ensure the file is a text file with UTF-8 encoding.")
+        except Exception as e:
+            st.error(f"Error processing bestcorr.out file: {str(e)}")
+            import traceback
+            st.error(f"Debug info: {traceback.format_exc()}")
+
+
+def parse_bestcorr_file(file_content):
+    lines = file_content.strip().split('\n')
+    correlation_data = []
+    objective_function = None
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith('Objective_function='):
+            objective_function = float(line.split('=')[1].strip())
+        elif line and not line.startswith('#'):
+            parts = line.split()
+            if len(parts) >= 4:
+                try:
+                    cluster_type = int(parts[0])
+                    distance = float(parts[1])
+                    sqs_correlation = float(parts[2])
+                    target_correlation = float(parts[3])
+
+                    correlation_data.append({
+                        'Cluster_Type': cluster_type,
+                        'Distance': distance,
+                        'SQS_Correlation': sqs_correlation,
+                        'Target_Correlation': target_correlation
+                    })
+                except (ValueError, IndexError):
+                    continue
+
+    return correlation_data, objective_function
+
+
+def analyze_ordering_from_correlations(correlation_data):
+    if not correlation_data:
+        return {}
+
+    differences = [abs(data['SQS_Correlation'] - data['Target_Correlation']) for data in correlation_data]
+    sqs_correlations = [abs(data['SQS_Correlation']) for data in correlation_data]
+    distances = [data['Distance'] for data in correlation_data]
+
+    max_abs_difference = max(differences)
+    avg_abs_difference = sum(differences) / len(differences)
+
+    strong_deviations = sum(1 for diff in differences if diff > 0.1)
+    moderate_deviations = sum(1 for diff in differences if 0.05 < diff <= 0.1)
+    weak_deviations = sum(1 for diff in differences if 0.001 < diff <= 0.05)
+    perfect_matches = sum(1 for diff in differences if diff <= 0.001)
+
+    randomness_score = 1.0 - (avg_abs_difference * 2)
+    randomness_score = max(0, min(1, randomness_score))
+
+    if perfect_matches >= len(correlation_data) * 0.8 and max_abs_difference <= 0.05:
+        overall_status = "Excellent SQS"
+        recommendation = "Structure is highly disordered and ideal for calculations"
+    elif strong_deviations == 0 and max_abs_difference <= 0.1:
+        overall_status = "Good SQS"
+        recommendation = "Structure is well-disordered and should be suitable for most calculations"
+    elif strong_deviations <= len(correlation_data) * 0.2:
+        overall_status = "Fair SQS"
+        recommendation = "Structure has some ordering - consider longer mcsqs run"
+    else:
+        overall_status = "Poor SQS"
+        recommendation = "Structure shows significant ordering - extend mcsqs optimization"
+
+    return {
+        'overall_status': overall_status,
+        'recommendation': recommendation,
+        'randomness_score': randomness_score,
+        'max_abs_difference': max_abs_difference,
+        'avg_abs_difference': avg_abs_difference,
+        'strong_deviations': strong_deviations,
+        'moderate_deviations': moderate_deviations,
+        'weak_deviations': weak_deviations,
+        'perfect_matches': perfect_matches,
+        'max_distance': max(distances) if distances else 0,
+        'total_correlations': len(correlation_data)
+    }
+
+
+def analyze_correlations_by_distance(correlation_data):
+    distance_groups = {}
+
+    for data in correlation_data:
+        distance = round(data['Distance'], 3)
+        if distance not in distance_groups:
+            distance_groups[distance] = []
+        distance_groups[distance].append({
+            'sqs_correlation': data['SQS_Correlation'],
+            'target_correlation': data['Target_Correlation'],
+            'difference': data['SQS_Correlation'] - data['Target_Correlation']
+        })
+
+    distance_analysis = {}
+    for distance, correlations in distance_groups.items():
+        sqs_values = [corr['sqs_correlation'] for corr in correlations]
+        differences = [abs(corr['difference']) for corr in correlations]
+
+        distance_analysis[distance] = {
+            'count': len(correlations),
+            'avg_sqs_correlation': sum(sqs_values) / len(sqs_values),
+            'max_abs_difference': max(differences),
+            'std_difference': (sum((d - sum(differences) / len(differences)) ** 2 for d in differences) / len(
+                differences)) ** 0.5
+        }
+
+    return dict(sorted(distance_analysis.items()))
+
+
+def create_correlation_distance_plot(correlation_data):
+    import plotly.graph_objects as go
+
+    distances = [data['Distance'] for data in correlation_data]
+    sqs_correlations = [data['SQS_Correlation'] for data in correlation_data]
+    target_correlations = [data['Target_Correlation'] for data in correlation_data]
+    differences = [abs(data['SQS_Correlation'] - data['Target_Correlation']) for data in correlation_data]
+    cluster_types = [data['Cluster_Type'] for data in correlation_data]
+
+    colors = ['red' if diff > 0.1 else 'orange' if diff > 0.05 else 'green' for diff in differences]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=distances,
+        y=target_correlations,
+        mode='markers',
+        name='Target (Random Alloy)',
+        marker=dict(
+            color='blue',
+            size=8,
+            symbol='circle',
+            opacity=0.7
+        ),
+        hovertemplate='<b>Target (Random)</b><br>Distance: %{x:.3f} Å<br>Correlation: %{y:.4f}<extra></extra>'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=distances,
+        y=sqs_correlations,
+        mode='markers',
+        name='SQS Structure',
+        marker=dict(
+            color=colors,
+            size=10,
+            symbol='diamond',
+            opacity=0.8
+        ),
+        hovertemplate='<b>SQS Structure</b><br>Distance: %{x:.3f} Å<br>Correlation: %{y:.4f}<br>Cluster: %{customdata}-body<extra></extra>',
+        customdata=cluster_types
+    ))
+
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+    fig.add_hline(y=0.1, line_dash="dot", line_color="red", opacity=0.3,
+                  annotation_text="Strong deviation threshold (+0.1)")
+    fig.add_hline(y=-0.1, line_dash="dot", line_color="red", opacity=0.3,
+                  annotation_text="Strong deviation threshold (-0.1)")
+    fig.add_hline(y=0.05, line_dash="dot", line_color="orange", opacity=0.3)
+    fig.add_hline(y=-0.05, line_dash="dot", line_color="orange", opacity=0.3)
+
+    fig.update_layout(
+        title=dict(
+            text="SQS vs Target Correlation Functions",
+            font=dict(size=24, family="Arial Black")
+        ),
+        xaxis_title="Inter-atomic Distance (Å)",
+        yaxis_title="Correlation Function Value",
+        height=600,
+        hovermode='closest',
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            font=dict(size=14)
+        ),
+        font=dict(size=16, family="Arial"),
+        xaxis=dict(
+            title_font=dict(size=18, family="Arial Black"),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            title_font=dict(size=18, family="Arial Black"),
+            tickfont=dict(size=14)
+        )
+    )
+
+    return fig
