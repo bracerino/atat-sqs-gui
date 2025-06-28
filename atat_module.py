@@ -5,7 +5,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.build import make_supercell
 from helpers import *
-
+from parallel_analysis import *
 
 def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
     try:
@@ -3021,13 +3021,15 @@ def validate_mcsqs_progress_csv(csv_content):
 
 def render_extended_optimization_analysis_tab():
     st.write("**Upload optimization files to analyze progress:**")
-    log_tab, csv_tab, parallel_tab, correlation_tab = st.tabs([
+    log_tab, csv_tab, parallel_tab, correlation_tab, tab_para = st.tabs([
         "📊 mcsqs.log Analysis",
         "📈 mcsqs_progress.csv Analysis",
         "🔄 Parallel Runs Analysis",
-        "🔗 bestcorr.out Analysis"
+        "🔗 bestcorr.out Analysis",
+        "📊 Parallel CSV Analysis",
     ])
-
+    with tab_para:
+        render_parallel_csv_analysis_tab()
     with log_tab:
         st.write("**Upload mcsqs.log file to analyze optimization progress:**")
         uploaded_mcsqs_log = st.file_uploader(
@@ -3498,16 +3500,155 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
         mcsqs_commands = []
         for i in range(1, parallel_runs + 1):
             mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} &")
-        mcsqs_execution = "\n".join(mcsqs_commands)  # + "\nwait"
-        log_file = "mcsqs1.log"  # Use mcsqs1.log for parallel runs
+        mcsqs_execution = "\n".join(mcsqs_commands)
+        log_file = "mcsqs1.log"
         mcsqs_display_cmd = f"{mcsqs_base_cmd} -ip=1 & {mcsqs_base_cmd} -ip=2 & ... (parallel execution)"
+        progress_file = "mcsqs_parallel_progress.csv"
+
+        monitoring_function = f'''start_parallel_monitoring_process() {{
+   local output_file="$1"
+   local minute=0
+
+   echo "Monitor started for {parallel_runs} parallel runs. Waiting for 5 seconds to allow mcsqs to initialize..."
+   sleep 5
+
+   header="Minute,Timestamp"
+   for i in $(seq 1 {parallel_runs}); do
+       header="$header,Run${{i}}_Steps,Run${{i}}_Objective,Run${{i}}_Status"
+   done
+   header="$header,Best_Overall_Objective,Best_Run"
+   echo "$header" > "$output_file"
+
+   echo "----------------------------------------"
+   echo "Monitoring {parallel_runs} parallel MCSQS runs every minute"
+   echo "Log files: mcsqs1.log, mcsqs2.log, ..., mcsqs{parallel_runs}.log"
+   echo "----------------------------------------"
+
+   while true; do
+       minute=$((minute + 1))
+       local current_time=$(date +"%m/%d/%Y %H:%M")
+
+       row_data="$minute,$current_time"
+       best_objective=""
+       best_run=""
+       any_running=false
+
+       for i in $(seq 1 {parallel_runs}); do
+           local log_file="mcsqs${{i}}.log"
+           local objective="N/A"
+           local step_count="0"
+           local status="STOPPED"
+
+           if pgrep -f "mcsqs.*-ip=${{i}}" > /dev/null; then
+               status="RUNNING"
+               any_running=true
+           fi
+
+           if [ -f "$log_file" ]; then
+               objective=$(extract_latest_objective "$log_file")
+               step_count=$(extract_latest_step "$log_file")
+               objective=${{objective:-"N/A"}}
+               step_count=${{step_count:-"0"}}
+           fi
+
+           row_data="$row_data,$step_count,$objective,$status"
+
+           if [ "$objective" != "N/A" ] && [ -n "$objective" ]; then
+               if [ -z "$best_objective" ] || awk "BEGIN {{exit !($objective < $best_objective)}}" 2>/dev/null; then
+                   best_objective="$objective"
+                   best_run="Run$i"
+               fi
+           fi
+       done
+
+       best_objective=${{best_objective:-"N/A"}}
+       best_run=${{best_run:-"N/A"}}
+       row_data="$row_data,$best_objective,$best_run"
+
+       echo "$row_data" >> "$output_file"
+
+       printf "Minute %3d | Active runs: " "$minute"
+        for i in $(seq 1 {parallel_runs}); do
+            if pgrep -f "mcsqs.*-ip=${{i}}" > /dev/null; then
+                printf "R%d " "$i"
+            else
+                printf "%s " "--"  
+            fi
+        done
+        printf "| Best: %s (%s)\\n" "$best_objective" "$best_run"
+
+       if [ "$any_running" = false ]; then
+           echo "All parallel runs stopped. Collecting final data..."
+           break
+       fi
+
+       sleep 60
+   done
+
+   echo "----------------------------------------"
+   echo "Parallel monitoring process finished."
+}}'''
+
+        monitor_call = "start_parallel_monitoring_process \"$PROGRESS_FILE\" &"
+
     else:
-        # Single execution
         mcsqs_execution = f"{mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 &"
         log_file = "mcsqs.log"
         mcsqs_display_cmd = mcsqs_base_cmd
+        progress_file = "mcsqs_progress.csv"
 
-    # Generate the complete script
+        monitoring_function = '''start_monitoring_process() {
+   local log_file="$1"
+   local output_file="$2"
+   local minute=0
+
+   echo "Monitor started. Waiting for 5 seconds to allow mcsqs to initialize..."
+   sleep 5
+
+   echo "Minute,Timestamp,Step_Count,Objective_Function,First_Correlation,Total_Correlations,Status" > "$output_file"
+   echo "----------------------------------------"
+   echo "Initial read complete. Now monitoring in 1-minute intervals."
+
+   while true; do
+       minute=$((minute + 1))
+       local current_time=$(date +"%m/%d/%Y %H:%M")
+       local status
+
+       if is_mcsqs_running; then
+           status="RUNNING"
+       else
+           status="STOPPED"
+       fi
+
+       local objective=$(extract_latest_objective "$log_file")
+       local step_count=$(extract_latest_step "$log_file")
+       local correlation=$(extract_latest_correlation "$log_file")
+       local corr_count=$(count_correlations "$log_file")
+
+       objective=${objective:-"N/A"}
+       step_count=${step_count:-"0"}
+       correlation=${correlation:-"N/A"}
+       corr_count=${corr_count:-"0"}
+
+       echo "$minute,$current_time,$step_count,$objective,$correlation,$corr_count,$status" >> "$output_file"
+
+       printf "Minute %3d | Steps: %6s | Objective: %12s | 1st Corr: %12s | Status: %s\\n" \\
+              "$minute" "$step_count" "$objective" "$correlation" "$status"
+
+       if [ "$status" = "STOPPED" ]; then
+           echo "MCSQS process stopped. Monitoring will collect final data before exiting."
+           break
+       fi
+
+       sleep 60
+   done
+
+   echo "----------------------------------------"
+   echo "Monitoring process finished."
+}'''
+
+        monitor_call = "start_monitoring_process \"$LOG_FILE\" \"$PROGRESS_FILE\" &"
+
     script_content = f'''#!/bin/bash
 
 # ATAT MCSQS Run with Integrated Progress Monitoring
@@ -3516,141 +3657,77 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
 # --- Configuration ---
 LOG_FILE="{log_file}"
-PROGRESS_FILE="mcsqs_progress.csv"
+PROGRESS_FILE="{progress_file}"
 DEFAULT_MCSQS_ARGS="{mcsqs_base_cmd.split('mcsqs ')[1]}"
 
 # --- Auto-generate ATAT Input Files ---
 create_input_files() {{
-    echo "Creating ATAT input files..."
+   echo "Creating ATAT input files..."
 
-    # Create rndstr.in
-    cat > rndstr.in << 'EOF'
+   cat > rndstr.in << 'EOF'
 {results['rndstr_content']}
 EOF
 
-    # Create sqscell.out
-    cat > sqscell.out << 'EOF'
+   cat > sqscell.out << 'EOF'
 {results['sqscell_content']}
 EOF
 
-    echo "✅ Input files created: rndstr.in, sqscell.out"
+   echo "✅ Input files created: rndstr.in, sqscell.out"
 }}
 
 # --- Monitoring Functions ---
 
-# Function to extract the latest objective function value from the log file
 extract_latest_objective() {{
-    grep "Objective_function=" "$1" | tail -1 | sed 's/.*= *//'
+   grep "Objective_function=" "$1" | tail -1 | sed 's/.*= *//' 2>/dev/null || echo ""
 }}
 
-# Function to extract the latest step count
 extract_latest_step() {{
-    grep -c "Objective_function=" "$1" 2>/dev/null || echo "0"
+   grep -c "Objective_function=" "$1" 2>/dev/null || echo "0"
 }}
 
-# Function to extract the first correlation mismatch value
 extract_latest_correlation() {{
-    grep "Correlations_mismatch=" "$1" | tail -1 | sed 's/.*= *//' | awk '{{print $1}}'
+   grep "Correlations_mismatch=" "$1" | tail -1 | sed 's/.*= *//' | awk '{{print $1}}' 2>/dev/null || echo ""
 }}
 
-# Function to count the total number of correlations reported
 count_correlations() {{
-    grep "Correlations_mismatch=" "$1" | tail -1 | awk -F'\\t' '{{print NF-1}}' 2>/dev/null || echo "0"
+   grep "Correlations_mismatch=" "$1" | tail -1 | awk -F'\\t' '{{print NF-1}}' 2>/dev/null || echo "0"
 }}
 
-# Function to check if the mcsqs process is still running
 is_mcsqs_running() {{
-    pgrep -f "mcsqs" > /dev/null
-    return $?
+   pgrep -f "mcsqs" > /dev/null
+   return $?
 }}
 
-# Main monitoring process
-start_monitoring_process() {{
-    local log_file="$1"
-    local output_file="$2"
-    local minute=0
-
-    echo "Monitor started. Waiting for 5 seconds to allow mcsqs to initialize..."
-    sleep 5
-
-    echo "Minute,Timestamp,Step_Count,Objective_Function,First_Correlation,Total_Correlations,Status" > "$output_file"
-    echo "----------------------------------------"
-    echo "Initial read complete. Now monitoring in 1-minute intervals."
-
-    while true; do
-        minute=$((minute + 1))
-        local current_time=$(date +"%m/%d/%Y %H:%M")
-        local status
-
-        if is_mcsqs_running; then
-            status="RUNNING"
-        else
-            status="STOPPED"
-        fi
-
-        # Extract latest values from the log
-        local objective=$(extract_latest_objective "$log_file")
-        local step_count=$(extract_latest_step "$log_file")
-        local correlation=$(extract_latest_correlation "$log_file")
-        local corr_count=$(count_correlations "$log_file")
-
-        # Use default values if extraction fails
-        objective=${{objective:-"N/A"}}
-        step_count=${{step_count:-"0"}}
-        correlation=${{correlation:-"N/A"}}
-        corr_count=${{corr_count:-"0"}}
-
-        # Write data to the progress CSV file
-        echo "$minute,$current_time,$step_count,$objective,$correlation,$corr_count,$status" >> "$output_file"
-
-        # Display progress in the terminal
-        printf "Minute %3d | Steps: %6s | Objective: %12s | 1st Corr: %12s | Status: %s\\n" \\
-               "$minute" "$step_count" "$objective" "$correlation" "$status"
-
-        if [ "$status" = "STOPPED" ]; then
-            echo "MCSQS process stopped. Monitoring will collect final data before exiting."
-            break
-        fi
-
-        sleep 60
-    done
-
-    echo "----------------------------------------"
-    echo "Monitoring process finished."
-}}
+{monitoring_function}
 
 # --- Main Script Logic ---
 
-# Function to check and create prerequisites
 check_prerequisites() {{
-    echo "Checking prerequisites..."
+   echo "Checking prerequisites..."
 
-    # Create input files first
-    create_input_files
+   create_input_files
 
-    if [ ! -f "clusters.out" ]; then
-        echo "Generating clusters with corrdump..."
-        echo "Command: {corrdump_cmd}"
-        {corrdump_cmd}
-        if [ $? -ne 0 ]; then
-            echo "ERROR: corrdump command failed!"
-            exit 1
-        fi
-        echo "✅ Clusters generated successfully."
-    fi
-    echo "✅ All prerequisites satisfied."
+   if [ ! -f "clusters.out" ]; then
+       echo "Generating clusters with corrdump..."
+       echo "Command: {corrdump_cmd}"
+       {corrdump_cmd}
+       if [ $? -ne 0 ]; then
+           echo "ERROR: corrdump command failed!"
+           exit 1
+       fi
+       echo "✅ Clusters generated successfully."
+   fi
+   echo "✅ All prerequisites satisfied."
 }}
 
-# Cleanup function
 cleanup() {{
-    echo ""
-    echo "Interrupt signal received. Cleaning up background processes..."
-    if [ -n "$MCSQS_PID" ]; then kill "$MCSQS_PID" 2>/dev/null; fi
-    if [ -n "$MONITOR_PID" ]; then kill "$MONITOR_PID" 2>/dev/null; fi
-    # Kill all mcsqs processes (for parallel runs)
-    pkill -f "mcsqs" 2>/dev/null
-    echo "Cleanup complete."
-    exit 1
+   echo ""
+   echo "Interrupt signal received. Cleaning up background processes..."
+   if [ -n "$MCSQS_PID" ]; then kill "$MCSQS_PID" 2>/dev/null; fi
+   if [ -n "$MONITOR_PID" ]; then kill "$MONITOR_PID" 2>/dev/null; fi
+   pkill -f "mcsqs" 2>/dev/null
+   echo "Cleanup complete."
+   exit 1
 }}
 
 trap cleanup SIGINT SIGTERM
@@ -3670,18 +3747,15 @@ echo "================================================"
 
 check_prerequisites
 
-# Remove old log and progress files
 rm -f "$LOG_FILE" "$PROGRESS_FILE" mcsqs*.log
 
 echo ""
 echo "Starting ATAT MCSQS optimization and progress monitor..."
 
-# Execute mcsqs (single or parallel)
 {mcsqs_execution}
 MCSQS_PID=$!
 
-# Start monitoring
-start_monitoring_process "$LOG_FILE" "$PROGRESS_FILE" &
+{monitor_call}
 MONITOR_PID=$!
 
 echo "✅ MCSQS started"
@@ -3691,18 +3765,15 @@ echo "Real-time progress logged to: $PROGRESS_FILE"
 echo "Press Ctrl+C to stop optimization and monitoring."
 echo "================================================"
 
-# Wait for completion
 {"wait" if parallel_runs > 1 else "wait $MCSQS_PID"}
 MCSQS_EXIT_CODE=$?
 
 echo ""
 echo "MCSQS process finished with exit code: $MCSQS_EXIT_CODE."
 
-# Allow monitor to capture final data
 echo "Allowing monitor to capture final data..."
 sleep 65
 
-# Stop monitoring
 kill $MONITOR_PID 2>/dev/null
 wait $MONITOR_PID 2>/dev/null
 
@@ -3717,11 +3788,10 @@ echo "  - Best structure:  bestsqs.out (if generated)"
 echo "  - Correlation data: bestcorr.out (if generated)"
 echo ""
 
-# Display final summary
 if [ -f "$PROGRESS_FILE" ]; then
-    echo "Progress Summary:"
-    echo "  - Total monitoring time:   ~$(tail -1 "$PROGRESS_FILE" | cut -d',' -f1) minutes"
-    echo "  - Final objective function: $(tail -1 "$PROGRESS_FILE" | cut -d',' -f4)"
+   echo "Progress Summary:"
+   echo "  - Total monitoring time:   ~$(tail -1 "$PROGRESS_FILE" | cut -d',' -f1) minutes"
+   {"echo \"  - Best overall objective:  $(tail -1 \"$PROGRESS_FILE\" | cut -d',' -f$((3 + 3 * " + str(parallel_runs) + ")))\"" if parallel_runs > 1 else "echo \"  - Final objective function: $(tail -1 \"$PROGRESS_FILE\" | cut -d',' -f4)\""}
 fi
 
 echo "================================================"
