@@ -3766,7 +3766,7 @@ def render_monitor_script_section(results):
             parallel_runs = st.number_input(
                 "Number of parallel runs:",
                 min_value=2,
-                max_value=8,
+                max_value=100,
                 value=3,
                 step=1,
                 key="monitor_parallel_count"
