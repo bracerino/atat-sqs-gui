@@ -625,7 +625,7 @@ def render_atat_sqs_section():
                 use_concentrations = achievable_concentrations_for_atat
                 use_sublattice_mode_final = True
                 use_chem_symbols = chem_symbols
-
+            
             rndstr_content, sqscell_content, atat_commands, final_concentrations, adjustment_info = generate_atat_input_files_corrected(
                 working_structure,
                 use_concentrations,
@@ -1237,93 +1237,6 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
 
     return sqs_structure
 
-
-def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
-    try:
-        with st.expander("📊 PRDF Analysis of Generated SQS", expanded=True):
-            with st.spinner("Calculating PRDF..."):
-                prdf_dict, distance_dict, species_combinations = calculate_sqs_prdf(
-                    sqs_structure, cutoff=cutoff, bin_size=bin_size
-                )
-
-                if prdf_dict is not None:
-                    import plotly.graph_objects as go
-                    import matplotlib.pyplot as plt
-                    import numpy as np
-
-                    colors = plt.cm.tab10.colors
-
-                    def rgb_to_hex(color):
-                        return '#%02x%02x%02x' % (int(color[0] * 255), int(color[1] * 255), int(color[2] * 255))
-
-                    font_dict = dict(size=18, color="black")
-
-                    fig_combined = go.Figure()
-
-                    for idx, (pair, prdf_values) in enumerate(prdf_dict.items()):
-                        hex_color = rgb_to_hex(colors[idx % len(colors)])
-
-                        fig_combined.add_trace(go.Scatter(
-                            x=distance_dict[pair],
-                            y=prdf_values,
-                            mode='lines+markers',
-                            name=f"{pair[0]}-{pair[1]}",
-                            line=dict(color=hex_color, width=2),
-                            marker=dict(size=6)
-                        ))
-
-                    fig_combined.update_layout(
-                        title={'text': "SQS PRDF: All Element Pairs", 'font': font_dict},
-                        xaxis_title={'text': "Distance (Å)", 'font': font_dict},
-                        yaxis_title={'text': "PRDF Intensity", 'font': font_dict},
-                        hovermode='x',
-                        font=font_dict,
-                        xaxis=dict(tickfont=font_dict),
-                        yaxis=dict(tickfont=font_dict, range=[0, None]),
-                        hoverlabel=dict(font=font_dict),
-                        legend=dict(
-                            orientation="h",
-                            yanchor="top",
-                            y=-0.2,
-                            xanchor="center",
-                            x=0.5,
-                            font=dict(size=16)
-                        )
-                    )
-
-                    st.plotly_chart(fig_combined, use_container_width=True)
-
-                    import base64
-
-                    st.write("**Download PRDF Data:**")
-                    download_cols = st.columns(min(len(prdf_dict), 4))  # Max 4 columns
-
-                    for idx, (pair, prdf_values) in enumerate(prdf_dict.items()):
-                        df = pd.DataFrame()
-                        df["Distance (Å)"] = distance_dict[pair]
-                        df["PRDF"] = prdf_values
-
-                        csv = df.to_csv(index=False)
-                        filename = f"SQS_{pair[0]}_{pair[1]}_prdf.csv"
-
-                        with download_cols[idx % len(download_cols)]:
-                            st.download_button(
-                                label=f"📥 {pair[0]}-{pair[1]} PRDF",
-                                data=csv,
-                                file_name=filename,
-                                mime="text/csv",
-                                key=f"download_prdf_{pair[0]}_{pair[1]}"
-                            )
-
-                    return True
-
-                else:
-                    st.error("Failed to calculate PRDF")
-                    return False
-
-    except Exception as e:
-        st.error(f"Error calculating PRDF: {e}")
-        return False
 
 
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
@@ -1975,37 +1888,6 @@ def generate_atat_sqscell_content(nx, ny, nz):
     return "\n".join(lines)
 
 
-def generate_atat_input_files_corrected(structure, target_concentrations, transformation_matrix,
-                                        use_sublattice_mode, chem_symbols, nx, ny, nz,
-                                        pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
-    if use_sublattice_mode:
-        achievable_concentrations, adjustment_info = calculate_achievable_concentrations_sublattice(
-            target_concentrations, chem_symbols, transformation_matrix, structure
-        )
-    else:
-        achievable_concentrations, achievable_counts = calculate_achievable_concentrations(
-            target_concentrations, total_atoms
-        )
-        adjustment_info = []
-        for element in target_concentrations:
-            if abs(target_concentrations[element] - achievable_concentrations[element]) > 0.001:
-                adjustment_info.append({
-                    'Element': element,
-                    'Target (%)': f"{target_concentrations[element] * 100:.1f}",
-                    'Achievable (%)': f"{achievable_concentrations[element] * 100:.1f}",
-                    'Atom Count': achievable_counts[element]
-                })
-
-    rndstr_content = generate_atat_rndstr_content_corrected(
-        structure, achievable_concentrations, use_sublattice_mode,
-        chem_symbols, transformation_matrix
-    )
-
-    sqscell_content = generate_atat_sqscell_content(nx, ny, nz)
-
-    atat_commands = generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms)
-
-    return rndstr_content, sqscell_content, atat_commands, achievable_concentrations, adjustment_info
 
 
 def generate_atat_input_files(structure, target_concentrations, transformation_matrix,
@@ -2100,56 +1982,6 @@ def convert_achievable_sublattice_to_site_assignments(structure, achievable_conc
     return site_assignments
 
 
-def generate_atat_rndstr_content(structure, achievable_concentrations, use_sublattice_mode, chem_symbols):
-    lattice = structure.lattice
-    a, b, c = lattice.a, lattice.b, lattice.c
-    alpha, beta, gamma = lattice.alpha, lattice.beta, lattice.gamma
-
-    max_param = max(a, b, c)
-    a_norm = a / max_param
-    b_norm = b / max_param
-    c_norm = c / max_param
-
-    lines = []
-
-    lines.append(f"{a_norm:.6f} {b_norm:.6f} {c_norm:.6f} {alpha:.2f} {beta:.2f} {gamma:.2f}")
-
-    lines.append("1 0 0")
-    lines.append("0 1 0")
-    lines.append("0 0 1")
-
-    if use_sublattice_mode:
-        site_assignments = convert_achievable_sublattice_to_site_assignments(structure, achievable_concentrations,
-                                                                             chem_symbols)
-    else:
-        site_assignments = {}
-        for i in range(len(structure)):
-            site_assignments[i] = achievable_concentrations.copy()
-
-    for i, site in enumerate(structure):
-        frac_coords = site.frac_coords
-        coord_str = f"{frac_coords[0]:.6f} {frac_coords[1]:.6f} {frac_coords[2]:.6f}"
-
-        if i in site_assignments:
-            concentrations = site_assignments[i]
-            conc_parts = []
-            for element, conc in concentrations.items():
-                if conc > 0:
-                    conc_parts.append(f"{element}={conc:.6f}")
-            conc_str = ",".join(conc_parts)
-        else:
-            if site.is_ordered:
-                conc_str = site.specie.symbol
-            else:
-                conc_parts = []
-                for sp, occ in site.species.items():
-                    if occ > 0:
-                        conc_parts.append(f"{sp.symbol}={occ:.6f}")
-                conc_str = ",".join(conc_parts)
-
-        lines.append(f"{coord_str} {conc_str}")
-
-    return "\n".join(lines)
 
 
 def integrate_atat_option():
@@ -2294,9 +2126,8 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                         key=f"sublattice_{sublattice_letter}_elements",
                         help=f"Select elements that can occupy {wyckoff_letter} positions"
                     )
-
-                    if len(selected_elements) < 2:
-                        st.warning(f"Select at least 2 elements for sublattice {sublattice_letter}")
+                    if len(selected_elements) < 1:
+                        st.warning(f"Select at least 1 element for sublattice {sublattice_letter}")
                         continue
 
                 with col_conc:
@@ -2334,7 +2165,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                         atom_count = frac * atoms_per_wyckoff_in_supercell
                         st.write(f"- {elem}: {atom_count:.1f} atoms")
 
-                if len(selected_elements) >= 2:
+                if len(selected_elements) >= 1:
                     target_concentrations[sublattice_letter] = sublattice_concentrations
 
                     for site_idx in all_equivalent_indices:
@@ -2566,7 +2397,7 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
 
         sublattice_site_indices = []
         for i, site_elements in enumerate(chem_symbols):
-            if len(site_elements) > 1 and set(site_elements) == set(target_fractions.keys()):
+            if len(site_elements) >= 1 and set(site_elements) == set(target_fractions.keys()):
                 sublattice_site_indices.append(i)
 
         for site_info in unique_sites:
@@ -2664,8 +2495,9 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
             coord_str = f"{coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}"
 
             site_elements = chem_symbols[i] if i < len(chem_symbols) else []
-
-            if len(site_elements) > 1:
+           # print(f"Site {i}: site_elements = {site_elements}")
+           # print(f"Site {i}: achievable_concentrations = {achievable_concentrations}")
+            if len(site_elements) >= 1:
                 conc_parts = []
                 for sublattice_letter, sublattice_concentrations in achievable_concentrations.items():
                     if set(site_elements) == set(sublattice_concentrations.keys()):
@@ -2687,6 +2519,7 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                         if occ > 1e-6:
                             conc_parts.append(f"{sp.symbol}={occ:.6f}")
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
+            print(lines)
     else:
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
@@ -2700,6 +2533,7 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
             lines.append(f"{coord_str} {conc_str}")
 
     return "\n".join(lines)
+
 
 
 def generate_atat_sqscell_content(nx, ny, nz):
