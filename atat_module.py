@@ -3880,16 +3880,14 @@ check_prerequisites() {{
 
    create_input_files
 
-   if [ ! -f "clusters.out" ]; then
-       echo "Generating clusters with corrdump..."
-       echo "Command: {corrdump_cmd}"
-       {corrdump_cmd}
-       if [ $? -ne 0 ]; then
-           echo "ERROR: corrdump command failed!"
-           exit 1
-       fi
-       echo "✅ Clusters generated successfully."
+   echo "Generating clusters with corrdump..."
+   echo "Command: {corrdump_cmd}"
+   {corrdump_cmd}
+   if [ $? -ne 0 ]; then
+       echo "ERROR: corrdump command failed!"
+       exit 1
    fi
+   echo "✅ Clusters generated successfully."
    echo "✅ All prerequisites satisfied."
 }}
 
