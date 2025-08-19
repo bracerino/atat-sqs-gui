@@ -783,7 +783,7 @@ def render_atat_sqs_section():
         with col_status3:
             st.info("🖥️ Commands Available")
 
-        
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("---")
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
