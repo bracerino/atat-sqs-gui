@@ -788,7 +788,7 @@ def render_atat_sqs_section():
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
 
-    file_tab1, file_tab2 = st.tabs(["📁 Structure Converter", "📊 Optimization Analysis"])
+    file_tab1, file_tab2 = st.tabs(["📁 Structure Converter", "📊 Optimization Analysis (mcsqs.log, mcsqs_progress.csv, parallel runs...)"])
 
 
     with file_tab1:
