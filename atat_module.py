@@ -694,7 +694,7 @@ def render_atat_sqs_section():
                 file_name="rndstr.in",
                 mime="text/plain",
                 key="atat_download_rndstr_persistent",
-                type="tertiary
+                type="tertiary"
             )
 
         with col_file2:
