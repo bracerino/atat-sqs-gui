@@ -2479,7 +2479,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
                     for i, elem in enumerate(selected_elements[:-1]):
                         frac_val = st.slider(
-                            f"{elem} fraction:",
+                            f"**{elem} fraction:**",
                             min_value=0.0,
                             max_value=remaining,
                             value=min(1.0 / len(selected_elements), remaining),
