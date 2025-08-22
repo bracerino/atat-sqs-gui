@@ -225,7 +225,7 @@ def create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs,
             y=0.99,
             xanchor="left",
             x=0.99,
-            font=dict(size=16)
+            font=dict(size=18)
         ),
         font=dict(size=20, family="Arial"),
         xaxis=dict(
@@ -233,8 +233,8 @@ def create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs,
             tickfont=dict(size=19, family="Arial Black")
         ),
         yaxis=dict(
-            title_font=dict(size=20, family="Arial"),
-            tickfont=dict(size=19, family="Arial")
+            title_font=dict(size=20, family="Arial Black"),
+            tickfont=dict(size=19, family="Arial Black")
         )
     )
 
