@@ -739,7 +739,7 @@ def render_atat_sqs_section():
                         f"**Active sites:** {active_count}/{total_count} ({', '.join(set(active_site_names))} positions)")
 
                 if nn_data['overall']:
-                    st.write("**NN Distances Between Active Sites:**")
+                    st.write("**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
                     overall_text = []
                     ordinals = {1: 'st', 2: 'nd', 3: 'rd', 4: 'th', 5: 'th', 6: 'th'}
                     for shell in nn_data['overall']:
