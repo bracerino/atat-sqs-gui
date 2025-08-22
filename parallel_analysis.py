@@ -214,7 +214,7 @@ def create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs,
     fig.update_layout(
         title=dict(
             text="Parallel MCSQS Optimization Progress",
-            font=dict(size=24, family="Arial Black")
+            font=dict(size=20, family="Arial Black")
         ),
         xaxis_title="Time (Minutes)",
         yaxis_title="Objective Function Value",
@@ -230,11 +230,11 @@ def create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs,
         font=dict(size=20, family="Arial"),
         xaxis=dict(
             title_font=dict(size=20, family="Arial Black"),
-            tickfont=dict(size=16)
+            tickfont=dict(size=19, family="Arial Black")
         ),
         yaxis=dict(
-            title_font=dict(size=20, family="Arial Black"),
-            tickfont=dict(size=16)
+            title_font=dict(size=20, family="Arial"),
+            tickfont=dict(size=19, family="Arial")
         )
     )
 
