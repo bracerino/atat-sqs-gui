@@ -4100,7 +4100,7 @@ def render_monitor_script_section(results):
             ### Configuration:
             - **Execution**: {cmd_preview}
             - **Monitoring**: Every 1 minute
-            - **Stop the run**: Automatic on Ctrl+C
+            - **Stop the run**: Once user presses Ctrl+C
 
              **The generated CSV file can be uploaded back to this tool for analysis!**
             """)
