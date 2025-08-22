@@ -694,7 +694,7 @@ def render_atat_sqs_section():
                 file_name="rndstr.in",
                 mime="text/plain",
                 key="atat_download_rndstr_persistent",
-                type="tertiary"
+                type="primary"
             )
 
         with col_file2:
@@ -706,7 +706,7 @@ def render_atat_sqs_section():
                 file_name="sqscell.out",
                 mime="text/plain",
                 key="atat_download_sqscell_persistent",
-                type="tertiary"
+                type="primary"
             )
 
         st.subheader("🖥️ ATAT Commands to Run")
