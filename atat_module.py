@@ -2482,7 +2482,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                             f"**{elem} fraction:**",
                             min_value=0.0,
                             max_value=remaining,
-                            value=min(1.0 / len(selected_elements), remaining),
+                            value=min(int(atoms_per_wyckoff_in_supercell/ len(selected_elements))*min_concentration_step, remaining),
                             step=min_concentration_step,
                             format="%.6f",
                             key=f"sublattice_{sublattice_letter}_{elem}_frac"
