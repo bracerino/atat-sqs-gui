@@ -706,7 +706,7 @@ def render_atat_sqs_section():
                 file_name="sqscell.out",
                 mime="text/plain",
                 key="atat_download_sqscell_persistent",
-                type="tertiary
+                type="tertiary"
             )
 
         st.subheader("🖥️ ATAT Commands to Run")
@@ -4060,7 +4060,7 @@ def render_monitor_script_section(results):
                     mime="text/plain",
                     type="secondary",
                     key="download_monitor_script",
-                    type="tertiary
+                    type="tertiary"
                 )
 
                 st.success("✅ Monitor script generated successfully!")
