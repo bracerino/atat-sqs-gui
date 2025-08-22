@@ -3532,7 +3532,7 @@ def render_extended_optimization_analysis_tab():
                             "Best Objective": f"{result['Best_Objective']:.6f}",
                             "Total Steps": result['Total_Steps'],
                             "Improvement": f"{result['Total_Improvement']:.6f}",
-                            "Performance": "🥇 Best" if result == best_run else "🥉 Worst" if result == worst_run else "✅ Good"
+                            "Performance": "🥇 Best" if result == best_run else "🥉 Worst" if result == worst_run else "✅ OK"
                         })
 
                     comparison_df = pd.DataFrame(comparison_data)
