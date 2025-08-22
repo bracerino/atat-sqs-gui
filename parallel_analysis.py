@@ -223,7 +223,7 @@ def create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs,
         legend=dict(
             yanchor="top",
             y=0.99,
-            xanchor="left",
+            xanchor="right",
             x=0.01,
             font=dict(size=16)
         ),
