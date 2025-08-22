@@ -354,7 +354,7 @@ def render_atat_sqs_section():
                     f"{elem}:",
                     min_value=0.0,
                     max_value=remaining,
-                    value=min(1.0 / len(element_list), remaining),
+                    value=min(int(supercell_multiplicity/ len(element_list))*min_step, remaining),
                     step=min_step,
                     format="%.6f",
                     key=f"atat_comp_global_{elem}"
