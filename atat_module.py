@@ -4058,9 +4058,8 @@ def render_monitor_script_section(results):
                     data=script_content,
                     file_name="monitor.sh",
                     mime="text/plain",
-                    type="secondary",
+                    type="primary",
                     key="download_monitor_script",
-                    type="tertiary"
                 )
 
                 st.success("✅ Monitor script generated successfully!")
