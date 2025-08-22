@@ -507,7 +507,7 @@ def render_atat_sqs_section():
                                 font-size: 1.8em;
                                 margin: 5px 0 0 0;
                                 opacity: 0.9;
-                            ">{int(count)} atoms</p>
+                            ">{int(round(count,0))} atoms</p>
                         </div>
                         """, unsafe_allow_html=True)
                 st.write(f"**Total expected atoms in supercell:** {int(total_supercell_atoms)}")
@@ -2715,7 +2715,7 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
                             font-size: 1.8em;
                             margin: 5px 0 0 0;
                             opacity: 0.9;
-                        ">{int(count)} atoms</p>
+                        ">{int(round(count,0))} atoms</p>
                     </div>
                     """, unsafe_allow_html=True)
 
