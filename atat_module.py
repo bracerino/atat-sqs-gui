@@ -693,7 +693,8 @@ def render_atat_sqs_section():
                 data=results['rndstr_content'],
                 file_name="rndstr.in",
                 mime="text/plain",
-                key="atat_download_rndstr_persistent"
+                key="atat_download_rndstr_persistent",
+                type="tertiary
             )
 
         with col_file2:
@@ -704,7 +705,8 @@ def render_atat_sqs_section():
                 data=results['sqscell_content'],
                 file_name="sqscell.out",
                 mime="text/plain",
-                key="atat_download_sqscell_persistent"
+                key="atat_download_sqscell_persistent",
+                type="tertiary
             )
 
         st.subheader("🖥️ ATAT Commands to Run")
@@ -4040,7 +4042,7 @@ def render_monitor_script_section(results):
     col_download, col_info = st.columns([1, 1])
 
     with col_download:
-        if st.button("🛠️ Generate Monitor Script", type="primary", key="generate_monitor_script"):
+        if st.button("🛠️ Generate Monitor Script", type="tertiary", key="generate_monitor_script"):
             try:
                 script_content = generate_atat_monitor_script(
                     results=results,
@@ -4057,7 +4059,8 @@ def render_monitor_script_section(results):
                     file_name="monitor.sh",
                     mime="text/plain",
                     type="secondary",
-                    key="download_monitor_script"
+                    key="download_monitor_script",
+                    type="tertiary
                 )
 
                 st.success("✅ Monitor script generated successfully!")
