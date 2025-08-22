@@ -7,183 +7,183 @@ from ase.build import make_supercell
 from helpers import *
 from parallel_analysis import *
 
-    def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublattice_mode=False):
-        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublattice_mode=False):
+    from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-        original_lattice = structure.lattice
-        a, b, c = original_lattice.abc
-        max_param = max(a, b, c)
+    original_lattice = structure.lattice
+    a, b, c = original_lattice.abc
+    max_param = max(a, b, c)
 
-        from pymatgen.core.lattice import Lattice
-        normalized_lattice = Lattice.from_parameters(
-            a / max_param, b / max_param, c / max_param,
-            original_lattice.alpha, original_lattice.beta, original_lattice.gamma
-        )
+    from pymatgen.core.lattice import Lattice
+    normalized_lattice = Lattice.from_parameters(
+        a / max_param, b / max_param, c / max_param,
+        original_lattice.alpha, original_lattice.beta, original_lattice.gamma
+    )
 
-        normalized_structure = structure.copy()
-        normalized_structure.lattice = normalized_lattice
-        sga = SpacegroupAnalyzer(normalized_structure)
-        wyckoff_symbols = sga.get_symmetry_dataset()['wyckoffs']
+    normalized_structure = structure.copy()
+    normalized_structure.lattice = normalized_lattice
+    sga = SpacegroupAnalyzer(normalized_structure)
+    wyckoff_symbols = sga.get_symmetry_dataset()['wyckoffs']
 
-        active_sites = []
-        if use_sublattice_mode and chem_symbols:
-            mixed_occupancy_sites = []
-            for i, site_elements in enumerate(chem_symbols):
-                if len(site_elements) >= 2:
-                    mixed_occupancy_sites.append(i)
-
-
-            if not mixed_occupancy_sites:
-                return {
-                    'overall': [],
-                    'message': "No mixed-occupancy sites found. ATAT requires at least 2 elements per site for cluster calculations."
-                }
-            wyckoff_to_sites = {}
-            for i, wyckoff_symbol in enumerate(wyckoff_symbols):
-                if wyckoff_symbol not in wyckoff_to_sites:
-                    wyckoff_to_sites[wyckoff_symbol] = []
-                wyckoff_to_sites[wyckoff_symbol].append(i)
-
-            wyckoff_positions_processed = set()
-            for site_idx in mixed_occupancy_sites:
-                wyckoff_symbol = wyckoff_symbols[site_idx]
-
-                if wyckoff_symbol not in wyckoff_positions_processed:
-                    sites_with_same_wyckoff = wyckoff_to_sites[wyckoff_symbol]
-
-                    mixed_sites_with_same_wyckoff = []
-                    for equiv_site in sites_with_same_wyckoff:
-                        if equiv_site in mixed_occupancy_sites:
-                            mixed_sites_with_same_wyckoff.append(equiv_site)
-
-                    for equiv_site in mixed_sites_with_same_wyckoff:
-                        if equiv_site not in active_sites:
-                            active_sites.append(equiv_site)
-
-                    wyckoff_positions_processed.add(wyckoff_symbol)
+    active_sites = []
+    if use_sublattice_mode and chem_symbols:
+        mixed_occupancy_sites = []
+        for i, site_elements in enumerate(chem_symbols):
+            if len(site_elements) >= 2:
+                mixed_occupancy_sites.append(i)
 
 
-            if not active_sites:
-                return {
-                    'overall': [],
-                    'message': "No active sites found after Wyckoff analysis."
-                }
+        if not mixed_occupancy_sites:
+            return {
+                'overall': [],
+                'message': "No mixed-occupancy sites found. ATAT requires at least 2 elements per site for cluster calculations."
+            }
+        wyckoff_to_sites = {}
+        for i, wyckoff_symbol in enumerate(wyckoff_symbols):
+            if wyckoff_symbol not in wyckoff_to_sites:
+                wyckoff_to_sites[wyckoff_symbol] = []
+            wyckoff_to_sites[wyckoff_symbol].append(i)
+
+        wyckoff_positions_processed = set()
+        for site_idx in mixed_occupancy_sites:
+            wyckoff_symbol = wyckoff_symbols[site_idx]
+
+            if wyckoff_symbol not in wyckoff_positions_processed:
+                sites_with_same_wyckoff = wyckoff_to_sites[wyckoff_symbol]
+
+                mixed_sites_with_same_wyckoff = []
+                for equiv_site in sites_with_same_wyckoff:
+                    if equiv_site in mixed_occupancy_sites:
+                        mixed_sites_with_same_wyckoff.append(equiv_site)
+
+                for equiv_site in mixed_sites_with_same_wyckoff:
+                    if equiv_site not in active_sites:
+                        active_sites.append(equiv_site)
+
+                wyckoff_positions_processed.add(wyckoff_symbol)
+
+
+        if not active_sites:
+            return {
+                'overall': [],
+                'message': "No active sites found after Wyckoff analysis."
+            }
+    else:
+        active_sites = list(range(len(normalized_structure.sites)))
+
+    for i, site_idx in enumerate(active_sites):
+        site = normalized_structure[site_idx]
+
+    active_lattice = normalized_structure.lattice
+    active_species = []
+    active_coords = []
+
+    for site_idx in active_sites:
+        site = normalized_structure[site_idx]
+        active_species.append(site.specie)
+        active_coords.append(site.frac_coords)
+
+    if not active_species:
+        return {'overall': [], 'message': "No active sites found."}
+
+    from pymatgen.core import Structure
+    active_structure = Structure(
+        lattice=active_lattice,
+        species=active_species,
+        coords=active_coords,
+        coords_are_cartesian=False
+    )
+
+    active_supercell = active_structure * (3, 3, 3)
+
+    original_active_sites = len(active_structure)
+    center_cell_start = 13 * original_active_sites
+    center_cell_end = center_cell_start + original_active_sites
+
+    overall_distances = []
+
+    for i in range(center_cell_start, center_cell_end):
+        center_site = active_supercell[i]
+
+        for j, target_site in enumerate(active_supercell):
+            if i == j:
+                continue
+
+            distance = center_site.distance(target_site)
+            if distance > 0.001:
+                overall_distances.append(distance)
+
+    original_distances = overall_distances.copy()
+
+    base_distances = []
+    for d in sorted(set(overall_distances)):
+        rounded_d = round(d, 3)
+        if abs(rounded_d - round(rounded_d)) < 0.01:
+            base_distances.append(rounded_d)
+
+
+    for base_d in base_distances:
+        if base_d > 0:
+
+            scaled_2x = base_d * 2.0
+            overall_distances.extend([scaled_2x] * 12)
+            scaled_3x = base_d * 3.0
+            overall_distances.extend([scaled_3x] * 6)
+
+
+    if overall_distances:
+        sorted_distances = sorted(overall_distances)
+
+        distances_around_2 = [d for d in sorted_distances if 1.8 < d < 2.2]
+
+        unique_distances = []
+        for d in sorted_distances:
+            rounded_d = round(d, 4)
+            if rounded_d not in unique_distances:
+                unique_distances.append(rounded_d)
+
+    overall_shells = group_distances_into_shells(overall_distances) if overall_distances else []
+
+    return {
+        'overall': overall_shells[:6],
+        'active_sites': active_sites,
+        'total_sites': len(normalized_structure.sites)
+    }
+
+def group_distances_into_shells(distances_data, tolerance=0.001):  # Much smaller tolerance
+    if not distances_data:
+        return []
+
+    distances_data.sort()
+    shells = []
+    shell_number = 1
+
+    current_group = [distances_data[0]]
+
+    for i in range(1, len(distances_data)):
+        diff = abs(distances_data[i] - current_group[0])
+
+        if diff <= tolerance:
+            current_group.append(distances_data[i])
         else:
-            active_sites = list(range(len(normalized_structure.sites)))
-
-        for i, site_idx in enumerate(active_sites):
-            site = normalized_structure[site_idx]
-
-        active_lattice = normalized_structure.lattice
-        active_species = []
-        active_coords = []
-
-        for site_idx in active_sites:
-            site = normalized_structure[site_idx]
-            active_species.append(site.specie)
-            active_coords.append(site.frac_coords)
-
-        if not active_species:
-            return {'overall': [], 'message': "No active sites found."}
-
-        from pymatgen.core import Structure
-        active_structure = Structure(
-            lattice=active_lattice,
-            species=active_species,
-            coords=active_coords,
-            coords_are_cartesian=False
-        )
-
-        active_supercell = active_structure * (3, 3, 3)
-
-        original_active_sites = len(active_structure)
-        center_cell_start = 13 * original_active_sites
-        center_cell_end = center_cell_start + original_active_sites
-
-        overall_distances = []
-
-        for i in range(center_cell_start, center_cell_end):
-            center_site = active_supercell[i]
-
-            for j, target_site in enumerate(active_supercell):
-                if i == j:
-                    continue
-
-                distance = center_site.distance(target_site)
-                if distance > 0.001:
-                    overall_distances.append(distance)
-
-        original_distances = overall_distances.copy()
-
-        base_distances = []
-        for d in sorted(set(overall_distances)):
-            rounded_d = round(d, 3)
-            if abs(rounded_d - round(rounded_d)) < 0.01:
-                base_distances.append(rounded_d)
-
-
-        for base_d in base_distances:
-            if base_d > 0:
-
-                scaled_2x = base_d * 2.0
-                overall_distances.extend([scaled_2x] * 12)
-                scaled_3x = base_d * 3.0
-                overall_distances.extend([scaled_3x] * 6)
-
-
-        if overall_distances:
-            sorted_distances = sorted(overall_distances)
-
-            distances_around_2 = [d for d in sorted_distances if 1.8 < d < 2.2]
-
-            unique_distances = []
-            for d in sorted_distances:
-                rounded_d = round(d, 4)
-                if rounded_d not in unique_distances:
-                    unique_distances.append(rounded_d)
-
-        overall_shells = group_distances_into_shells(overall_distances) if overall_distances else []
-
-        return {
-            'overall': overall_shells[:6],
-            'active_sites': active_sites,
-            'total_sites': len(normalized_structure.sites)
-        }
-
-    def group_distances_into_shells(distances_data, tolerance=0.001):  # Much smaller tolerance
-        if not distances_data:
-            return []
-
-        distances_data.sort()
-        shells = []
-        shell_number = 1
-
-        current_group = [distances_data[0]]
-
-        for i in range(1, len(distances_data)):
-            diff = abs(distances_data[i] - current_group[0])
-
-            if diff <= tolerance:
-                current_group.append(distances_data[i])
-            else:
-                avg_distance = sum(current_group) / len(current_group)
-                shells.append({
-                    'shell': shell_number,
-                    'distance': avg_distance,
-                    'count': len(current_group)
-                })
-                shell_number += 1
-                current_group = [distances_data[i]]
-
-        if current_group:
             avg_distance = sum(current_group) / len(current_group)
             shells.append({
                 'shell': shell_number,
                 'distance': avg_distance,
                 'count': len(current_group)
             })
+            shell_number += 1
+            current_group = [distances_data[i]]
 
-        return shells
+    if current_group:
+        avg_distance = sum(current_group) / len(current_group)
+        shells.append({
+            'shell': shell_number,
+            'distance': avg_distance,
+            'count': len(current_group)
+        })
+
+    return shells
 
 def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
     try:
