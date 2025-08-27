@@ -724,6 +724,73 @@ def render_sqs_module():
             - [User guide for ATAT](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual.pdf).
             - [User guide specifically for ATAT mcsqs](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual/node48.html).
             - [C++ code for converting bestsqs.out into POSCAR format](https://github.com/c-niu/sqs2poscar). 
+
+            ### 🛠️ ATAT Installation Tutorial
+            
+            #### 🎥 Video Tutorial
+            
+            **Watch the complete compilation process:** [ATAT Compilation Video Tutorial](https://youtu.be/d5PceJoL1tw?si=akSMQ76_hKHaTKcB)
+            
+            ---
+            
+            #### Prerequisites (Ubuntu/WSL2)
+            
+            First, update your system and install required packages:
+            ```bash
+            sudo apt-get upgrade
+            sudo apt-get install tcsh
+            ```
+            
+            #### Download and Compile ATAT
+            
+            1. **Download ATAT toolkit:**
+            ```bash
+            wget http://alum.mit.edu/www/avdw/atat/atat3_36.tar.gz
+            ```
+            
+            2. **Extract and prepare build directory:**
+            ```bash
+            tar xvzf atat3_36.tar.gz
+            cd atat
+            mkdir build
+            ```
+            
+            3. **Configure installation path:**
+            ```bash
+            nano makefile
+            ```
+            Change the first line to specify where binaries will be installed (use the current directory path + build):
+            ```
+            BINDIR=$(pwd)/build
+            ```
+            Save (Ctrl+S) and exit (Ctrl+X).
+            
+            4. **Compile ATAT:**
+            ```bash
+            make -j 10
+            make install
+            ```
+            
+            5. **Add to PATH:**
+            ```bash
+            cd build
+            pwd  # Note this path
+            nano ~/.bashrc
+            ```
+            Add this line at the bottom of ~/.bashrc (replace the path with your actual build directory path):
+            ```bash
+            export PATH=$(pwd)/build:$PATH
+            ```
+            Save, exit, and refresh:
+            ```bash
+            source ~/.bashrc
+            ```
+            
+            6. **Test installation:**
+            ```bash
+            mcsqs
+            ```
+            This should display the list of mcsqs parameters.
         """)
     # -------------- DATABASE ----------
     show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
