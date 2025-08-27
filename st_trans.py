@@ -731,6 +731,8 @@ def render_sqs_module():
             
             **Watch the complete compilation process:** [ATAT Compilation Video Tutorial](https://youtu.be/d5PceJoL1tw?si=akSMQ76_hKHaTKcB)
             
+            #### 📝 Written Tutorial
+            
             ---
             
             #### Prerequisites (Ubuntu/WSL2)
