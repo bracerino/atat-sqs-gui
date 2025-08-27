@@ -800,7 +800,7 @@ def render_sqs_module():
             ```bash
             mcsqs
             ```
-            This should display the list of mcsqs parameters.
+            This should display the list of mcsqs parameters if the compilation was successful.
         """)
     # -------------- DATABASE ----------
     show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
