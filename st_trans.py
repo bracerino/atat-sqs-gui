@@ -761,9 +761,17 @@ def render_sqs_module():
             ```bash
             nano makefile
             ```
-            Change the first line to specify where binaries will be installed (use the current directory path + build):
+            Change the first line from `BINDIR=...` to use the current directory path. You can get your current path with:
+            ```bash
+            pwd
             ```
-            BINDIR=$(pwd)/build
+            Then edit the makefile to set:
+            ```
+            BINDIR=/full/path/from/pwd/command/build
+            ```
+            For example, if `pwd` shows `/home/username/atat`, then set:
+            ```
+            BINDIR=/home/username/atat/build
             ```
             Save (Ctrl+S) and exit (Ctrl+X).
             
