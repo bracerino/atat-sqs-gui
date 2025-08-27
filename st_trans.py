@@ -691,15 +691,14 @@ if "prdf_structure_key" not in st.session_state:
 
 def render_sqs_module():
 
-    st.title("🎲 SimplySQS: Generate input and analyze output files for ATAT mcsqs to create special quasi-random structures (SQS)")
     st.markdown(
     """
-    <h1 style='text-align: center; color: #2E86C1;'>
-        🎲 <span style='color:#E74C3C; font-weight:bold;'>SimplySQS</span>
+    <h1 style='text-align: left; color: #1E3D7B;'>
+        🎲 <span style='color:#2E86C1; font-weight:bold;'>SimplySQS</span>
     </h1>
-    <h3 style='text-align: center; color: #555555; font-weight: normal;'>
+    <h3 style='text-align: left; color: #444444; font-weight: normal;'>
         Generate input and analyze output files for 
-        <span style='color:#27AE60;'>ATAT mcsqs</span> 
+        <span style='color:#1A7F5D;'>ATAT mcsqs</span> 
         to create <em>special quasi-random structures (SQS)</em>
     </h3>
     """,
