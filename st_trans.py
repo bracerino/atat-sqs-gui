@@ -698,8 +698,8 @@ def render_sqs_module():
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
         Generate input and analyze output files for 
-        <span style='color:#1A7F5D;'>ATAT mcsqs</span> 
-        to create <em>special quasi-random structures (SQS)</em>
+        <b><span style='color:#1A7F5D;'>ATAT mcsqs</span></b> 
+        to create <b><em>special quasi-random structures (SQS)</em></b>
     </h3>
     """,
     unsafe_allow_html=True
