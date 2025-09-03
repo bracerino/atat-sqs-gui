@@ -142,7 +142,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         time_per_conc = st.number_input(
             "Time per concentration (minutes)",
             min_value=0.1,
-            max_value=1440.0,
+            max_value=14400.0,
             value=0.2,
             step=0.5,
             help="How long to run mcsqs for each concentration"
@@ -151,7 +151,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         max_parallel = st.number_input(
             "Maximum parallel jobs",
             min_value=1,
-            max_value=16,
+            max_value=200,
             value=4,
             step=1,
             help="Number of parallel mcsqs processes"
@@ -160,8 +160,8 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         parallel_runs_per_conc = st.number_input(
             "Parallel runs per concentration",
             min_value=1,
-            max_value=8,
-            value=2,
+            max_value=200,
+            value=5,
             step=1,
             help="Number of parallel mcsqs instances to run for each concentration"
         )
