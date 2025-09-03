@@ -24,7 +24,7 @@ Open your terminal console and write the following commands (the **bold text**):
       **sudo apt install git**    
 
 
-1) Download updates and prerequisities:
+1) Download updates and prerequisites:  
    **sudo apt update**  
    **sudo apt install -y python3-venv**  
    Download the SimplySQS code from GitHub (or download it manually without Git on the following link by clicking on 'Code' and 'Download ZIP', then extract the ZIP. With Git, it is automatically extracted):  
