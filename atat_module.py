@@ -7,6 +7,691 @@ from ase.build import make_supercell
 from helpers import *
 from parallel_analysis import *
 
+
+
+
+def render_concentration_sweep_section(chemical_symbols, target_concentrations, transformation_matrix,
+                                       primitive_structure, cutoffs):
+    if not target_concentrations:
+        return
+
+    is_binary = False
+    sweep_element = None
+    complement_element = None
+    selected_sublattice = None
+
+    if isinstance(target_concentrations, dict):
+        first_value = next(iter(target_concentrations.values()))
+
+        if isinstance(first_value, dict):
+            binary_sublattices = []
+            for sublattice_letter, concentrations in target_concentrations.items():
+                if len(concentrations) == 2:
+                    elements = list(concentrations.keys())
+                    binary_sublattices.append((sublattice_letter, elements))
+
+            if len(binary_sublattices) == 0:
+                return
+            elif len(binary_sublattices) == 1:
+                is_binary = True
+                selected_sublattice, elements = binary_sublattices[0]
+                sweep_element = elements[0]
+                complement_element = elements[1]
+            else:
+                st.markdown("---")
+                st.subheader("🔄 Concentration Sweep Mode")
+                st.info("Multiple binary sublattices detected. Please select one for concentration sweep:")
+
+                sublattice_options = []
+                for sublattice_letter, elements in binary_sublattices:
+                    sublattice_options.append(f"Sublattice {sublattice_letter}: {elements[0]} + {elements[1]}")
+
+                selected_option = st.selectbox(
+                    "Choose sublattice for concentration sweep:",
+                    options=sublattice_options,
+                    index=0
+                )
+
+                if selected_option:
+                    selected_idx = sublattice_options.index(selected_option)
+                    selected_sublattice, elements = binary_sublattices[selected_idx]
+                    is_binary = True
+                    sweep_element = elements[0]
+                    complement_element = elements[1]
+                else:
+                    return
+        else:
+            if len(target_concentrations) == 2:
+                is_binary = True
+                elements = list(target_concentrations.keys())
+                sweep_element = elements[0]
+                complement_element = elements[1]
+
+    if not is_binary:
+        return
+
+    st.markdown("---")
+    st.subheader("🔄 Concentration Sweep Mode")
+
+    if selected_sublattice:
+        st.info(f"**Binary sublattice {selected_sublattice} detected:** {sweep_element} + {complement_element}")
+    else:
+        st.info(f"**Binary system detected:** {sweep_element} + {complement_element}")
+
+    enable_sweep = st.checkbox(
+        f"Enable concentration sweep for {sweep_element}",
+        value=False,
+        help=f"Generate bash script to automatically test multiple achievable concentrations of {sweep_element}"
+    )
+
+    if not enable_sweep:
+        return
+
+    supercell_factor = calculate_supercell_factor(transformation_matrix)
+
+    if selected_sublattice:
+        sublattice_sites = 0
+        sublattice_elements = set([sweep_element, complement_element])
+
+        for i, site_elements in enumerate(chemical_symbols):
+            if isinstance(site_elements, list) and len(site_elements) > 1:
+                if set(site_elements) == sublattice_elements:
+                    sublattice_sites += 1
+
+        total_sites_for_sublattice = sublattice_sites * supercell_factor
+        st.write(f"**Sites for sublattice {selected_sublattice} in primitive cell:** {sublattice_sites}")
+        st.write(f"**Total sites for sublattice {selected_sublattice} in supercell:** {total_sites_for_sublattice}")
+
+        possible_concentrations = []
+        for i in range(1, total_sites_for_sublattice):
+            conc = i / total_sites_for_sublattice
+            possible_concentrations.append(round(conc, 6))
+
+    else:
+        st.write(f"**Supercell multiplicity:** {supercell_factor}")
+        st.write(f"**Minimum concentration step:** 1/{supercell_factor} = {1 / supercell_factor:.6f}")
+        st.info("**Global Mode:** Each concentration applies to ALL atomic sites equally")
+
+        possible_concentrations = []
+        for i in range(1, supercell_factor):
+            conc = i / supercell_factor
+            possible_concentrations.append(round(conc, 6))
+
+        atoms = pymatgen_to_ase(primitive_structure)
+        total_sites_for_sublattice = len(atoms) * supercell_factor
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if selected_sublattice:
+            st.write(
+                f"**Available {sweep_element} concentrations for sublattice {selected_sublattice}:** {len(possible_concentrations)}")
+        else:
+            st.write(f"**Available {sweep_element} concentrations:** {len(possible_concentrations)}")
+            st.write("**Valid concentrations:** " + ", ".join([f"{c:.3f}" for c in possible_concentrations]))
+
+        selected_concentrations = st.multiselect(
+            f"Select {sweep_element} concentrations for SQS generation:",
+            options=possible_concentrations,
+            default=possible_concentrations,
+            help="Choose from achievable concentrations" + (
+                " based on sublattice size" if selected_sublattice else " (multiples of 1/supercell_multiplicity)")
+        )
+
+    with col2:
+        time_per_conc = st.number_input(
+            "Time per concentration (minutes)",
+            min_value=0.1,
+            max_value=1440.0,
+            value=0.2,
+            step=0.5,
+            help="How long to run mcsqs for each concentration"
+        )
+
+        max_parallel = st.number_input(
+            "Maximum parallel jobs",
+            min_value=1,
+            max_value=16,
+            value=4,
+            step=1,
+            help="Number of parallel mcsqs processes"
+        )
+
+        parallel_runs_per_conc = st.number_input(
+            "Parallel runs per concentration",
+            min_value=1,
+            max_value=8,
+            value=2,
+            step=1,
+            help="Number of parallel mcsqs instances to run for each concentration"
+        )
+
+        progress_update_interval = st.number_input(
+            "Progress update interval (seconds)",
+            min_value=1,
+            max_value=60,
+            value=10,
+            step=1,
+            help="How often to print the progress update to the console in seconds"
+        )
+
+    if not selected_concentrations:
+        st.warning("Please select at least one concentration for SQS generation.")
+        return
+
+    st.write(f"**Selected concentrations:** {selected_concentrations}")
+    st.write(f"**Total estimated time:** {len(selected_concentrations) * time_per_conc:.1f} minutes")
+
+    if st.button("Generate Concentration Sweep Script", type="primary"):
+        if selected_sublattice:
+            filtered_target_concentrations = {
+                selected_sublattice: target_concentrations[selected_sublattice]
+            }
+        else:
+            filtered_target_concentrations = target_concentrations
+
+        script_content = generate_concentration_sweep_script(
+            sweep_element,
+            complement_element,
+            selected_concentrations,
+            time_per_conc,
+            max_parallel,
+            parallel_runs_per_conc,
+            filtered_target_concentrations,
+            chemical_symbols,
+            transformation_matrix,
+            primitive_structure,
+            cutoffs,
+            total_sites_for_sublattice,
+            progress_update_interval
+        )
+
+        st.download_button(
+            label="📥 Download Concentration Sweep Script",
+            data=script_content,
+            file_name="concentration_sweep.sh",
+            mime="text/plain",
+            type="primary"
+        )
+
+        st.success("Concentration sweep script generated!")
+
+        with st.expander("Script Preview", expanded=False):
+            st.code(script_content, language="bash")
+
+
+def generate_concentration_sweep_script(sweep_element, complement_element, selected_concentrations,
+                                        time_per_conc, max_parallel, parallel_runs_per_conc,
+                                        target_concentrations, chemical_symbols, transformation_matrix,
+                                        primitive_structure, cutoffs, total_sites, progress_update_interval):
+    corrdump_cmd = "corrdump -l=rndstr.in -ro -noe -nop -clus"
+    if len(cutoffs) >= 1 and cutoffs[0] is not None:
+        corrdump_cmd += f" -2={cutoffs[0]}"
+    if len(cutoffs) >= 2 and cutoffs[1] is not None:
+        corrdump_cmd += f" -3={cutoffs[1]}"
+    if len(cutoffs) >= 3 and cutoffs[2] is not None:
+        corrdump_cmd += f" -4={cutoffs[2]}"
+
+    atoms = pymatgen_to_ase(primitive_structure)
+    original_lattice = primitive_structure.lattice
+    max_param = max(original_lattice.a, original_lattice.b, original_lattice.c)
+
+    script_lines = [
+        "#!/bin/bash",
+        "",
+        f"# Concentration sweep script for {sweep_element}-{complement_element} system",
+        f"# Generated by SimplySQS",
+        f"# Corrdump command: {corrdump_cmd}",
+        f"# Total sites in supercell: {total_sites}",
+        f"# Parallel runs per concentration: {parallel_runs_per_conc}",
+        f"# Maximum concurrent jobs: {max_parallel}",
+        f"# Concentrations: {selected_concentrations}",
+        f"# Total estimated time: {len(selected_concentrations) * time_per_conc} minutes",
+        "",
+        "set -e",
+        "",
+        f'SWEEP_ELEMENT="{sweep_element}"',
+        f'COMPLEMENT_ELEMENT="{complement_element}"',
+        f"TIME_PER_CONC={time_per_conc}",
+        f"MAX_PARALLEL={max_parallel}",
+        f"PARALLEL_RUNS_PER_CONC={parallel_runs_per_conc}",
+        f'CORRDUMP_CMD="{corrdump_cmd}"',
+        f"PROGRESS_UPDATE_INTERVAL={progress_update_interval}",
+        "",
+        'TOTAL_TIME_SECONDS=$(echo "$TIME_PER_CONC * 60" | bc | xargs printf "%.0f")',
+        "",
+        "GLOBAL_START_TIME=$(date +%s)",
+        "declare -A CONC_START_TIMES",
+        "declare -A CONC_BEST_SCORES",
+        "declare -A CONC_BEST_RUNS",
+        "",
+        'echo "🚀 Starting concentration sweep..."',
+        'echo "🔬 Sweep element: $SWEEP_ELEMENT"',
+        'echo "🔬 Complement element: $COMPLEMENT_ELEMENT"',
+        'echo "🧪 Corrdump command: $CORRDUMP_CMD"',
+        'echo "⏱️ Time per concentration: $TIME_PER_CONC minutes"',
+        f'echo "⚙️ Parallel runs per concentration: $PARALLEL_RUNS_PER_CONC"',
+        f'echo "🔍 Concentrations to be searched: {selected_concentrations}"',
+        "",
+        'mkdir -p best_poscars',
+        'echo "📂 Created folder best_poscars to store the best structures from each concentration."',
+        "",
+        "cleanup() {",
+        '    echo "🧹 Cleaning up background processes..."',
+        "    jobs -p | xargs -r kill 2>/dev/null || true",
+        "    wait",
+        "}",
+        "",
+        "trap cleanup EXIT INT TERM",
+        "",
+        "format_elapsed_time() {",
+        "    local elapsed=$1",
+        "    local days=$((elapsed / 86400))",
+        "    local hours=$(((elapsed % 86400) / 3600))",
+        "    local minutes=$(((elapsed % 3600) / 60))",
+        "    local seconds=$((elapsed % 60))",
+        "    printf '%02d:%02d:%02d:%02d' $days $hours $minutes $seconds",
+        "}",
+        "",
+        "extract_latest_objective() {",
+        '    grep "Objective_function=" "$1" | tail -1 | sed "s/.*= *//" 2>/dev/null || echo ""',
+        "}",
+        "",
+        "get_best_objective_and_run() {",
+        "    local best_obj=\"N/A\"",
+        "    local best_run=\"N/A\"",
+        "    ",
+        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do",
+        "            if [ -f \"mcsqs$i.log\" ]; then",
+        "                local current_obj=$(extract_latest_objective \"mcsqs$i.log\")",
+        "                if [ -n \"$current_obj\" ] && [ \"$current_obj\" != \"N/A\" ] && [ \"$current_obj\" != \"\" ]; then",
+        "                    if [ \"$best_obj\" = \"N/A\" ] || awk \"BEGIN {exit !($current_obj < $best_obj)}\" 2>/dev/null; then",
+        "                        best_obj=\"$current_obj\"",
+        "                        best_run=\"$i\"",
+        "                    fi",
+        "                fi",
+        "            fi",
+        "        done",
+        "    else",
+        "        if [ -f \"mcsqs.log\" ]; then",
+        "            local current_obj=$(extract_latest_objective \"mcsqs.log\")",
+        "            if [ -n \"$current_obj\" ] && [ \"$current_obj\" != \"N/A\" ] && [ \"$current_obj\" != \"\" ]; then",
+        "                best_obj=\"$current_obj\"",
+        "                best_run=\"1\"",
+        "            fi",
+        "        fi",
+        "    fi",
+        "    ",
+        "    echo \"$best_obj,$best_run\"",
+        "}",
+        "",
+        "convert_bestsqs_to_poscar() {",
+        "    local bestsqs_file=$1",
+        "    local poscar_file=$2",
+        "    local conc=$3",
+        "    ",
+        "    if [ ! -f \"$bestsqs_file\" ]; then",
+        '        echo "⚠️ Warning: $bestsqs_file not found"',
+        "        return 1",
+        "    fi",
+        "    ",
+        '    echo "🔄 Converting $bestsqs_file to $poscar_file..."',
+        "    ",
+        "    python3 << EOF",
+        "import sys",
+        "import numpy as np",
+        "try:",
+        "    def parse_bestsqs(filename):",
+        "        with open(filename, 'r') as f:",
+        "            lines = f.readlines()",
+        "        ",
+        "        A = np.array([[float(x) for x in lines[i].split()] for i in range(3)])",
+        "        B = np.array([[float(x) for x in lines[i].split()] for i in range(3, 6)])",
+        "        ",
+        f"        A_scaled = A * {max_param:.6f}",
+        "        final_lattice = np.dot(B, A_scaled)",
+        "        ",
+        "        atoms = []",
+        "        for i in range(6, len(lines)):",
+        "            line = lines[i].strip()",
+        "            if line:",
+        "                parts = line.split()",
+        "                if len(parts) >= 4:",
+        "                    x, y, z, element = float(parts[0]), float(parts[1]), float(parts[2]), parts[3]",
+        "                    cart_pos = np.dot([x, y, z], A_scaled)",
+        "                    atoms.append((element, cart_pos))",
+        "        ",
+        "        return final_lattice, atoms",
+        "",
+        "    def write_poscar(lattice, atoms, filename, comment):",
+        "        from collections import defaultdict",
+        "        element_groups = defaultdict(list)",
+        "        for element, pos in atoms:",
+        "            element_groups[element].append(pos)",
+        "        ",
+        "        elements = sorted(element_groups.keys())",
+        "        ",
+        "        with open(filename, 'w') as f:",
+        "            f.write(f'{comment}\\n')",
+        "            f.write('1.0\\n')",
+        "            ",
+        "            for vec in lattice:",
+        "                f.write(f'  {vec[0]:15.9f} {vec[1]:15.9f} {vec[2]:15.9f}\\n')",
+        "            ",
+        "            f.write(' '.join(elements) + '\\n')",
+        "            f.write(' '.join(str(len(element_groups[el])) for el in elements) + '\\n')",
+        "            ",
+        "            f.write('Direct\\n')",
+        "            inv_lattice = np.linalg.inv(lattice)",
+        "            for element in elements:",
+        "                for cart_pos in element_groups[element]:",
+        "                    frac_pos = np.dot(cart_pos, inv_lattice)",
+        "                    f.write(f'  {frac_pos[0]:15.9f} {frac_pos[1]:15.9f} {frac_pos[2]:15.9f}\\n')",
+        "",
+        f'    comment = "SQS {sweep_element}{complement_element} conc=$conc from $bestsqs_file"',
+        f'    lattice, atoms = parse_bestsqs("$bestsqs_file")',
+        f'    write_poscar(lattice, atoms, "$poscar_file", comment)',
+        f'    print(f"Successfully converted $bestsqs_file to $poscar_file")',
+        "except Exception as e:",
+        '    print(f"Python script failed with error: {e}")',
+        "    import traceback",
+        "    traceback.print_exc()",
+        "    sys.exit(1)",
+        "EOF",
+        "    ",
+        "    local python_exit_code=$?",
+        "    return $python_exit_code",
+        "}",
+        "",
+        "monitor_progress() {",
+        "    local conc=$1",
+        "    local elapsed_seconds=0",
+        "    ",
+        "    while [ $elapsed_seconds -lt $TOTAL_TIME_SECONDS ]; do",
+        "        sleep $PROGRESS_UPDATE_INTERVAL",
+        "        elapsed_seconds=$((elapsed_seconds + PROGRESS_UPDATE_INTERVAL))",
+        "        ",
+        "        local current_time=$(date +%s)",
+        "        local global_elapsed=$((current_time - GLOBAL_START_TIME))",
+        "        local conc_elapsed=$((current_time - CONC_START_TIMES[$conc]))",
+        "        ",
+        "        local result=$(get_best_objective_and_run)",
+        "        local best_obj=$(echo $result | cut -d',' -f1)",
+        "        local best_run=$(echo $result | cut -d',' -f2)",
+        "        ",
+        "        CONC_BEST_SCORES[$conc]=\"$best_obj\"",
+        "        CONC_BEST_RUNS[$conc]=\"$best_run\"",
+        "        ",
+        "        local global_time_str=$(format_elapsed_time $global_elapsed)",
+        "        local conc_time_str=$(format_elapsed_time $conc_elapsed)",
+        "        ",
+        "        if [ \"$best_run\" != \"N/A\" ] && [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "            printf \"[Conc %s] [%s] Global: %s | Conc %s: %s (sec %d/%d) | Best obj: %s (run %s)\\n\" \\",
+        "                   \"$conc\" \"$(date +'%H:%M:%S')\" \"$global_time_str\" \"$conc\" \"$conc_time_str\" \\",
+        "                   \"$elapsed_seconds\" \"$TOTAL_TIME_SECONDS\" \"$best_obj\" \"$best_run\"",
+        "        else",
+        "            printf \"[Conc %s] [%s] Global: %s | Conc %s: %s (sec %d/%d) | Best obj: %s\\n\" \\",
+        "                   \"$conc\" \"$(date +'%H:%M:%S')\" \"$global_time_str\" \"$conc\" \"$conc_time_str\" \\",
+        "                   \"$elapsed_seconds\" \"$TOTAL_TIME_SECONDS\" \"$best_obj\"",
+        "        fi",
+        "    done",
+        "}",
+        "",
+        "run_concentration() {",
+        "    local conc=$1",
+        "    local current_run=$2",
+        "    local total_runs=$3",
+        f'    local sweep_atoms=$(printf "%.0f" $(echo "$conc * {total_sites}" | bc))',
+        f'    local comp_atoms=$(echo "{total_sites} - $sweep_atoms" | bc)',
+        '    local folder="conc_${SWEEP_ELEMENT}_${conc}"',
+        '    local comp_conc=$(echo "1.0 - $conc" | bc -l)',
+        "    ",
+        "    CONC_START_TIMES[$conc]=$(date +%s)",
+        "    ",
+        '    echo ""',
+        '    echo "=========================================="',
+        '    echo "($current_run/$total_runs) 🔬 Starting concentration $conc for $SWEEP_ELEMENT"',
+        '    ' 'echo "🔢 Target atoms: $sweep_atoms $SWEEP_ELEMENT + $comp_atoms $COMPLEMENT_ELEMENT"',
+        f'    echo "🏃 Running $PARALLEL_RUNS_PER_CONC parallel instances for $TIME_PER_CONC minutes"',
+        '    echo "=========================================="',
+        '    mkdir -p "$folder"',
+        '    cd "$folder"',
+        "    ",
+        "    cat > rndstr.in << EOF",
+        f"{original_lattice.a / max_param:.6f} {original_lattice.b / max_param:.6f} {original_lattice.c / max_param:.6f} {original_lattice.alpha:.2f} {original_lattice.beta:.2f} {original_lattice.gamma:.2f}",
+        "1 0 0",
+        "0 1 0",
+        "0 0 1"
+    ]
+
+    for i, site in enumerate(primitive_structure):
+        coord_str = f"{site.frac_coords[0]:.6f} {site.frac_coords[1]:.6f} {site.frac_coords[2]:.6f}"
+        site_elements = chemical_symbols[i]
+
+        if isinstance(site_elements, list) and len(site_elements) > 1:
+            if set(site_elements) == {sweep_element, complement_element}:
+                script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
+            else:
+                script_lines.append(f"{coord_str} {','.join(sorted(site_elements))}")
+        else:
+            element = site_elements[0] if isinstance(site_elements, list) else str(site.specie)
+            script_lines.append(f"{coord_str} {element}")
+
+    script_lines.extend([
+        "EOF",
+        "",
+        "    cat > sqscell.out << EOF",
+        f"1",
+        f"",
+        f"{transformation_matrix[0][0]} {transformation_matrix[0][1]} {transformation_matrix[0][2]}",
+        f"{transformation_matrix[1][0]} {transformation_matrix[1][1]} {transformation_matrix[1][2]}",
+        f"{transformation_matrix[2][0]} {transformation_matrix[2][1]} {transformation_matrix[2][2]}",
+        "EOF",
+        "",
+        '    echo "✨ Generating clusters with corrdump..."',
+        "    eval $CORRDUMP_CMD",
+        "    if [ $? -ne 0 ]; then",
+        '        echo "❌ ERROR: corrdump failed for concentration $conc"',
+        "        cd ..",
+        "        return 1",
+        "    fi",
+        "",
+        '    echo "✨ Starting $PARALLEL_RUNS_PER_CONC parallel mcsqs instances..."',
+        "    ",
+        "    local pids=()",
+        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        '        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do',
+        '            timeout ${TOTAL_TIME_SECONDS}s mcsqs -rc -ip=$i > mcsqs$i.log 2>&1 || true &',
+        "            pids+=($!)",
+        '            echo "  ✅ Started mcsqs run $i for concentration $conc (PID: $!)"',
+        "        done",
+        "    else",
+        '        timeout ${TOTAL_TIME_SECONDS}s mcsqs -rc > mcsqs.log 2>&1 || true &',
+        "        pids+=($!)",
+        '            echo "  ✅ Started single mcsqs run for concentration $conc (PID: $!)"',
+        "    fi",
+        "    ",
+        "    monitor_progress $conc &",
+        "    local monitor_pid=$!",
+        "    ",
+        "    for pid in \"${pids[@]}\"; do",
+        "        wait $pid || true",
+        "    done",
+        "    ",
+        "    kill $monitor_pid 2>/dev/null || true",
+        "    wait $monitor_pid 2>/dev/null || true",
+        "    ",
+        '    echo ""',
+        '    echo "=========================================="',
+        '    echo "📄 Processing results and converting to POSCAR format for concentration $conc..."',
+        '    echo "=========================================="',
+        "    ",
+        "    declare -a successful_runs",
+        "    declare -a run_scores",
+        "    ",
+        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do",
+        "            if [ -f \"bestsqs$i.out\" ]; then",
+        '                local score=$(extract_latest_objective "mcsqs$i.log")',
+        "                if [ -n \"$score\" ] && [ \"$score\" != \"N/A\" ] && [ \"$score\" != \"\" ]; then",
+        "                    successful_runs+=($i)",
+        '                    run_scores+=("$score")',
+        "                fi",
+        "            fi",
+        "        done",
+        "    else",
+        "        if [ -f \"bestsqs.out\" ]; then",
+        '            local score=$(extract_latest_objective "mcsqs.log")',
+        "            if [ -n \"$score\" ] && [ \"$score\" != \"N/A\" ] && [ \"$score\" != \"\" ]; then",
+        "                successful_runs+=(1)",
+        '                run_scores+=("$score")',
+        "            fi",
+        "        fi",
+        "    fi",
+        "    ",
+        "    if [ ${#successful_runs[@]} -eq 0 ]; then",
+        '        echo "❌ No successful runs for concentration $conc"',
+        "        cd ..",
+        "        return 1",
+        "    fi",
+        "    ",
+        'echo "Found ${#successful_runs[@]} successful runs"',
+        "    ",
+        "    local sorted_indices=()",
+        "    for ((i=0; i<${#successful_runs[@]}; i++)); do",
+        "        sorted_indices+=($i)",
+        "    done",
+        "    ",
+        "    for ((i=0; i<${#sorted_indices[@]}; i++)); do",
+        "        for ((j=i+1; j<${#sorted_indices[@]}; j++)); do",
+        "            local idx_i=${sorted_indices[i]}",
+        "            local idx_j=${sorted_indices[j]}",
+        "            local score_i=${run_scores[idx_i]}",
+        "            local score_j=${run_scores[idx_j]}",
+        '            if awk "BEGIN {exit !($score_j < $score_i)}" 2>/dev/null; then',
+        "                local temp=${sorted_indices[i]}",
+        "                sorted_indices[i]=${sorted_indices[j]}",
+        "                sorted_indices[j]=$temp",
+        "            fi",
+        "        done",
+        "    done",
+        "    ",
+        '    echo "Converting ${#successful_runs[@]} successful runs to POSCAR format:"',
+        "    local best_run_found=false",
+        "    local best_poscar_filename=\"\"",
+        "    ",
+        "    for ((rank=0; rank<${#sorted_indices[@]}; rank++)); do",
+        "        local idx=${sorted_indices[rank]}",
+        "        local run_num=${successful_runs[idx]}",
+        "        local score=${run_scores[idx]}",
+        "        ",
+        "        local bestsqs_filename",
+        "        local poscar_filename",
+        "        if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "            bestsqs_filename=\"bestsqs${run_num}.out\"",
+        "            poscar_filename=\"POSCAR_$((rank + 1))\"",
+        "        else",
+        "            bestsqs_filename=\"bestsqs.out\"",
+        "            poscar_filename=\"POSCAR\"",
+        "        fi",
+        "        ",
+        "        if convert_bestsqs_to_poscar \"$bestsqs_filename\" \"$poscar_filename\" \"$conc\"; then",
+        "            if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        '                echo "  ✔️ POSCAR_$((rank + 1)): Run $run_num (score: $score)"',
+        "            else",
+        '                echo "  ✔️ POSCAR: Run 1 (score: $score)"',
+        "            fi",
+        "            ",
+        "            if [ $rank -eq 0 ]; then",
+        "                best_run_found=true",
+        "                best_poscar_filename=\"$poscar_filename\"",
+        "                if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "                    cp \"POSCAR_1\" \"POSCAR\"",
+        '                    echo "  🏆 → Best result: POSCAR_1 (also saved as POSCAR)"',
+        "                else",
+        '                    echo "  🏆 → Best result: POSCAR"',
+        "                fi",
+        "            fi",
+        "        else",
+        "            if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        '                echo "  ❌ Failed to convert run $run_num to POSCAR"',
+        "            else",
+        '                echo "  ❌ Failed to convert single run to POSCAR"',
+        "            fi",
+        "        fi",
+        "    done",
+        "    ",
+        "    if [ \"$best_run_found\" = true ]; then",
+        "        local best_idx=${sorted_indices[0]}",
+        "        local best_score=${run_scores[best_idx]}",
+        '        echo ""',
+        '        echo "✅ Concentration $conc completed successfully"',
+        '        echo "✨ Best result has score: $best_score"',
+        "        if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        '            echo "📂 Generated ${#successful_runs[@]} POSCAR files (POSCAR_1 to POSCAR_${#successful_runs[@]})"',
+        "        else",
+        '            echo "📂 Generated POSCAR file"',
+        "        fi",
+        "        ",
+        '        local file_prefix="$2"',
+        '        cp "POSCAR" "../best_poscars/${file_prefix}_POSCAR-${conc}"',
+        '        echo "📁 Copied best POSCAR to ../best_poscars/${file_prefix}_POSCAR-${conc}"',
+        "        ",
+        "    else",
+        '        echo "❌ Failed to convert any results for concentration $conc"',
+        "    fi",
+        "    ",
+        "    cd ..",
+        "}",
+        "",
+        "export -f run_concentration",
+        "export -f monitor_progress",
+        "export -f format_elapsed_time",
+        "export -f get_best_objective_and_run",
+        "export -f convert_bestsqs_to_poscar",
+        "export -f extract_latest_objective",
+        "",
+        "concentrations=("
+    ])
+
+    for conc in selected_concentrations:
+        script_lines.append(f"    {conc}")
+
+    script_lines.extend([
+        ")",
+        "",
+        'echo "Will process ${#concentrations[@]} concentrations with $PARALLEL_RUNS_PER_CONC parallel runs each"',
+        'echo "Total estimated time: $(echo "${#concentrations[@]} * $TIME_PER_CONC" | bc -l | xargs printf "%.1f") minutes"',
+        'echo "Maximum concurrent jobs: $MAX_PARALLEL"',
+        'echo ""',
+        "",
+        "total_concentrations=${#concentrations[@]}",
+        'for ((i=0; i<total_concentrations; i++)); do',
+        "    while [ $(jobs -r | wc -l) -ge $MAX_PARALLEL ]; do",
+        "        sleep 5",
+        "    done",
+        "    ",
+        '    run_concentration "${concentrations[i]}" "$((i+1))" "$total_concentrations" &',
+        "done",
+        "",
+        "wait",
+        "",
+        'echo ""',
+        'echo "========================================"',
+        'echo "🏁 All concentrations completed!"',
+        'echo "========================================"',
+        "",
+        'echo "📋 Summary of generated files:"',
+        'echo "- 📁 Each concentration folder contains POSCAR_1, POSCAR_2, etc. (ordered by objective function)"',
+        'echo "- 📁 A copy of each best POSCAR is saved in the best_poscars folder"',
+        "",
+        'echo "✅ Concentration sweep completed successfully!"'
+    ])
+
+    return '\n'.join(script_lines)
+
+
 def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublattice_mode=False):
     from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
@@ -31,7 +716,6 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
         for i, site_elements in enumerate(chem_symbols):
             if len(site_elements) >= 2:
                 mixed_occupancy_sites.append(i)
-
 
         if not mixed_occupancy_sites:
             return {
@@ -61,7 +745,6 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
                         active_sites.append(equiv_site)
 
                 wyckoff_positions_processed.add(wyckoff_symbol)
-
 
         if not active_sites:
             return {
@@ -121,15 +804,12 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
         if abs(rounded_d - round(rounded_d)) < 0.01:
             base_distances.append(rounded_d)
 
-
     for base_d in base_distances:
         if base_d > 0:
-
             scaled_2x = base_d * 2.0
             overall_distances.extend([scaled_2x] * 12)
             scaled_3x = base_d * 3.0
             overall_distances.extend([scaled_3x] * 6)
-
 
     if overall_distances:
         sorted_distances = sorted(overall_distances)
@@ -149,6 +829,7 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
         'active_sites': active_sites,
         'total_sites': len(normalized_structure.sites)
     }
+
 
 def group_distances_into_shells(distances_data, tolerance=0.001):  # Much smaller tolerance
     if not distances_data:
@@ -184,6 +865,7 @@ def group_distances_into_shells(distances_data, tolerance=0.001):  # Much smalle
         })
 
     return shells
+
 
 def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
     try:
@@ -532,7 +1214,7 @@ def render_atat_sqs_section():
                     f"{elem}:",
                     min_value=0.0,
                     max_value=remaining,
-                    value=min(int(supercell_multiplicity/ len(element_list))*min_step, remaining),
+                    value=min(int(supercell_multiplicity / len(element_list)) * min_step, remaining),
                     step=min_step,
                     format="%.6f",
                     key=f"atat_comp_global_{elem}"
@@ -626,7 +1308,6 @@ def render_atat_sqs_section():
             st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
             st.write("#### **Overall Expected Element Distribution in Supercell:**")
 
-
             total_element_counts = {}
             for elem, per_site_count in achievable_counts_global.items():
                 total_element_counts[elem] = per_site_count * len(working_structure)
@@ -685,7 +1366,7 @@ def render_atat_sqs_section():
                                 font-size: 1.8em;
                                 margin: 5px 0 0 0;
                                 opacity: 0.9;
-                            ">{int(round(count,0))} atoms</p>
+                            ">{int(round(count, 0))} atoms</p>
                         </div>
                         """, unsafe_allow_html=True)
                 st.write(f"**Total expected atoms in supercell:** {int(total_supercell_atoms)}")
@@ -739,7 +1420,8 @@ def render_atat_sqs_section():
                         f"**Active sites:** {active_count}/{total_count} ({', '.join(set(active_site_names))} positions)")
 
                 if nn_data['overall']:
-                    st.write("**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
+                    st.write(
+                        "**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
                     overall_text = []
                     ordinals = {1: 'st', 2: 'nd', 3: 'rd', 4: 'th', 5: 'th', 6: 'th'}
                     for shell in nn_data['overall']:
@@ -748,7 +1430,7 @@ def render_atat_sqs_section():
                     st.write(" | ".join(overall_text))
 
                 st.caption("💡 These values can suggest how to set the pair/triplet cut-off distances")
-                
+
     col_cut1, col_cut2, col_cut3 = st.columns(3)
     with col_cut1:
         pair_cutoff = st.number_input(
@@ -847,7 +1529,7 @@ def render_atat_sqs_section():
                 use_concentrations = achievable_concentrations_for_atat
                 use_sublattice_mode_final = True
                 use_chem_symbols = chem_symbols
-            
+
             rndstr_content, sqscell_content, atat_commands, final_concentrations, adjustment_info = generate_atat_input_files_corrected(
                 working_structure,
                 use_concentrations,
@@ -903,6 +1585,20 @@ def render_atat_sqs_section():
                 st.metric("Triplet Cutoff", f"{results['triplet_cutoff']:.1f}")
             if results['quadruplet_cutoff']:
                 st.metric("Quadruplet Cutoff", f"{results['quadruplet_cutoff']:.1f}")
+
+        cutoffs = [results['pair_cutoff']]
+        if results.get('triplet_cutoff'):
+            cutoffs.append(results['triplet_cutoff'])
+        if results.get('quadruplet_cutoff'):
+            cutoffs.append(results['quadruplet_cutoff'])
+
+        render_concentration_sweep_section(
+            chem_symbols,
+            target_concentrations,
+            transformation_matrix,
+            working_structure,
+            cutoffs
+        )
 
         st.subheader("📁 Generated Files")
         col_file1, col_file2 = st.columns(2)
@@ -1012,16 +1708,16 @@ def render_atat_sqs_section():
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
 
-    file_tab1, file_tab2 = st.tabs(["📁 Structure Converter", "📊 Optimization Analysis (mcsqs.log, mcsqs_progress.csv, parallel runs...)"])
-
+    file_tab1, file_tab2 = st.tabs(
+        ["📁 Structure Converter", "📊 Optimization Analysis (mcsqs.log, mcsqs_progress.csv, parallel runs...)"])
 
     with file_tab1:
 
         converter_mode = st.radio(
-                "Choose conversion mode:",
-                ["Single File Converter", "Batch Converter (Multiple Files)"],
-                key="converter_mode_selector"
-            )
+            "Choose conversion mode:",
+            ["Single File Converter", "Batch Converter (Multiple Files)"],
+            key="converter_mode_selector"
+        )
 
         if converter_mode == "Single File Converter":
             st.write("**Upload bestsqs.out file to convert the output format:**")
@@ -1082,12 +1778,12 @@ def render_atat_sqs_section():
                         # VASP POSCAR download with options
                         st.markdown("**VASP Options:**")
                         use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
-                                                    value=True,
-                                                    key="poscar_fractional")
+                                                     value=True,
+                                                     key="poscar_fractional")
 
                         from ase.constraints import FixAtoms
                         use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
-                                                            value=False, key="poscar_sd")
+                                                             value=False, key="poscar_sd")
 
                         # Generate VASP content with options
                         try:
@@ -1135,7 +1831,7 @@ def render_atat_sqs_section():
                         if additional_format == "LAMMPS":
                             st.markdown("**LAMMPS Export Options**")
                             atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
-                                                    key="lammps_atom_style")
+                                                      key="lammps_atom_style")
                             units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
                             include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
                             force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
@@ -1162,7 +1858,7 @@ def render_atat_sqs_section():
                                         )
 
                                     file_content = CifWriter(new_struct, symprec=0.1,
-                                                            write_site_properties=True).__str__()
+                                                             write_site_properties=True).__str__()
                                     download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
                                     mime_type = "chemical/x-cif"
 
@@ -1471,7 +2167,6 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
     )
 
     return sqs_structure
-
 
 
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
@@ -1822,7 +2517,7 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
                     element_counts[element] = element_counts.get(
                         element, 0) + 1
 
-                summary_lines.append(f"File {i+1}: {file_name}")
+                summary_lines.append(f"File {i + 1}: {file_name}")
                 summary_lines.append(f"  Total atoms: {len(atoms)}")
                 summary_lines.append(
                     f"  Composition: {', '.join([f'{elem}: {count}' for elem, count in sorted(element_counts.items())])}")
@@ -1958,6 +2653,7 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
 
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
+
 
 def create_complete_atat_zip(results, vasp_content, bestsqs_content):
     import zipfile
@@ -2451,8 +3147,6 @@ def generate_atat_sqscell_content(nx, ny, nz):
     return "\n".join(lines)
 
 
-
-
 def generate_atat_input_files(structure, target_concentrations, transformation_matrix,
                               use_sublattice_mode, chem_symbols, nx, ny, nz,
                               pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
@@ -2543,8 +3237,6 @@ def convert_achievable_sublattice_to_site_assignments(structure, achievable_conc
             site_assignments[site_idx] = {element: 1.0}
 
     return site_assignments
-
-
 
 
 def integrate_atat_option():
@@ -2704,7 +3396,9 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                             f"**{elem} fraction:**",
                             min_value=0.0,
                             max_value=remaining,
-                            value=min(int(atoms_per_wyckoff_in_supercell/ len(selected_elements))*min_concentration_step, remaining),
+                            value=min(
+                                int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
+                                remaining),
                             step=min_concentration_step,
                             format="%.6f",
                             key=f"sublattice_{sublattice_letter}_{elem}_frac"
@@ -2858,8 +3552,8 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
                         found_sublattice_config = True
                         break
                 if not found_sublattice_config:
-                   # st.warning(
-                   #     f"Warning: Site {i} has multiple elements {site_elements_list} but no matching sublattice configuration. Defaulting to original fractional occupancies if available.")
+                    # st.warning(
+                    #     f"Warning: Site {i} has multiple elements {site_elements_list} but no matching sublattice configuration. Defaulting to original fractional occupancies if available.")
                     if working_structure[i].is_ordered:
                         current_site_composition = {working_structure[i].specie.symbol: 1.0}
                     else:
@@ -2937,7 +3631,7 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
                             font-size: 1.8em;
                             margin: 5px 0 0 0;
                             opacity: 0.9;
-                        ">{int(round(count,0))} atoms</p>
+                        ">{int(round(count, 0))} atoms</p>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -3058,8 +3752,8 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
             coord_str = f"{coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}"
 
             site_elements = chem_symbols[i] if i < len(chem_symbols) else []
-           # print(f"Site {i}: site_elements = {site_elements}")
-           # print(f"Site {i}: achievable_concentrations = {achievable_concentrations}")
+            # print(f"Site {i}: site_elements = {site_elements}")
+            # print(f"Site {i}: achievable_concentrations = {achievable_concentrations}")
             if len(site_elements) >= 1:
                 conc_parts = []
                 for sublattice_letter, sublattice_concentrations in achievable_concentrations.items():
@@ -3096,7 +3790,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
             lines.append(f"{coord_str} {conc_str}")
 
     return "\n".join(lines)
-
 
 
 def generate_atat_sqscell_content(nx, ny, nz):
