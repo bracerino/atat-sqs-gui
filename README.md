@@ -11,7 +11,7 @@
 # **How to compile and run the ATAT SQS GUI locally:** 
 
 ### **Prerequisities**: 
-- Python 3.x (Tested 3.12)
+- Python 3.11 (Tested 3.12)
 - Console (For Windows, I recommend to use WSL2 (Windows Subsystem for Linux))
 - Git (optional for downloading the code)
   
@@ -63,6 +63,7 @@ Python 3.12.3
  - Upload crystal structures or retrieved them from implemented search interface in MP, AFLOW, and COD databases.
  - Generate ATAT Input Files: Create rndstr.in and sqscell.out files with global or sublattice-specific composition control. The concentrations are automatically recalculated for the achiavable concentrations given the total number of atoms in supercell.
  - Generate complete bash script that will create the rndstr.in and sqscell.out and run the ATAT mcsqs with improved monitoring and creating the mcsqs_progress.csv
+ - Generate complete bash script to automate the SQS search across a range of compositions for a binary alloy system.
  - Convert ATAT Output: Transform bestsqs.out files to VASP, CIF, LAMMPS, and XYZ formats with 3D visualization
  - Monitor Optimization: Analyze ATAT convergence from log files (mcsqs.log or at once for parallel run with mcsqs1.log, mcsqs2.log, ...) and CSV time progress file (mcsqs_progress.csv) data with interactive plots and main information. For parallel run, it will automatically identify the best performing optimization
  - Calculate PRDF: Compute Partial Radial Distribution Functions for SQS
