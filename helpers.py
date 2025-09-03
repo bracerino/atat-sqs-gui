@@ -58,9 +58,11 @@ def intro_text():
     
     📊 Recalculate feasible concentrations based on the chosen supercell size
     
-    💾 Generate rndstr.in and sqscell.out input files automatically
+    💾 Generate **rndstr.in** and **sqscell.out** input files automatically
     
     🛠️ Generate a bash script to automate the creation of input files and run mcsqs with optional parallelization and real-time convergence monitoring
+        
+    🛠️ Generate complete bash script to automate the SQS search **across a range of compositions for a binary alloy system**
     
     📤 Upload bestsqs.out to convert to POSCAR, LMP, CIF, or XYZ formats
     
