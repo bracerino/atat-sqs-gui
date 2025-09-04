@@ -41,6 +41,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
                 st.markdown("---")
                 st.subheader("🔄 Concentration Sweep Mode")
                 st.info("Multiple binary sublattices detected. Please select one for concentration sweep:")
+                st.info(f"You can generate a script to automatically run the mcsqs search across concentration range.")
 
                 sublattice_options = []
                 for sublattice_letter, elements in binary_sublattices:
@@ -75,8 +76,10 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
 
     if selected_sublattice:
         st.info(f"**Binary sublattice {selected_sublattice} detected:** {sweep_element} + {complement_element}")
+        st.info(f"You can generate a script to automatically run the mcsqs search across concentration range.")
     else:
         st.info(f"**Binary system detected:** {sweep_element} + {complement_element}")
+        st.info(f"You can generate a script to automatically run the mcsqs search across concentration range.")
 
     enable_sweep = st.checkbox(
         f"Enable concentration sweep for {sweep_element}",
@@ -99,7 +102,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
                     sublattice_sites += 1
 
         total_sites_for_sublattice = sublattice_sites * supercell_factor
-        st.write(f"**Sites for sublattice {selected_sublattice} in primitive cell:** {sublattice_sites}")
+        st.write(f"**Sites for sublattice {selected_sublattice} in initial unit cell:** {sublattice_sites}")
         st.write(f"**Total sites for sublattice {selected_sublattice} in supercell:** {total_sites_for_sublattice}")
 
         possible_concentrations = []
@@ -219,7 +222,6 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         with st.expander("Script Preview", expanded=False):
             st.code(script_content, language="bash")
 
-
 def generate_concentration_sweep_script(sweep_element, complement_element, selected_concentrations,
                                         time_per_conc, max_parallel, parallel_runs_per_conc,
                                         target_concentrations, chemical_symbols, transformation_matrix,
@@ -252,13 +254,13 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "",
         f'SWEEP_ELEMENT="{sweep_element}"',
         f'COMPLEMENT_ELEMENT="{complement_element}"',
-        f"TIME_PER_CONC={time_per_conc}",
+        f"TIME_PER_CONC_DEFAULT={time_per_conc}",
         f"MAX_PARALLEL={max_parallel}",
-        f"PARALLEL_RUNS_PER_CONC={parallel_runs_per_conc}",
+        f"PARALLEL_RUNS_PER_CONC_DEFAULT={parallel_runs_per_conc}",
         f'CORRDUMP_CMD="{corrdump_cmd}"',
         f"PROGRESS_UPDATE_INTERVAL={progress_update_interval}",
         "",
-        'TOTAL_TIME_SECONDS=$(echo "$TIME_PER_CONC * 60" | bc | xargs printf "%.0f")',
+        'TOTAL_TIME_SECONDS=$(echo "$TIME_PER_CONC_DEFAULT * 60" | bc | xargs printf "%.0f")',
         "",
         "GLOBAL_START_TIME=$(date +%s)",
         "declare -A CONC_START_TIMES",
@@ -269,8 +271,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         'echo "🔬 Sweep element: $SWEEP_ELEMENT"',
         'echo "🔬 Complement element: $COMPLEMENT_ELEMENT"',
         'echo "🧪 Corrdump command: $CORRDUMP_CMD"',
-        'echo "⏱️ Time per concentration: $TIME_PER_CONC minutes"',
-        f'echo "⚙️ Parallel runs per concentration: $PARALLEL_RUNS_PER_CONC"',
+        'echo "⏱️ Default time per concentration: $TIME_PER_CONC_DEFAULT minutes"',
+        f'echo "⚙️ Default parallel runs per concentration: $PARALLEL_RUNS_PER_CONC_DEFAULT"',
         f'echo "🔍 Concentrations to be searched: {selected_concentrations}"',
         "",
         'mkdir -p best_poscars',
@@ -300,9 +302,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "get_best_objective_and_run() {",
         "    local best_obj=\"N/A\"",
         "    local best_run=\"N/A\"",
+        "    local parallel_runs_per_conc=$1",
         "    ",
-        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
-        "        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do",
+        "    if [ $parallel_runs_per_conc -gt 1 ]; then",
+        "        for ((i=1; i<=parallel_runs_per_conc; i++)); do",
         "            if [ -f \"mcsqs$i.log\" ]; then",
         "                local current_obj=$(extract_latest_objective \"mcsqs$i.log\")",
         "                if [ -n \"$current_obj\" ] && [ \"$current_obj\" != \"N/A\" ] && [ \"$current_obj\" != \"\" ]; then",
@@ -406,9 +409,11 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "",
         "monitor_progress() {",
         "    local conc=$1",
+        "    local parallel_runs_per_conc=$2",
+        "    local total_time_seconds=$3",
         "    local elapsed_seconds=0",
         "    ",
-        "    while [ $elapsed_seconds -lt $TOTAL_TIME_SECONDS ]; do",
+        "    while [ $elapsed_seconds -lt $total_time_seconds ]; do",
         "        sleep $PROGRESS_UPDATE_INTERVAL",
         "        elapsed_seconds=$((elapsed_seconds + PROGRESS_UPDATE_INTERVAL))",
         "        ",
@@ -416,7 +421,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        local global_elapsed=$((current_time - GLOBAL_START_TIME))",
         "        local conc_elapsed=$((current_time - CONC_START_TIMES[$conc]))",
         "        ",
-        "        local result=$(get_best_objective_and_run)",
+        "        local result=$(get_best_objective_and_run $parallel_runs_per_conc)",
         "        local best_obj=$(echo $result | cut -d',' -f1)",
         "        local best_run=$(echo $result | cut -d',' -f2)",
         "        ",
@@ -426,14 +431,14 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        local global_time_str=$(format_elapsed_time $global_elapsed)",
         "        local conc_time_str=$(format_elapsed_time $conc_elapsed)",
         "        ",
-        "        if [ \"$best_run\" != \"N/A\" ] && [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "        if [ \"$best_run\" != \"N/A\" ] && [ $parallel_runs_per_conc -gt 1 ]; then",
         "            printf \"[Conc %s] [%s] Global: %s | Conc %s: %s (sec %d/%d) | Best obj: %s (run %s)\\n\" \\",
         "                   \"$conc\" \"$(date +'%H:%M:%S')\" \"$global_time_str\" \"$conc\" \"$conc_time_str\" \\",
-        "                   \"$elapsed_seconds\" \"$TOTAL_TIME_SECONDS\" \"$best_obj\" \"$best_run\"",
+        "                   \"$elapsed_seconds\" \"$total_time_seconds\" \"$best_obj\" \"$best_run\"",
         "        else",
         "            printf \"[Conc %s] [%s] Global: %s | Conc %s: %s (sec %d/%d) | Best obj: %s\\n\" \\",
         "                   \"$conc\" \"$(date +'%H:%M:%S')\" \"$global_time_str\" \"$conc\" \"$conc_time_str\" \\",
-        "                   \"$elapsed_seconds\" \"$TOTAL_TIME_SECONDS\" \"$best_obj\"",
+        "                   \"$elapsed_seconds\" \"$total_time_seconds\" \"$best_obj\"",
         "        fi",
         "    done",
         "}",
@@ -447,13 +452,25 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '    local folder="conc_${SWEEP_ELEMENT}_${conc}"',
         '    local comp_conc=$(echo "1.0 - $conc" | bc -l)',
         "    ",
+        "    local time_per_conc_current=$TIME_PER_CONC_DEFAULT",
+        "    local parallel_runs_per_conc_current=$PARALLEL_RUNS_PER_CONC_DEFAULT",
+        "    ",
+        "    if [ \"$sweep_atoms\" -le 1 ] || [ \"$comp_atoms\" -le 1 ]; then",
+        "        time_per_conc_current=0.1",
+        "        parallel_runs_per_conc_current=1",
+        '        echo ""',
+        '        echo "ℹ️  Note: Single or very few atoms detected. Reducing time to $time_per_conc_current min and parallel runs to $parallel_runs_per_conc_current."',
+        "    fi",
+        "    ",
+        "    local total_time_seconds_current=$(echo \"$time_per_conc_current * 60\" | bc | xargs printf \"%.0f\")",
+        "    ",
         "    CONC_START_TIMES[$conc]=$(date +%s)",
         "    ",
         '    echo ""',
         '    echo "=========================================="',
         '    echo "($current_run/$total_runs) 🔬 Starting concentration $conc for $SWEEP_ELEMENT"',
         '    ' 'echo "🔢 Target atoms: $sweep_atoms $SWEEP_ELEMENT + $comp_atoms $COMPLEMENT_ELEMENT"',
-        f'    echo "🏃 Running $PARALLEL_RUNS_PER_CONC parallel instances for $TIME_PER_CONC minutes"',
+        '    echo "🏃 Running $parallel_runs_per_conc_current parallel instances for $time_per_conc_current minutes"',
         '    echo "=========================================="',
         '    mkdir -p "$folder"',
         '    cd "$folder"',
@@ -467,16 +484,23 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
 
     for i, site in enumerate(primitive_structure):
         coord_str = f"{site.frac_coords[0]:.6f} {site.frac_coords[1]:.6f} {site.frac_coords[2]:.6f}"
-        site_elements = chemical_symbols[i]
 
-        if isinstance(site_elements, list) and len(site_elements) > 1:
-            if set(site_elements) == {sweep_element, complement_element}:
-                script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
-            else:
-                script_lines.append(f"{coord_str} {','.join(sorted(site_elements))}")
+        # Check if chemical_symbols is None (global mode) or populated (sublattice mode)
+        if chemical_symbols is None:
+            # Global mode: all sites get the sweep elements
+            script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
         else:
-            element = site_elements[0] if isinstance(site_elements, list) else str(site.specie)
-            script_lines.append(f"{coord_str} {element}")
+            # Sublattice mode: use the chemical_symbols array
+            site_elements = chemical_symbols[i]
+
+            if isinstance(site_elements, list) and len(site_elements) > 1:
+                if set(site_elements) == {sweep_element, complement_element}:
+                    script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
+                else:
+                    script_lines.append(f"{coord_str} {','.join(sorted(site_elements))}")
+            else:
+                element = site_elements[0] if isinstance(site_elements, list) else str(site.specie)
+                script_lines.append(f"{coord_str} {element}")
 
     script_lines.extend([
         "EOF",
@@ -497,22 +521,22 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        return 1",
         "    fi",
         "",
-        '    echo "✨ Starting $PARALLEL_RUNS_PER_CONC parallel mcsqs instances..."',
+        '    echo "✨ Starting $parallel_runs_per_conc_current parallel mcsqs instances..."',
         "    ",
         "    local pids=()",
-        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
-        '        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do',
-        '            timeout ${TOTAL_TIME_SECONDS}s mcsqs -rc -ip=$i > mcsqs$i.log 2>&1 || true &',
+        "    if [ $parallel_runs_per_conc_current -gt 1 ]; then",
+        '        for ((i=1; i<=parallel_runs_per_conc_current; i++)); do',
+        '            timeout ${total_time_seconds_current}s mcsqs -rc -ip=$i > mcsqs$i.log 2>&1 || true &',
         "            pids+=($!)",
         '            echo "  ✅ Started mcsqs run $i for concentration $conc (PID: $!)"',
         "        done",
         "    else",
-        '        timeout ${TOTAL_TIME_SECONDS}s mcsqs -rc > mcsqs.log 2>&1 || true &',
+        '        timeout ${total_time_seconds_current}s mcsqs -rc > mcsqs.log 2>&1 || true &',
         "        pids+=($!)",
         '            echo "  ✅ Started single mcsqs run for concentration $conc (PID: $!)"',
         "    fi",
         "    ",
-        "    monitor_progress $conc &",
+        "    monitor_progress $conc $parallel_runs_per_conc_current $total_time_seconds_current &",
         "    local monitor_pid=$!",
         "    ",
         "    for pid in \"${pids[@]}\"; do",
@@ -530,8 +554,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    declare -a successful_runs",
         "    declare -a run_scores",
         "    ",
-        "    if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
-        "        for ((i=1; i<=PARALLEL_RUNS_PER_CONC; i++)); do",
+        "    if [ $parallel_runs_per_conc_current -gt 1 ]; then",
+        "        for ((i=1; i<=parallel_runs_per_conc_current; i++)); do",
         "            if [ -f \"bestsqs$i.out\" ]; then",
         '                local score=$(extract_latest_objective "mcsqs$i.log")',
         "                if [ -n \"$score\" ] && [ \"$score\" != \"N/A\" ] && [ \"$score\" != \"\" ]; then",
@@ -588,7 +612,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        ",
         "        local bestsqs_filename",
         "        local poscar_filename",
-        "        if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "        if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         "            bestsqs_filename=\"bestsqs${run_num}.out\"",
         "            poscar_filename=\"POSCAR_$((rank + 1))\"",
         "        else",
@@ -597,7 +621,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        fi",
         "        ",
         "        if convert_bestsqs_to_poscar \"$bestsqs_filename\" \"$poscar_filename\" \"$conc\"; then",
-        "            if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "            if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         '                echo "  ✔️ POSCAR_$((rank + 1)): Run $run_num (score: $score)"',
         "            else",
         '                echo "  ✔️ POSCAR: Run 1 (score: $score)"',
@@ -606,7 +630,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "            if [ $rank -eq 0 ]; then",
         "                best_run_found=true",
         "                best_poscar_filename=\"$poscar_filename\"",
-        "                if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "                if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         "                    cp \"POSCAR_1\" \"POSCAR\"",
         '                    echo "  🏆 → Best result: POSCAR_1 (also saved as POSCAR)"',
         "                else",
@@ -614,7 +638,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "                fi",
         "            fi",
         "        else",
-        "            if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "            if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         '                echo "  ❌ Failed to convert run $run_num to POSCAR"',
         "            else",
         '                echo "  ❌ Failed to convert single run to POSCAR"',
@@ -628,7 +652,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '        echo ""',
         '        echo "✅ Concentration $conc completed successfully"',
         '        echo "✨ Best result has score: $best_score"',
-        "        if [ $PARALLEL_RUNS_PER_CONC -gt 1 ]; then",
+        "        if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         '            echo "📂 Generated ${#successful_runs[@]} POSCAR files (POSCAR_1 to POSCAR_${#successful_runs[@]})"',
         "        else",
         '            echo "📂 Generated POSCAR file"',
@@ -661,8 +685,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
     script_lines.extend([
         ")",
         "",
-        'echo "Will process ${#concentrations[@]} concentrations with $PARALLEL_RUNS_PER_CONC parallel runs each"',
-        'echo "Total estimated time: $(echo "${#concentrations[@]} * $TIME_PER_CONC" | bc -l | xargs printf "%.1f") minutes"',
+        'echo "Will process ${#concentrations[@]} concentrations with a default of $PARALLEL_RUNS_PER_CONC_DEFAULT parallel runs each"',
+        'echo "Total estimated time: $(echo "${#concentrations[@]} * $TIME_PER_CONC_DEFAULT" | bc -l | xargs printf "%.1f") minutes"',
         'echo "Maximum concurrent jobs: $MAX_PARALLEL"',
         'echo ""',
         "",
