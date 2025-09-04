@@ -11,7 +11,7 @@ from parallel_analysis import *
 
 
 def render_concentration_sweep_section(chemical_symbols, target_concentrations, transformation_matrix,
-                                       primitive_structure, cutoffs):
+                                       primitive_structure, cutoffs, total_atoms_in_supercell):
     if not target_concentrations:
         return
 
@@ -92,6 +92,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
 
     supercell_factor = calculate_supercell_factor(transformation_matrix)
 
+
     if selected_sublattice:
         sublattice_sites = 0
         sublattice_elements = set([sweep_element, complement_element])
@@ -142,6 +143,21 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         )
 
     with col2:
+        mcsqs_mode = st.radio(
+            "Choose MCSQS mode:",
+            options=["Supercell Mode", "Atom Count Mode"],
+            index=0,
+            help="Supercell mode (-rc): Uses predefined supercell transformation\nAtom Count mode (-n): Searches for optimal supercell with specified atom count",
+            key="concentration_sweep_mcsqs_mode"
+        )
+
+        if mcsqs_mode == "Supercell Mode":
+            mode_description = "Uses -rc flag (predefined supercell)"
+        else:
+            mode_description = f"Uses -n flag (optimize for total of {total_atoms_in_supercell} atoms)"
+
+        st.caption(mode_description)
+
         time_per_conc = st.number_input(
             "Time per concentration (minutes)",
             min_value=0.1,
@@ -206,7 +222,8 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             primitive_structure,
             cutoffs,
             total_sites_for_sublattice,
-            progress_update_interval
+            progress_update_interval,
+            mcsqs_mode,total_atoms_in_supercell
         )
 
         st.download_button(
@@ -225,7 +242,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
 def generate_concentration_sweep_script(sweep_element, complement_element, selected_concentrations,
                                         time_per_conc, max_parallel, parallel_runs_per_conc,
                                         target_concentrations, chemical_symbols, transformation_matrix,
-                                        primitive_structure, cutoffs, total_sites, progress_update_interval):
+                                        primitive_structure, cutoffs, total_sites, progress_update_interval, mcsqs_mode, total_atoms_in_supercell):
     corrdump_cmd = "corrdump -l=rndstr.in -ro -noe -nop -clus"
     if len(cutoffs) >= 1 and cutoffs[0] is not None:
         corrdump_cmd += f" -2={cutoffs[0]}"
@@ -237,7 +254,12 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
     atoms = pymatgen_to_ase(primitive_structure)
     original_lattice = primitive_structure.lattice
     max_param = max(original_lattice.a, original_lattice.b, original_lattice.c)
-
+    if mcsqs_mode == "Supercell Mode":
+        mcsqs_base_cmd = "mcsqs -rc"
+        mode_description = "supercell mode (-rc)"
+    else:
+        mcsqs_base_cmd = f"mcsqs -n {total_atoms_in_supercell}"
+        mode_description = f"atom count mode (-n {total_atoms_in_supercell})"
     script_lines = [
         "#!/bin/bash",
         "",
@@ -258,6 +280,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         f"MAX_PARALLEL={max_parallel}",
         f"PARALLEL_RUNS_PER_CONC_DEFAULT={parallel_runs_per_conc}",
         f'CORRDUMP_CMD="{corrdump_cmd}"',
+        f'MCSQS_BASE_CMD="{mcsqs_base_cmd}"',
+        f'MCSQS_MODE="{mcsqs_mode}"',
         f"PROGRESS_UPDATE_INTERVAL={progress_update_interval}",
         "",
         'TOTAL_TIME_SECONDS=$(echo "$TIME_PER_CONC_DEFAULT * 60" | bc | xargs printf "%.0f")',
@@ -271,6 +295,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         'echo "🔬 Sweep element: $SWEEP_ELEMENT"',
         'echo "🔬 Complement element: $COMPLEMENT_ELEMENT"',
         'echo "🧪 Corrdump command: $CORRDUMP_CMD"',
+        'echo "⚙️ MCSQS mode: $MCSQS_MODE"',
+        'echo "⚙️ MCSQS command: $MCSQS_BASE_CMD"',
         'echo "⏱️ Default time per concentration: $TIME_PER_CONC_DEFAULT minutes"',
         f'echo "⚙️ Default parallel runs per concentration: $PARALLEL_RUNS_PER_CONC_DEFAULT"',
         f'echo "🔍 Concentrations to be searched: {selected_concentrations}"',
@@ -526,12 +552,12 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    local pids=()",
         "    if [ $parallel_runs_per_conc_current -gt 1 ]; then",
         '        for ((i=1; i<=parallel_runs_per_conc_current; i++)); do',
-        '            timeout ${total_time_seconds_current}s mcsqs -rc -ip=$i > mcsqs$i.log 2>&1 || true &',
+        '            timeout ${total_time_seconds_current}s $MCSQS_BASE_CMD -ip=$i > mcsqs$i.log 2>&1 || true &',
         "            pids+=($!)",
         '            echo "  ✅ Started mcsqs run $i for concentration $conc (PID: $!)"',
         "        done",
         "    else",
-        '        timeout ${total_time_seconds_current}s mcsqs -rc > mcsqs.log 2>&1 || true &',
+        '        timeout ${total_time_seconds_current}s $MCSQS_BASE_CMD > mcsqs.log 2>&1 || true &',
         "        pids+=($!)",
         '            echo "  ✅ Started single mcsqs run for concentration $conc (PID: $!)"',
         "    fi",
@@ -1621,7 +1647,7 @@ def render_atat_sqs_section():
             target_concentrations,
             transformation_matrix,
             working_structure,
-            cutoffs
+            cutoffs,len(supercell_preview)
         )
 
         st.subheader("📁 Generated Files")
