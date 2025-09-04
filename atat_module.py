@@ -144,7 +144,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
     with col2:
         time_per_conc = st.number_input(
             "Time per concentration (minutes)",
-            min_value=0.1,
+            min_value=30.0,
             max_value=14400.0,
             value=0.2,
             step=0.5,
