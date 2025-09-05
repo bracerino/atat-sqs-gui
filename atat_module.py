@@ -1808,6 +1808,15 @@ def render_atat_sqs_section():
                     try:
                         bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
 
+                        if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                            results = st.session_state.atat_results
+                        else:
+                            results = {
+                                'structure_name': selected_atat_file,
+                                'supercell_size': f"{nx}×{ny}×{nz}" if 'nx' in locals() else "Unknown",
+                                'total_atoms': len(supercell_preview) if 'supercell_preview' in locals() else 0
+                            }
+
                         is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
 
                         if not is_valid:
@@ -1987,19 +1996,27 @@ def render_atat_sqs_section():
                                     st.error(f"Error generating {additional_format}: {str(e)}")
 
                         st.write("**Complete Package:**")
-                        zip_buffer_complete = create_complete_atat_zip(
-                            results, vasp_content, bestsqs_content
-                        )
+                        if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                            zip_buffer_complete = create_complete_atat_zip(
+                                st.session_state.atat_results, vasp_content, bestsqs_content
+                            )
 
-                        st.download_button(
-                            label="📦 Download Complete Package",
-                            data=zip_buffer_complete,
-                            file_name=f"ATAT_SQS_Complete_{results['structure_name'].split('.')[0]}.zip",
-                            mime="application/zip",
-                            type="primary",
-                            key="download_complete_package"
-                        )
-
+                            st.download_button(
+                                label="📦 Download Complete Package",
+                                data=zip_buffer_complete,
+                                file_name=f"ATAT_SQS_Complete_{st.session_state.atat_results['structure_name'].split('.')[0]}.zip",
+                                mime="application/zip",
+                                type="primary",
+                                key="download_complete_package"
+                            )
+                        else:
+                            st.warning(
+                                "⚠️ Complete package not available. Please generate ATAT input files in Step 4 first.")
+                            st.button(
+                                "📦 Complete Package (Unavailable)",
+                                disabled=True,
+                                help="Generate ATAT input files first to enable complete package download"
+                            )
                         lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
 
                         element_counts = {}
