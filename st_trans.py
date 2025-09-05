@@ -711,11 +711,11 @@ def render_sqs_module():
         """,
         unsafe_allow_html=True
     )
-    how_cite = st.checkbox(f"📚 How to **cite**"
-                           )
-    cl1, cl2 = st.columns(2)
-    if how_cite:
-        with cl1:
+
+    cl1, cl2,cl3 = st.columns(3)
+    with cl1:
+        how_cite = st.checkbox(f"📚 How to **cite**")
+        if how_cite:
             with st.expander("How to cite", icon="📚", expanded=True):
                 st.markdown("""
                  Please cite the following sources
@@ -723,7 +723,7 @@ def render_sqs_module():
                  - **ATAT mcsqs method** - [VAN DE WALLE, Axel, et al. Efficient stochastic generation of special quasirandom structures. Calphad, 2013](https://www.sciencedirect.com/science/article/pii/S0364591613000540?casa_token=i1iog7eW3lQAAAAA:wxlTn-9Twj38XFx1lMfSazPb6r0JrDV7NPxeums5-2qFXHWItT2ZVu9E-IfuBjRsr7f1BEzcSw).
                  - **ATAT** - [VAN DE WALLE, Axel; ASTA, Mark; CEDER, Gerbrand. The alloy theoretic automated toolkit: A user guide. Calphad, 2002](https://www.sciencedirect.com/science/article/abs/pii/S0364591602800062).
             """)
-    with cl1:
+    with cl2:
         read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
                                )
     if read_more:
@@ -816,7 +816,7 @@ def render_sqs_module():
             This should display the list of mcsqs parameters if the compilation was successful.
         """)
     # -------------- DATABASE ----------
-    with cl1:
+    with cl3:
         show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
                                            value=False,
                                            help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
@@ -1790,11 +1790,10 @@ def render_sqs_module():
             st.error(traceback.format_exc())
     else:
         intro_text()
-        with cl2:
-            st.info("""
-                Special Quasi-Random Structures (SQS) approximate random alloys by matching the correlation functions 
-                of a truly random alloy in a finite supercell.
-            """)
+        st.info("""
+            Special Quasi-Random Structures (SQS) approximate random alloys by matching the correlation functions 
+            of a truly random alloy in a finite supercell.
+        """)
 
 def check_sqs_mode(calc_mode):
     if "previous_calc_mode" not in st.session_state:
