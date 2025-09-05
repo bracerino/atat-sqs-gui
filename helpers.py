@@ -48,29 +48,66 @@ def intro_text():
 
     st.markdown("""
 
-     This tool provides GUI for generation of input files (rndstr.in, sqscell.out) for creating SQS (special quasi-random structure)
-     using ATAT (Alloy Theoretic Automated Toolkit) mcsqs. Additionally, it is possible to generate a script for a binary alloy and automatically run the mcsqs search across element concentration range (video tutorial at: **[YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)**).
-     
-     ### Key Features:
-    🔬 Upload or retrieve crystal structures from MP, AFLOW, or COD databases
-    
-    🎯 Set supercell size and target sublattice concentrations
-    
-    📊 Recalculate feasible concentrations based on the chosen supercell size
-    
-    💾 Generate **rndstr.in** and **sqscell.out** input files automatically
-    
-    🛠️ Generate a bash script to automate the creation of input files and run mcsqs with optional parallelization and real-time convergence monitoring
-        
-    🛠️ Generate complete bash script to automate the SQS search **across a range of compositions for a binary alloy system**
-    
-    📤 Upload bestsqs.out to convert to POSCAR, LMP, CIF, or XYZ formats
-    
-    📥 Upload log files (mcsqs.log, mcsqs1.log, ..., mcsqs_progress.csv) for convergence analysis and best run detection
-    
-    📈 Calculate the PRDF (pair radial distribution function) for the uploaded bestsqs.out structure
-    
-    🧹 Create ordered vacancies by removing specific elements from the bestsqs.out SQS structure
+     # 🧰 SQS Input File Generator for ATAT (mcsqs)
+
+This tool provides a **graphical interface** for generating input files  
+(`rndstr.in`, `sqscell.out`) to create **Special Quasi-Random Structures (SQS)** using the **ATAT mcsqs** package.  
+
+It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
+
+🎥 **Video tutorial:** [Watch on YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)
+
+---
+
+## ✨ Key Features
+
+### 🔬 Crystal Structures
+- Upload custom crystal structures  
+- Retrieve directly from **Materials Project (MP)**, **AFLOW**, or **COD** databases  
+
+---
+
+### 🎯 Supercell & Concentrations
+- Define **supercell size**  
+- Set target **sublattice concentrations**  
+- 📊 Automatically recalculate feasible concentrations  
+
+---
+
+### 💾 Input File Generation
+- Generate **`rndstr.in`** and **`sqscell.out`** files instantly  
+
+---
+
+### 🛠️ Automated Workflows
+- Create **bash scripts** to:  
+  - Build input files  
+  - Run **mcsqs** with optional parallelization  
+  - Monitor convergence in real-time  
+- ⚡ Automate full SQS searches **across binary alloy composition ranges**  
+
+---
+
+### 📤 & 📥 File Handling
+- Convert **`bestsqs.out`** into:  
+  - POSCAR | LMP | CIF | XYZ  
+- Upload log files (`mcsqs.log`, `mcsqs1.log`, …, `mcsqs_progress.csv`) for:  
+  - Convergence analysis  
+  - Best run detection  
+
+---
+
+### 📈 Structure Analysis
+- Compute the **Pair Radial Distribution Function (PRDF)** for `bestsqs.out`  
+
+---
+
+### 🧹 Vacancy Engineering
+- Introduce **ordered vacancies** by selectively removing elements from SQS  
+
+---
+
+🚀 This tool streamlines the **entire SQS workflow** — from structure input to automated search, analysis, and output conversion.
      
      """)
 
