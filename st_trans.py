@@ -1764,11 +1764,7 @@ def render_sqs_module():
                                     )
                                     st.info(
                                         f"**Note**: If H element is missing in CIF file, it is not shown in the formula either.")
-    with cl2:
-        st.info("""
-            Special Quasi-Random Structures (SQS) approximate random alloys by matching the correlation functions 
-            of a truly random alloy in a finite supercell.
-        """)
+
 
     if "sqs_mode_initialized" not in st.session_state:
         if "calc_xrd" not in st.session_state:
@@ -1794,7 +1790,11 @@ def render_sqs_module():
             st.error(traceback.format_exc())
     else:
         intro_text()
-
+        with cl2:
+            st.info("""
+                Special Quasi-Random Structures (SQS) approximate random alloys by matching the correlation functions 
+                of a truly random alloy in a finite supercell.
+            """)
 
 def check_sqs_mode(calc_mode):
     if "previous_calc_mode" not in st.session_state:
