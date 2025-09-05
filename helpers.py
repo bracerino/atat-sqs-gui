@@ -45,6 +45,131 @@ def calculate_achievable_concentrations(target_concentrations, supercell_multipl
 def intro_text():
     st.warning(f"Please upload a **crystal structure** file (or search for the structure with the implemented interface within **MP, AFLOW, or "
                "COD databases**) to use the SQS tool.")
+    components.html(
+                """
+                <style>
+                .sqs-wrap {
+                    position: relative;
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 8px 0 24px 0;
+                    --accent: #5b8cff;
+                    --fg: rgba(0,0,0,0.75);
+                    --muted: rgba(0,0,0,0.12);
+                }
+                @media (prefers-color-scheme: dark) {
+                  .sqs-wrap { --fg: rgba(255,255,255,0.85); --muted: rgba(255,255,255,0.18); }
+                }
+                :root, .stApp {
+                   --accent: var(--primary-color, #5b8cff);
+                }
+                .sqs-scene {
+                    position: relative;
+                    width: 420px;
+                    max-width: min(90vw, 560px);
+                    aspect-ratio: 2.8 / 1;
+                    border-radius: 14px;
+                    overflow: hidden;
+                    background: radial-gradient(120% 180% at 10% 0%,
+                                rgba(0,0,0,0.02), rgba(0,0,0,0) 60%),
+                                linear-gradient(90deg,
+                                color-mix(in oklab, var(--accent), white 70%) 0%,
+                                transparent 30%,
+                                transparent 70%,
+                                color-mix(in oklab, var(--accent), black 10%) 100%);
+                    outline: 1px solid var(--muted);
+                }
+                .sqs-shimmer {
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(120deg,
+                         transparent 0%,
+                         color-mix(in oklab, var(--accent), white 75%) 20%,
+                         transparent 40%);
+                    opacity: 0.25;
+                    transform: translateX(-60%);
+                    animation: shimmer 4.2s ease-in-out infinite;
+                }
+                @keyframes shimmer {
+                  0%   { transform: translateX(-60%); }
+                  60%  { transform: translateX(60%);  }
+                  100% { transform: translateX(60%);  }
+                }
+                .nucleus {
+                    position: absolute;
+                    left: 50%; top: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 18px; height: 18px;
+                    border-radius: 50%;
+                    background: var(--accent);
+                    box-shadow:
+                      0 0 12px color-mix(in oklab, var(--accent), white 20%),
+                      0 0 22px color-mix(in oklab, var(--accent), white 10%);
+                }
+                .orbit {
+                    position: absolute;
+                    left: 50%; top: 50%;
+                    border: 1px dashed var(--muted);
+                    border-radius: 50%;
+                    transform: translate(-50%, -50%) rotate(0deg);
+                    animation: spin linear infinite;
+                    transform-origin: center center;
+                    will-change: transform;
+                }
+                .orbit.o1 { width: 220px; height: 120px; animation-duration: 12s; }
+                .orbit.o2 { width: 280px; height: 160px; animation-duration: 16s; animation-direction: reverse; }
+                .orbit.o3 { width: 340px; height: 200px; animation-duration: 20s; }
+                @keyframes spin {
+                  to { transform: translate(-50%, -50%) rotate(360deg); }
+                }
+                .atom {
+                    position: absolute;
+                    width: 10px; height: 10px;
+                    border-radius: 50%;
+                    background: color-mix(in oklab, var(--accent), white 25%);
+                    box-shadow:
+                      0 0 10px color-mix(in oklab, var(--accent), white 40%),
+                      0 0 18px color-mix(in oklab, var(--accent), black 10%);
+                    left: 50%; top: 50%;
+                    transform: translate(calc(var(--rx, 50%) - 50%), calc(-50%)) translateX(calc(var(--ox, 50%)));
+                }
+                .o1 .atom { --rx: 110px; }
+                .o2 .atom { --rx: 140px; }
+                .o3 .atom { --rx: 170px; }
+                .sqs-underline {
+                    width: min(440px, 92vw);
+                    height: 3px;
+                    margin: 8px auto 0 auto;
+                    border-radius: 999px;
+                    background: linear-gradient(90deg,
+                       transparent 0%,
+                       color-mix(in oklab, var(--accent), white 60%) 20%,
+                       color-mix(in oklab, var(--accent), black 0%) 50%,
+                       transparent 80%);
+                    filter: blur(0.2px);
+                    animation: pulse 2.8s ease-in-out infinite;
+                    opacity: 0.7;
+                }
+                @keyframes pulse {
+                  0%,100% { transform: scaleX(0.96); opacity: 0.5; }
+                  50%     { transform: scaleX(1.02); opacity: 0.9; }
+                }
+                </style>
+                <div class="sqs-wrap" aria-hidden="true">
+                  <div class="sqs-scene">
+                    <div class="sqs-shimmer"></div>
+                    <div class="nucleus"></div>
+                    <div class="orbit o1"><div class="atom"></div></div>
+                    <div class="orbit o2"><div class="atom"></div></div>
+                    <div class="orbit o3"><div class="atom"></div></div>
+                  </div>
+                </div>
+                <div class="sqs-underline"></div>
+                """,
+                height=230
+            )
     
     
 
