@@ -76,7 +76,7 @@ def remove_fractional_occupancies_safely(structure):
 # File uploader in the sidebar
 st.sidebar.subheader("📁 Upload Your Structure Files")
 uploaded_files_user_sidebar = st.sidebar.file_uploader(
-    "Upload Structure Files (CIF, POSCAR, LMP, XSF, PW, CFG, ...):",
+    "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ):",
     type=None,
     accept_multiple_files=True,
     key="sidebar_uploader"
