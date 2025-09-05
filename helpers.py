@@ -48,6 +48,8 @@ def intro_text():
 
     st.markdown("""
 
+    st.markdown("""
+
      This tool provides GUI for generation of input files (rndstr.in, sqscell.out) for creating SQS (special quasi-random structure)
      using ATAT (Alloy Theoretic Automated Toolkit) mcsqs. Additionally, it is possible to generate a script for a binary alloy and automatically run the mcsqs search across element concentration range (video tutorial at: **[YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)**).
      
