@@ -1064,163 +1064,102 @@ def render_atat_sqs_section():
     st.write(f"**Selected structure:** {atat_structure.composition.reduced_formula}")
     st.write(f"**Number of atoms:** {len(atat_structure)}")
 
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.subheader("Structure Preparation")
-
-        reduce_to_primitive = st.checkbox(
-            "Convert to primitive cell before ATAT input generation",
-            value=False,
-            help="This will convert the structure to its primitive cell before creating ATAT input.",
-            key="atat_reduce_primitive"
-        )
-
-        if reduce_to_primitive:
-            analyzer = SpacegroupAnalyzer(atat_structure)
-            primitive_structure = analyzer.get_primitive_standard_structure()
-            st.write(f"**Primitive cell contains {len(primitive_structure)} atoms**")
-            working_structure = primitive_structure
-        else:
-            working_structure = atat_structure
-
-        try:
-            analyzer = SpacegroupAnalyzer(working_structure)
-            spg_symbol = analyzer.get_space_group_symbol()
-            spg_number = analyzer.get_space_group_number()
-            st.write(f"**Space group:** {spg_symbol} (#{spg_number})")
-        except:
-            st.write("**Space group:** Could not determine")
-
-        unique_sites = get_unique_sites(working_structure)
-        all_sites = get_all_sites(working_structure)
-
-        st.subheader("Wyckoff Positions Analysis")
-
-        site_data = []
-        for site_info in unique_sites:
-            site_data.append({
-                "Wyckoff Index": site_info['wyckoff_index'],
-                "Wyckoff Letter": site_info['wyckoff_letter'],
-                "Current Element": site_info['element'],
-                "Coordinates": f"({site_info['coords'][0]:.3f}, {site_info['coords'][1]:.3f}, {site_info['coords'][2]:.3f})",
-                "Multiplicity": site_info['multiplicity'],
-                "Site Indices": str(site_info['equivalent_indices'])
-            })
-
-        site_df = pd.DataFrame(site_data)
-        st.dataframe(site_df, use_container_width=True)
-
-    with col2:
-        structure_preview(working_structure)
-
-    st.markdown(
-        """
-        <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.subheader("🔵1️⃣ Step 1: Select Composition Mode")
-    colb1, colb2 = st.columns([1, 1])
-    with colb1:
-        composition_mode = st.radio(
-            "Choose composition specification mode:",
-            [
-                "🔄 Global Composition",
-                "🎯 Sublattice-Specific"
-            ],
-            index=1,
-            key="atat_composition_mode_radio",
-            help="Global: Specify overall composition. Sublattice: Control each atomic position separately."
-        )
-    with colb2:
-        with st.expander("ℹ️ Composition Mode Details", expanded=False):
-            st.markdown("""
-            ##### 🔄 Global Composition
-            - Specify the target composition for the entire structure (e.g., 50% Fe, 50% Ni)
-            - All crystallographic sites can be occupied by any of the selected elements
-            - Elements are distributed randomly throughout the structure according to the specified fractions
-            - **Example:** Fe₀.₅Ni₀.₅ random alloy where Fe and Ni atoms can occupy any position
-
-            ---
-
-            ##### 🎯 Sublattice-Specific  
-            - Control which elements can occupy specific crystallographic sites (Wyckoff positions)
-            - Set different compositions for different atomic sublattices
-            - **Example:** In a perovskite ABO₃, control A-site (Ba/Sr) and B-site (Ti/Zr) compositions independently
-
-            ---
-            **Global** treats all sites equally, while **Sublattice-Specific** allows site-dependent element distributions.
-            """)
-
-    st.markdown(
-        """
-        <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.subheader("🔵2️⃣ Step 2: Supercell Configuration")
-
-    col_x, col_y, col_z = st.columns(3)
-    with col_x:
-        nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nx")
-    with col_y:
-        ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_ny")
-    with col_z:
-        nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nz")
-
-    transformation_matrix = np.array([
-        [nx, 0, 0],
-        [0, ny, 0],
-        [0, 0, nz]
+    tabs1, tabs2, tabs3, tabs4, tabs5 = st.tabs([
+        "📊 Structure View",
+        "1️⃣ + 2️⃣ Composition & Supercell ",
+        "3️⃣ Elements Concentrations",
+        "4️⃣ Clusters & Generation",
+        "📊 Analyze Atat Outputs"
     ])
+    with tabs1:
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.subheader("Structure Preparation")
 
-    st.write(f"**Supercell size:** {nx}×{ny}×{nz}")
+            reduce_to_primitive = st.checkbox(
+                "Convert to primitive cell before ATAT input generation",
+                value=False,
+                help="This will convert the structure to its primitive cell before creating ATAT input.",
+                key="atat_reduce_primitive"
+            )
 
-    ase_atoms = pymatgen_to_ase(working_structure)
-    supercell_preview = make_supercell(ase_atoms, transformation_matrix)
-    st.write(f"**Preview: Supercell will contain {len(supercell_preview)} atoms**")
-
-    all_elements = set()
-    for site in working_structure:
-        if site.is_ordered:
-            all_elements.add(site.specie.symbol)
-        else:
-            for sp in site.species:
-                all_elements.add(sp.symbol)
-
-    use_sublattice_mode = composition_mode.startswith("🎯")
-    target_concentrations = {}
-    chem_symbols = None
-    otrs = None
-
-    supercell_multiplicity = nx * ny * nz
-    total_supercell_atoms = len(supercell_preview)
-
-    if composition_mode == "🔄 Global Composition":
-        common_elements = [
-            'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
-            'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
-            'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-            'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc',
-            'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
-            'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
-            'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn',
-            'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
-            'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
-        ]
-
-        all_elements_list = sorted(common_elements)
-
-        structure_elements = set()
-        for site in working_structure:
-            if site.is_ordered:
-                structure_elements.add(site.specie.symbol)
+            if reduce_to_primitive:
+                analyzer = SpacegroupAnalyzer(atat_structure)
+                primitive_structure = analyzer.get_primitive_standard_structure()
+                st.write(f"**Primitive cell contains {len(primitive_structure)} atoms**")
+                working_structure = primitive_structure
             else:
-                for sp in site.species:
-                    structure_elements.add(sp.symbol)
+                working_structure = atat_structure
+
+            try:
+                analyzer = SpacegroupAnalyzer(working_structure)
+                spg_symbol = analyzer.get_space_group_symbol()
+                spg_number = analyzer.get_space_group_number()
+                st.write(f"**Space group:** {spg_symbol} (#{spg_number})")
+            except:
+                st.write("**Space group:** Could not determine")
+
+            unique_sites = get_unique_sites(working_structure)
+            all_sites = get_all_sites(working_structure)
+
+            st.subheader("Wyckoff Positions Analysis")
+
+            site_data = []
+            for site_info in unique_sites:
+                site_data.append({
+                    "Wyckoff Index": site_info['wyckoff_index'],
+                    "Wyckoff Letter": site_info['wyckoff_letter'],
+                    "Current Element": site_info['element'],
+                    "Coordinates": f"({site_info['coords'][0]:.3f}, {site_info['coords'][1]:.3f}, {site_info['coords'][2]:.3f})",
+                    "Multiplicity": site_info['multiplicity'],
+                    "Site Indices": str(site_info['equivalent_indices'])
+                })
+
+            site_df = pd.DataFrame(site_data)
+            st.dataframe(site_df, use_container_width=True)
+
+        with col2:
+            structure_preview(working_structure)
+
+        st.markdown(
+            """
+            <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
+            """,
+            unsafe_allow_html=True
+        )
+    with tabs2:
+        st.subheader("🔵1️⃣ Step 1: Select Composition Mode")
+        colb1, colb2 = st.columns([1, 1])
+        with colb1:
+            composition_mode = st.radio(
+                "Choose composition specification mode:",
+                [
+                    "🔄 Global Composition",
+                    "🎯 Sublattice-Specific"
+                ],
+                index=1,
+                key="atat_composition_mode_radio",
+                help="Global: Specify overall composition. Sublattice: Control each atomic position separately."
+            )
+        with colb2:
+            with st.expander("ℹ️ Composition Mode Details", expanded=False):
+                st.markdown("""
+                ##### 🔄 Global Composition
+                - Specify the target composition for the entire structure (e.g., 50% Fe, 50% Ni)
+                - All crystallographic sites can be occupied by any of the selected elements
+                - Elements are distributed randomly throughout the structure according to the specified fractions
+                - **Example:** Fe₀.₅Ni₀.₅ random alloy where Fe and Ni atoms can occupy any position
+    
+                ---
+    
+                ##### 🎯 Sublattice-Specific  
+                - Control which elements can occupy specific crystallographic sites (Wyckoff positions)
+                - Set different compositions for different atomic sublattices
+                - **Example:** In a perovskite ABO₃, control A-site (Ba/Sr) and B-site (Ti/Zr) compositions independently
+    
+                ---
+                **Global** treats all sites equally, while **Sublattice-Specific** allows site-dependent element distributions.
+                """)
 
         st.markdown(
             """
@@ -1229,394 +1168,479 @@ def render_atat_sqs_section():
             unsafe_allow_html=True
         )
 
-        st.subheader("🔵3️⃣ Step 3: Select Elements and Concentrations")
-        element_list = st.multiselect(
-            "Select elements for ATAT SQS (use 'X' for vacancy):",
-            options=all_elements_list,
-            default=sorted(list(structure_elements)),
-            key="atat_composition_global",
-            help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy, or 'O' and 'X' for oxygen with vacancies"
-        )
+        st.subheader("🔵2️⃣ Step 2: Supercell Configuration")
 
-        if len(element_list) == 0:
-            st.error("You must select at least one element.")
-            st.stop()
+        col_x, col_y, col_z = st.columns(3)
+        with col_x:
+            nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nx")
+        with col_y:
+            ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_ny")
+        with col_z:
+            nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nz")
 
-        composition_input = ", ".join(element_list)
+        transformation_matrix = np.array([
+            [nx, 0, 0],
+            [0, ny, 0],
+            [0, 0, nz]
+        ])
 
-        st.info(f"""
-        **Global Mode Concentration Constraints:**
-        - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
-        - Valid concentrations must be multiples of 1/{supercell_multiplicity}
-        - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
-        - Each concentration applies to ALL atomic sites equally
-        """)
+        st.write(f"**Supercell size:** {nx}×{ny}×{nz}")
 
-        st.write("**Set target composition fractions:**")
-        cols = st.columns(len(element_list))
-        target_concentrations = {}
+        ase_atoms = pymatgen_to_ase(working_structure)
+        supercell_preview = make_supercell(ase_atoms, transformation_matrix)
+        st.write(f"**Preview: Supercell will contain {len(supercell_preview)} atoms**")
 
-        remaining = 1.0
-        for j, elem in enumerate(element_list[:-1]):
-            with cols[j]:
-                min_step = 1.0 / supercell_multiplicity
-                frac_val = st.slider(
-                    f"{elem}:",
-                    min_value=0.0,
-                    max_value=remaining,
-                    value=min(int(supercell_multiplicity / len(element_list)) * min_step, remaining),
-                    step=min_step,
-                    format="%.6f",
-                    key=f"atat_comp_global_{elem}"
-                )
-                target_concentrations[elem] = frac_val
-                remaining -= frac_val
-
-        if element_list:
-            last_elem = element_list[-1]
-            target_concentrations[last_elem] = max(0.0, remaining)
-            with cols[-1]:
-                st.write(f"**{last_elem}: {target_concentrations[last_elem]:.6f}**")
-
-        corrected_concentrations = {}
-        corrections_made = False
-
-        for elem, frac in target_concentrations.items():
-            nearest_step = round(frac * supercell_multiplicity) / supercell_multiplicity
-            corrected_concentrations[elem] = nearest_step
-            if abs(frac - nearest_step) > 1e-6:
-                corrections_made = True
-                st.warning(
-                    f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
-
-        total_corrected = sum(corrected_concentrations.values())
-        if abs(total_corrected - 1.0) > 1e-6:
-            largest_elem = max(corrected_concentrations.keys(), key=lambda x: corrected_concentrations[x])
-            adjustment = 1.0 - total_corrected
-            corrected_concentrations[largest_elem] += adjustment
-            if corrections_made:
-                st.info(
-                    f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
-
-        target_concentrations = corrected_concentrations
-
-        if corrections_made:
-            st.success("✅ All concentrations are now valid multiples of 1/{} = {:.6f}".format(
-                supercell_multiplicity, 1 / supercell_multiplicity))
-
-    else:
-        element_list = [2, 2]
-        composition_input = []
-        chem_symbols, target_concentrations, otrs = render_site_sublattice_selector_fixed(
-            working_structure, all_sites, unique_sites, supercell_multiplicity
-        )
-
-    if composition_mode == "🔄 Global Composition":
-        try:
-            achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
-                target_concentrations, supercell_multiplicity)
-
-            st.write("**Overall Target vs. Achievable Concentrations:**")
-            conc_data = []
-            for element, target_frac in target_concentrations.items():
-                achievable_frac = achievable_concentrations_global.get(element, 0)
-                achievable_count = achievable_counts_global.get(element, 0)
-                status = "✅ Exact" if abs(target_frac - achievable_frac) < 1e-6 else "⚠️ Rounded"
-
-                total_element_atoms = achievable_count * len(working_structure)
-
-                conc_data.append({
-                    "Element": element,
-                    "Target (%)": f"{target_frac * 100:.3f}",
-                    "Achievable (%)": f"{achievable_frac * 100:.3f}",
-                    "Atoms per Site": achievable_count,
-                    "Total Atoms": total_element_atoms,
-                    "Status": status
-                })
-            conc_df = pd.DataFrame(conc_data)
-            st.dataframe(conc_df, use_container_width=True)
-            st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
-
-            preview_data = []
-            for site_info in unique_sites:
-                site_label = f"{site_info['element']} @ {site_info['wyckoff_letter']} (×{site_info['multiplicity']})"
-
-                conc_parts = []
-                for element, frac in sorted(achievable_concentrations_global.items()):
-                    if frac > 1e-6:
-                        conc_parts.append(f"{element}={frac:.6f}")
-
-                preview_data.append({
-                    "Wyckoff Position": site_label,
-                    "Supercell Replicas": f"{supercell_multiplicity}",
-                    "Site Concentrations": ", ".join(conc_parts),
-                    "Note": "Same for all sites"
-                })
-
-            preview_df = pd.DataFrame(preview_data)
-            st.dataframe(preview_df, use_container_width=True)
-            st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
-            st.write("#### **Overall Expected Element Distribution in Supercell:**")
-
-            total_element_counts = {}
-            for elem, per_site_count in achievable_counts_global.items():
-                total_element_counts[elem] = per_site_count * len(working_structure)
-
-            if total_element_counts:
-                cols = st.columns(min(len(total_element_counts), 4))
-                for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
-                    percentage = (count / total_supercell_atoms) * 100 if total_supercell_atoms > 0 else 0
-                    with cols[i % len(cols)]:
-                        if percentage >= 80:
-                            color = "#2E4057"  # Dark Blue-Gray
-                        elif percentage >= 60:
-                            color = "#4A6741"  # Dark Forest Green
-                        elif percentage >= 40:
-                            color = "#6B73FF"  # Purple-Blue
-                        elif percentage >= 25:
-                            color = "#FF8C00"  # Dark Orange
-                        elif percentage >= 15:
-                            color = "#4ECDC4"  # Teal
-                        elif percentage >= 10:
-                            color = "#45B7D1"  # Blue
-                        elif percentage >= 5:
-                            color = "#96CEB4"  # Green
-                        elif percentage >= 2:
-                            color = "#FECA57"  # Yellow
-                        elif percentage >= 1:
-                            color = "#DDA0DD"  # Plum
-                        else:
-                            color = "#D3D3D3"  # Light Gray
-
-                        st.markdown(f"""
-                        <div style="
-                            background: linear-gradient(135deg, {color}, {color}CC);
-                            padding: 20px;
-                            border-radius: 15px;
-                            text-align: center;
-                            margin: 10px 0;
-                            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-                            border: 2px solid rgba(255,255,255,0.2);
-                        ">
-                            <h1 style="
-                                color: white;
-                                font-size: 3em;
-                                margin: 0;
-                                text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
-                                font-weight: bold;
-                            ">{elem}</h1>
-                            <h2 style="
-                                color: white;
-                                font-size: 2em;
-                                margin: 10px 0 0 0;
-                                text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-                            ">{percentage:.1f}%</h2>
-                            <p style="
-                                color: white;
-                                font-size: 1.8em;
-                                margin: 5px 0 0 0;
-                                opacity: 0.9;
-                            ">{int(round(count, 0))} atoms</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                st.write(f"**Total expected atoms in supercell:** {int(total_supercell_atoms)}")
-
-        except Exception as e:
-            st.error(f"Error creating concentration preview: {e}")
-    else:
-        display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
-                                         unique_sites)
-
-    st.markdown(
-        """
-        <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.subheader("🔵4️⃣ Step 4: ATAT Cluster Configuration")
-
-    col_nn_btn, col_nn_results = st.columns([1, 3])
-
-    with col_nn_btn:
-        if st.button("🔍 Calculate NN Distances", type="secondary", key="calc_nn_atat"):
-            with st.spinner("Calculating..."):
-                nn_results = calculate_first_six_nn_atat_aware(
-                    working_structure,
-                    chem_symbols if use_sublattice_mode else None,
-                    use_sublattice_mode,
-                )
-
-            st.session_state['nn_results'] = nn_results
-
-    with col_nn_results:
-        if 'nn_results' in st.session_state and st.session_state['nn_results']:
-            nn_data = st.session_state['nn_results']
-
-            if 'message' in nn_data:
-                st.warning(nn_data['message'])
+        all_elements = set()
+        for site in working_structure:
+            if site.is_ordered:
+                all_elements.add(site.specie.symbol)
             else:
-                if 'active_sites' in nn_data:
-                    active_count = len(nn_data['active_sites'])
-                    total_count = nn_data['total_sites']
-                    active_site_names = []
-                    if use_sublattice_mode and chem_symbols:
-                        for i in nn_data['active_sites']:
-                            if i < len(chem_symbols):
-                                elements = "+".join(sorted(chem_symbols[i]))
-                                active_site_names.append(elements)
+                for sp in site.species:
+                    all_elements.add(sp.symbol)
 
+        use_sublattice_mode = composition_mode.startswith("🎯")
+        target_concentrations = {}
+        chem_symbols = None
+        otrs = None
+
+        supercell_multiplicity = nx * ny * nz
+        total_supercell_atoms = len(supercell_preview)
+    with tabs3:
+        if composition_mode == "🔄 Global Composition":
+            css = '''
+            <style>
+                .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+                    font-size: 1.1rem !important;
+                    color: #1e3a8a !important;
+                    font-weight: bold !important;
+                }
+
+                .stTabs [data-baseweb="tab-list"] {
+                    gap: 25px !important;
+                }
+            </style>
+            '''
+            st.markdown(css, unsafe_allow_html=True)
+            common_elements = [
+                'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+                'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
+                'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+                'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc',
+                'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
+                'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
+                'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn',
+                'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
+                'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+            ]
+
+            all_elements_list = sorted(common_elements)
+
+            structure_elements = set()
+            for site in working_structure:
+                if site.is_ordered:
+                    structure_elements.add(site.specie.symbol)
+                else:
+                    for sp in site.species:
+                        structure_elements.add(sp.symbol)
+
+            st.markdown(
+                """
+                <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.subheader("🔵3️⃣ Step 3: Select Elements and Concentrations")
+            element_list = st.multiselect(
+                "Select elements for ATAT SQS",
+                options=all_elements_list,
+                default=sorted(list(structure_elements)),
+                key="atat_composition_global",
+                help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy"
+            )
+
+            if len(element_list) == 0:
+                st.error("You must select at least one element.")
+                st.stop()
+
+            composition_input = ", ".join(element_list)
+
+
+
+            st.info(f"""
+            **Global Mode Concentration Constraints:**
+            - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
+            - Valid concentrations must be multiples of 1/{supercell_multiplicity}
+            - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
+            - Each concentration applies to ALL atomic sites equally
+            """)
+
+            st.write("**Set target composition fractions:**")
+            cols = st.columns(len(element_list))
+            target_concentrations = {}
+
+            remaining = 1.0
+            for j, elem in enumerate(element_list[:-1]):
+                with cols[j]:
+                    min_step = 1.0 / supercell_multiplicity
+                    frac_val = st.slider(
+                        f"{elem}:",
+                        min_value=0.0,
+                        max_value=remaining,
+                        value=min(int(supercell_multiplicity / len(element_list)) * min_step, remaining),
+                        step=min_step,
+                        format="%.6f",
+                        key=f"atat_comp_global_{elem}"
+                    )
+                    target_concentrations[elem] = frac_val
+                    remaining -= frac_val
+
+            if element_list:
+                last_elem = element_list[-1]
+                target_concentrations[last_elem] = max(0.0, remaining)
+                with cols[-1]:
+                    st.write(f"**{last_elem}: {target_concentrations[last_elem]:.6f}**")
+
+            corrected_concentrations = {}
+            corrections_made = False
+
+            for elem, frac in target_concentrations.items():
+                nearest_step = round(frac * supercell_multiplicity) / supercell_multiplicity
+                corrected_concentrations[elem] = nearest_step
+                if abs(frac - nearest_step) > 1e-6:
+                    corrections_made = True
+                    st.warning(
+                        f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
+
+            total_corrected = sum(corrected_concentrations.values())
+            if abs(total_corrected - 1.0) > 1e-6:
+                largest_elem = max(corrected_concentrations.keys(), key=lambda x: corrected_concentrations[x])
+                adjustment = 1.0 - total_corrected
+                corrected_concentrations[largest_elem] += adjustment
+                if corrections_made:
                     st.info(
-                        f"**Active sites:** {active_count}/{total_count} ({', '.join(set(active_site_names))} positions)")
+                        f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
 
-                if nn_data['overall']:
-                    st.write(
-                        "**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
-                    overall_text = []
-                    ordinals = {1: 'st', 2: 'nd', 3: 'rd', 4: 'th', 5: 'th', 6: 'th'}
-                    for shell in nn_data['overall']:
-                        ordinal = ordinals.get(shell['shell'], 'th')
-                        overall_text.append(f"**{shell['shell']}{ordinal} NN:** {shell['distance']:.4f}")
-                    st.write(" | ".join(overall_text))
+            target_concentrations = corrected_concentrations
 
-                st.caption("💡 These values can suggest how to set the pair/triplet cut-off distances")
+            if corrections_made:
+                st.success("✅ All concentrations are now valid multiples of 1/{} = {:.6f}".format(
+                    supercell_multiplicity, 1 / supercell_multiplicity))
 
-    col_cut1, col_cut2, col_cut3 = st.columns(3)
-    with col_cut1:
-        pair_cutoff = st.number_input(
-            "Pair cutoff distance:",
-            min_value=0.1,
-            max_value=5.0,
-            value=1.1,
-            step=0.1,
-            format="%.1f",
-            help="Maximum distance for pair correlations. Usually 1.1 includes first 2 nearest neighbor shells.",
-            key="atat_pair_cutoff"
-        )
-
-    with col_cut2:
-        include_triplets = st.checkbox("Include triplet clusters", value=False, key="atat_include_triplets")
-        if include_triplets:
-            triplet_cutoff = st.number_input(
-                "Triplet cutoff:",
-                min_value=0.1,
-                max_value=3.0,
-                value=1.0,
-                step=0.1,
-                format="%.1f",
-                key="atat_triplet_cutoff_val"
+        else:
+            element_list = [2, 2]
+            composition_input = []
+            chem_symbols, target_concentrations, otrs = render_site_sublattice_selector_fixed(
+                working_structure, all_sites, unique_sites, supercell_multiplicity
             )
-        else:
-            triplet_cutoff = None
 
-    with col_cut3:
-        include_quadruplets = st.checkbox("Include quadruplet clusters", value=False, key="atat_include_quadruplets")
-        if include_quadruplets:
-            quadruplet_cutoff = st.number_input(
-                "Quadruplet cutoff:",
-                min_value=0.1,
-                max_value=2.0,
-                value=0.8,
-                step=0.1,
-                format="%.1f",
-                key="atat_quadruplet_cutoff_val"
-            )
-        else:
-            quadruplet_cutoff = None
+        if composition_mode == "🔄 Global Composition":
 
-    st.markdown(
-        """
-        <hr style="border: none; height: 6px; background-color: #ff6600; border-radius: 8px; margin: 20px 0;">
-        """,
-        unsafe_allow_html=True
-    )
-
-    if "atat_results" not in st.session_state:
-        st.session_state.atat_results = None
-
-    current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}"
-
-    if "atat_config_key" not in st.session_state:
-        st.session_state.atat_config_key = current_config_key
-    elif st.session_state.atat_config_key != current_config_key:
-        st.session_state.atat_results = None
-        st.session_state.atat_config_key = current_config_key
-
-    col_button, col_clear = st.columns([3, 1])
-
-    with col_button:
-        if not target_concentrations:
-            st.warning("Create at least 1 sublattice (with minimum of two elements) first.")
-            generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
-                                             help="Configure at least 1 sublattice concentration first.")
-        elif len(element_list) < 2 and composition_mode == "🔄 Global Composition":
-            st.warning(f"Select at least two elements first in Step 4:")
-            generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
-                                             help="Select at least two elements first.")
-        else:
-            generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary")
-
-    with col_clear:
-        if st.session_state.atat_results is not None:
-            if st.button("🗑️ Clear Results", type="secondary", help="Clear current ATAT results"):
-                st.session_state.atat_results = None
-                st.rerun()
-
-    if generate_atat_button:
-        try:
-            if composition_mode == "🔄 Global Composition":
-                achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
+            try:
+                achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
                     target_concentrations, supercell_multiplicity)
 
-                use_concentrations = achievable_concentrations_for_atat
-                use_sublattice_mode_final = False
-                use_chem_symbols = None
-            else:
-                achievable_concentrations_for_atat, adjustment_info = calculate_achievable_concentrations_sublattice_fixed(
-                    target_concentrations, chem_symbols, transformation_matrix, working_structure, unique_sites
+                st.write("**Overall Target vs. Achievable Concentrations:**")
+                conc_data = []
+                for element, target_frac in target_concentrations.items():
+                    achievable_frac = achievable_concentrations_global.get(element, 0)
+                    achievable_count = achievable_counts_global.get(element, 0)
+                    status = "✅ Exact" if abs(target_frac - achievable_frac) < 1e-6 else "⚠️ Rounded"
+
+                    total_element_atoms = achievable_count * len(working_structure)
+
+                    conc_data.append({
+                        "Element": element,
+                        "Target (%)": f"{target_frac * 100:.3f}",
+                        "Achievable (%)": f"{achievable_frac * 100:.3f}",
+                        "Atoms per Site": achievable_count,
+                        "Total Atoms": total_element_atoms,
+                        "Status": status
+                    })
+                conc_df = pd.DataFrame(conc_data)
+                st.dataframe(conc_df, use_container_width=True)
+                st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
+
+                preview_data = []
+                for site_info in unique_sites:
+                    site_label = f"{site_info['element']} @ {site_info['wyckoff_letter']} (×{site_info['multiplicity']})"
+
+                    conc_parts = []
+                    for element, frac in sorted(achievable_concentrations_global.items()):
+                        if frac > 1e-6:
+                            conc_parts.append(f"{element}={frac:.6f}")
+
+                    preview_data.append({
+                        "Wyckoff Position": site_label,
+                        "Supercell Replicas": f"{supercell_multiplicity}",
+                        "Site Concentrations": ", ".join(conc_parts),
+                        "Note": "Same for all sites"
+                    })
+
+                preview_df = pd.DataFrame(preview_data)
+                st.dataframe(preview_df, use_container_width=True)
+                st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
+                st.write("#### **Overall Expected Element Distribution in Supercell:**")
+
+                total_element_counts = {}
+                for elem, per_site_count in achievable_counts_global.items():
+                    total_element_counts[elem] = per_site_count * len(working_structure)
+
+                if total_element_counts:
+                    cols = st.columns(min(len(total_element_counts), 4))
+                    for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
+                        percentage = (count / total_supercell_atoms) * 100 if total_supercell_atoms > 0 else 0
+                        with cols[i % len(cols)]:
+                            if percentage >= 80:
+                                color = "#2E4057"  # Dark Blue-Gray
+                            elif percentage >= 60:
+                                color = "#4A6741"  # Dark Forest Green
+                            elif percentage >= 40:
+                                color = "#6B73FF"  # Purple-Blue
+                            elif percentage >= 25:
+                                color = "#FF8C00"  # Dark Orange
+                            elif percentage >= 15:
+                                color = "#4ECDC4"  # Teal
+                            elif percentage >= 10:
+                                color = "#45B7D1"  # Blue
+                            elif percentage >= 5:
+                                color = "#96CEB4"  # Green
+                            elif percentage >= 2:
+                                color = "#FECA57"  # Yellow
+                            elif percentage >= 1:
+                                color = "#DDA0DD"  # Plum
+                            else:
+                                color = "#D3D3D3"  # Light Gray
+
+                            st.markdown(f"""
+                            <div style="
+                                background: linear-gradient(135deg, {color}, {color}CC);
+                                padding: 20px;
+                                border-radius: 15px;
+                                text-align: center;
+                                margin: 10px 0;
+                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                border: 2px solid rgba(255,255,255,0.2);
+                            ">
+                                <h1 style="
+                                    color: white;
+                                    font-size: 3em;
+                                    margin: 0;
+                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                    font-weight: bold;
+                                ">{elem}</h1>
+                                <h2 style="
+                                    color: white;
+                                    font-size: 2em;
+                                    margin: 10px 0 0 0;
+                                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                ">{percentage:.1f}%</h2>
+                                <p style="
+                                    color: white;
+                                    font-size: 1.8em;
+                                    margin: 5px 0 0 0;
+                                    opacity: 0.9;
+                                ">{int(round(count, 0))} atoms</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    st.write(f"**Total expected atoms in supercell:** {int(total_supercell_atoms)}")
+
+            except Exception as e:
+                st.error(f"Error creating concentration preview: {e}")
+        else:
+            display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
+                                             unique_sites)
+
+        st.markdown(
+            """
+            <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
+            """,
+            unsafe_allow_html=True
+        )
+    with tabs4:
+        st.subheader("🔵4️⃣ Step 4: ATAT Cluster Configuration")
+
+        col_nn_btn, col_nn_results = st.columns([1, 3])
+
+        with col_nn_btn:
+            if st.button("🔍 Calculate NN Distances", type="secondary", key="calc_nn_atat"):
+                with st.spinner("Calculating..."):
+                    nn_results = calculate_first_six_nn_atat_aware(
+                        working_structure,
+                        chem_symbols if use_sublattice_mode else None,
+                        use_sublattice_mode,
+                    )
+
+                st.session_state['nn_results'] = nn_results
+
+        with col_nn_results:
+            if 'nn_results' in st.session_state and st.session_state['nn_results']:
+                nn_data = st.session_state['nn_results']
+
+                if 'message' in nn_data:
+                    st.warning(nn_data['message'])
+                else:
+                    if 'active_sites' in nn_data:
+                        active_count = len(nn_data['active_sites'])
+                        total_count = nn_data['total_sites']
+                        active_site_names = []
+                        if use_sublattice_mode and chem_symbols:
+                            for i in nn_data['active_sites']:
+                                if i < len(chem_symbols):
+                                    elements = "+".join(sorted(chem_symbols[i]))
+                                    active_site_names.append(elements)
+
+                        st.info(
+                            f"**Active sites:** {active_count}/{total_count} ({', '.join(set(active_site_names))} positions)")
+
+                    if nn_data['overall']:
+                        st.write(
+                            "**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
+                        overall_text = []
+                        ordinals = {1: 'st', 2: 'nd', 3: 'rd', 4: 'th', 5: 'th', 6: 'th'}
+                        for shell in nn_data['overall']:
+                            ordinal = ordinals.get(shell['shell'], 'th')
+                            overall_text.append(f"**{shell['shell']}{ordinal} NN:** {shell['distance']:.4f}")
+                        st.write(" | ".join(overall_text))
+
+                    st.caption("💡 These values can suggest how to set the pair/triplet cut-off distances")
+
+        col_cut1, col_cut2, col_cut3 = st.columns(3)
+        with col_cut1:
+            pair_cutoff = st.number_input(
+                "Pair cutoff distance:",
+                min_value=0.1,
+                max_value=5.0,
+                value=1.1,
+                step=0.1,
+                format="%.1f",
+                help="Maximum distance for pair correlations. Usually 1.1 includes first 2 nearest neighbor shells.",
+                key="atat_pair_cutoff"
+            )
+
+        with col_cut2:
+            include_triplets = st.checkbox("Include triplet clusters", value=False, key="atat_include_triplets")
+            if include_triplets:
+                triplet_cutoff = st.number_input(
+                    "Triplet cutoff:",
+                    min_value=0.1,
+                    max_value=3.0,
+                    value=1.0,
+                    step=0.1,
+                    format="%.1f",
+                    key="atat_triplet_cutoff_val"
                 )
+            else:
+                triplet_cutoff = None
 
-                use_concentrations = achievable_concentrations_for_atat
-                use_sublattice_mode_final = True
-                use_chem_symbols = chem_symbols
+        with col_cut3:
+            include_quadruplets = st.checkbox("Include quadruplet clusters", value=False, key="atat_include_quadruplets")
+            if include_quadruplets:
+                quadruplet_cutoff = st.number_input(
+                    "Quadruplet cutoff:",
+                    min_value=0.1,
+                    max_value=2.0,
+                    value=0.8,
+                    step=0.1,
+                    format="%.1f",
+                    key="atat_quadruplet_cutoff_val"
+                )
+            else:
+                quadruplet_cutoff = None
 
-            rndstr_content, sqscell_content, atat_commands, final_concentrations, adjustment_info = generate_atat_input_files_corrected(
-                working_structure,
-                use_concentrations,
-                transformation_matrix,
-                use_sublattice_mode_final,
-                use_chem_symbols,
-                nx, ny, nz,
-                pair_cutoff,
-                triplet_cutoff,
-                quadruplet_cutoff,
-                len(supercell_preview))
+        st.markdown(
+            """
+            <hr style="border: none; height: 6px; background-color: #ff6600; border-radius: 8px; margin: 20px 0;">
+            """,
+            unsafe_allow_html=True
+        )
 
-            if adjustment_info and len(adjustment_info) > 0:
-                st.warning(
-                    "⚠️ **Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
-                adj_df = pd.DataFrame(adjustment_info)
-                st.dataframe(adj_df, use_container_width=True)
+        if "atat_results" not in st.session_state:
+            st.session_state.atat_results = None
 
-            st.session_state.atat_results = {
-                'structure_name': selected_atat_file,
-                'supercell_size': f"{nx}×{ny}×{nz}",
-                'total_atoms': len(supercell_preview),
-                'pair_cutoff': pair_cutoff,
-                'triplet_cutoff': triplet_cutoff,
-                'quadruplet_cutoff': quadruplet_cutoff,
-                'rndstr_content': rndstr_content,
-                'sqscell_content': sqscell_content,
-                'atat_commands': atat_commands,
-                'final_concentrations': final_concentrations
-            }
+        current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}"
 
-            st.success("✅ ATAT input files generated successfully with corrected per-site concentrations!")
-            st.rerun()
+        if "atat_config_key" not in st.session_state:
+            st.session_state.atat_config_key = current_config_key
+        elif st.session_state.atat_config_key != current_config_key:
+            st.session_state.atat_results = None
+            st.session_state.atat_config_key = current_config_key
 
-        except Exception as e:
-            st.error(f"Error generating ATAT input files: {str(e)}")
-            st.exception(e)
+        col_button, col_clear = st.columns([3, 1])
+
+        with col_button:
+            if not target_concentrations:
+                st.warning("Create at least 1 sublattice (with minimum of two elements) first.")
+                generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
+                                                 help="Configure at least 1 sublattice concentration first.")
+            elif len(element_list) < 2 and composition_mode == "🔄 Global Composition":
+                st.warning(f"Select at least two elements first in Step 4:")
+                generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
+                                                 help="Select at least two elements first.")
+            else:
+                generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary")
+
+        with col_clear:
+            if st.session_state.atat_results is not None:
+                if st.button("🗑️ Clear Results", type="secondary", help="Clear current ATAT results"):
+                    st.session_state.atat_results = None
+                    st.rerun()
+
+        if generate_atat_button:
+            try:
+                if composition_mode == "🔄 Global Composition":
+                    achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
+                        target_concentrations, supercell_multiplicity)
+
+                    use_concentrations = achievable_concentrations_for_atat
+                    use_sublattice_mode_final = False
+                    use_chem_symbols = None
+                else:
+                    achievable_concentrations_for_atat, adjustment_info = calculate_achievable_concentrations_sublattice_fixed(
+                        target_concentrations, chem_symbols, transformation_matrix, working_structure, unique_sites
+                    )
+
+                    use_concentrations = achievable_concentrations_for_atat
+                    use_sublattice_mode_final = True
+                    use_chem_symbols = chem_symbols
+
+                rndstr_content, sqscell_content, atat_commands, final_concentrations, adjustment_info = generate_atat_input_files_corrected(
+                    working_structure,
+                    use_concentrations,
+                    transformation_matrix,
+                    use_sublattice_mode_final,
+                    use_chem_symbols,
+                    nx, ny, nz,
+                    pair_cutoff,
+                    triplet_cutoff,
+                    quadruplet_cutoff,
+                    len(supercell_preview))
+
+                if adjustment_info and len(adjustment_info) > 0:
+                    st.warning(
+                        "⚠️ **Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
+                    adj_df = pd.DataFrame(adjustment_info)
+                    st.dataframe(adj_df, use_container_width=True)
+
+                st.session_state.atat_results = {
+                    'structure_name': selected_atat_file,
+                    'supercell_size': f"{nx}×{ny}×{nz}",
+                    'total_atoms': len(supercell_preview),
+                    'pair_cutoff': pair_cutoff,
+                    'triplet_cutoff': triplet_cutoff,
+                    'quadruplet_cutoff': quadruplet_cutoff,
+                    'rndstr_content': rndstr_content,
+                    'sqscell_content': sqscell_content,
+                    'atat_commands': atat_commands,
+                    'final_concentrations': final_concentrations
+                }
+
+                st.success("✅ ATAT input files generated successfully with corrected per-site concentrations!")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Error generating ATAT input files: {str(e)}")
+                st.exception(e)
     if st.session_state.atat_results is not None:
         results = st.session_state.atat_results
 
@@ -1755,349 +1779,351 @@ def render_atat_sqs_section():
 
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("---")
-    st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
-    st.info("Upload your ATAT output files to convert and analyze the results.")
+    with tabs5:
 
-    file_tab1, file_tab2 = st.tabs(
-        ["📁 Structure Converter", "📊 Optimization Analysis (mcsqs.log, mcsqs_progress.csv, parallel runs...)"])
+        st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
+        st.info("Upload your ATAT output files to convert and analyze the results.")
 
-    with file_tab1:
+        file_tab1, file_tab2 = st.tabs(
+            ["📁 Structure Converter", "📊 Optimization Analysis (mcsqs.log, mcsqs_progress.csv, parallel runs...)"])
 
-        converter_mode = st.radio(
-            "Choose conversion mode:",
-            ["Single File Converter", "Batch Converter (Multiple Files)"],
-            key="converter_mode_selector"
-        )
+        with file_tab1:
 
-        if converter_mode == "Single File Converter":
-            st.write("**Upload bestsqs.out file to convert the output format:**")
-            uploaded_bestsqs = st.file_uploader(
-                "Upload bestsqs.out file:",
-                type=['out', 'txt', 'log'],
-                help="Upload the bestsqs.out file generated by ATAT mcsqs command",
-                key="bestsqs_uploader"
+            converter_mode = st.radio(
+                "Choose conversion mode:",
+                ["Single File Converter", "Batch Converter (Multiple Files)"],
+                key="converter_mode_selector"
             )
 
-            if uploaded_bestsqs is not None:
-                try:
-                    bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
+            if converter_mode == "Single File Converter":
+                st.write("**Upload bestsqs.out file to convert the output format:**")
+                uploaded_bestsqs = st.file_uploader(
+                    "Upload bestsqs.out file:",
+                    type=['out', 'txt', 'log'],
+                    help="Upload the bestsqs.out file generated by ATAT mcsqs command",
+                    key="bestsqs_uploader"
+                )
 
-                    is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
+                if uploaded_bestsqs is not None:
+                    try:
+                        bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
 
-                    if not is_valid:
-                        st.error(f"Invalid bestsqs.out file: {validation_message}")
-                        st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
-                        return
+                        is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
 
-                    st.success(f"✅ Valid ATAT file detected: {validation_message}")
-                    vasp_content, conversion_info = convert_bestsqs_to_vasp(
-                        bestsqs_content,
-                        working_structure,
-                        transformation_matrix,
-                        results['structure_name']
-                    )
+                        if not is_valid:
+                            st.error(f"Invalid bestsqs.out file: {validation_message}")
+                            st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
+                            return
 
-                    sqs_pymatgen_structure = convert_atat_to_pymatgen_structure(
-                        bestsqs_content, working_structure, transformation_matrix
-                    )
-
-                    st.success("✅ Successfully converted bestsqs.out to VASP format!")
-                    col_conv1, col_conv2 = st.columns(2)
-                    with col_conv1:
-                        st.write("#### **Conversion Summary:**")
-                        for key, value in conversion_info.items():
-                            st.write(f"- **{key}:** {value}")
-
-                    with col_conv2:
-                        st.write("#### **VASP POSCAR Preview:**")
-                        preview_lines = vasp_content.split('\n')[:15]
-                        st.code('\n'.join(preview_lines) + '\n...', language="text")
-                    sqs_result = {
-                        'structure': sqs_pymatgen_structure
-                    }
-
-                    st.write("#### **3D Structure Visualization:**")
-                    sqs_visualization(sqs_result)
-
-                    # Download buttons with multiple format options
-                    # Download buttons with multiple format options
-                    st.write("**Download Converted Structure:**")
-                    col_down1, col_down2, col_down3 = st.columns(3)
-
-                    with col_down1:
-                        # VASP POSCAR download with options
-                        st.markdown("**VASP Options:**")
-                        use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
-                                                     value=True,
-                                                     key="poscar_fractional")
-
-                        from ase.constraints import FixAtoms
-                        use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
-                                                             value=False, key="poscar_sd")
-
-                        # Generate VASP content with options
-                        try:
-                            grouped_data = sqs_pymatgen_structure.copy() if 'sqs_pymatgen_structure' in locals() else None
-                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
-
-                            # Add atoms to structure (simplified version)
-                            for site in sqs_pymatgen_structure:
-                                new_struct.append(
-                                    species=site.species,
-                                    coords=site.frac_coords,
-                                    coords_are_cartesian=False,
-                                )
-
-                            out = StringIO()
-                            current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
-
-                            if use_selective_dynamics:
-                                constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
-                                current_ase_structure.set_constraint(constraint)
-
-                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=True)
-                            vasp_content_with_options = out.getvalue()
-
-                            st.download_button(
-                                label="📥 Download POSCAR",
-                                data=vasp_content_with_options,
-                                file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
-                                mime="text/plain",
-                                type="primary",
-                                key="download_converted_poscar"
-                            )
-                        except Exception as e:
-                            st.error(f"Error generating VASP file: {str(e)}")
-
-                    with col_down2:
-                        # Additional format selector
-                        additional_format = st.selectbox(
-                            "Additional Format:",
-                            ["CIF", "LAMMPS", "XYZ"],
-                            key="additional_format_selector"
+                        st.success(f"✅ Valid ATAT file detected: {validation_message}")
+                        vasp_content, conversion_info = convert_bestsqs_to_vasp(
+                            bestsqs_content,
+                            working_structure,
+                            transformation_matrix,
+                            results['structure_name']
                         )
 
-                        # Show LAMMPS options if LAMMPS is selected
-                        if additional_format == "LAMMPS":
-                            st.markdown("**LAMMPS Export Options**")
-                            atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
-                                                      key="lammps_atom_style")
-                            units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
-                            include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
-                            force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
+                        sqs_pymatgen_structure = convert_atat_to_pymatgen_structure(
+                            bestsqs_content, working_structure, transformation_matrix
+                        )
 
-                    with col_down3:
-                        if st.button("📄 Generate & Download", key="generate_additional_format"):
+                        st.success("✅ Successfully converted bestsqs.out to VASP format!")
+                        col_conv1, col_conv2 = st.columns(2)
+                        with col_conv1:
+                            st.write("#### **Conversion Summary:**")
+                            for key, value in conversion_info.items():
+                                st.write(f"- **{key}:** {value}")
+
+                        with col_conv2:
+                            st.write("#### **VASP POSCAR Preview:**")
+                            preview_lines = vasp_content.split('\n')[:15]
+                            st.code('\n'.join(preview_lines) + '\n...', language="text")
+                        sqs_result = {
+                            'structure': sqs_pymatgen_structure
+                        }
+
+                        st.write("#### **3D Structure Visualization:**")
+                        sqs_visualization(sqs_result)
+
+                        # Download buttons with multiple format options
+                        # Download buttons with multiple format options
+                        st.write("**Download Converted Structure:**")
+                        col_down1, col_down2, col_down3 = st.columns(3)
+
+                        with col_down1:
+                            # VASP POSCAR download with options
+                            st.markdown("**VASP Options:**")
+                            use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
+                                                         value=True,
+                                                         key="poscar_fractional")
+
+                            from ase.constraints import FixAtoms
+                            use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
+                                                                 value=False, key="poscar_sd")
+
+                            # Generate VASP content with options
                             try:
-                                if additional_format == "CIF":
-                                    from pymatgen.io.cif import CifWriter
+                                grouped_data = sqs_pymatgen_structure.copy() if 'sqs_pymatgen_structure' in locals() else None
+                                new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
 
-                                    # Create structure for CIF
-                                    grouped_data = sqs_pymatgen_structure.copy()
-                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
-
-                                    for site in sqs_pymatgen_structure:
-                                        species_dict = {}
-                                        for element, occupancy in site.species.items():
-                                            species_dict[element] = float(occupancy)
-
-                                        new_struct.append(
-                                            species=species_dict,
-                                            coords=site.frac_coords,
-                                            coords_are_cartesian=False,
-                                        )
-
-                                    file_content = CifWriter(new_struct, symprec=0.1,
-                                                             write_site_properties=True).__str__()
-                                    download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
-                                    mime_type = "chemical/x-cif"
-
-                                elif additional_format == "LAMMPS":
-                                    # Create structure for LAMMPS
-                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
-
-                                    for site in sqs_pymatgen_structure:
-                                        new_struct.append(
-                                            species=site.species,
-                                            coords=site.frac_coords,
-                                            coords_are_cartesian=False,
-                                        )
-
-                                    current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
-                                    out = StringIO()
-                                    write(
-                                        out,
-                                        current_ase_structure,
-                                        format="lammps-data",
-                                        atom_style=atom_style,
-                                        units=units,
-                                        masses=include_masses,
-                                        force_skew=force_skew
+                                # Add atoms to structure (simplified version)
+                                for site in sqs_pymatgen_structure:
+                                    new_struct.append(
+                                        species=site.species,
+                                        coords=site.frac_coords,
+                                        coords_are_cartesian=False,
                                     )
-                                    file_content = out.getvalue()
-                                    download_file_name = f"{results['structure_name'].split('.')[0]}.lmp"
-                                    mime_type = "text/plain"
 
-                                elif additional_format == "XYZ":
-                                    # Generate XYZ format (you'll need to implement this)
-                                    additional_content, additional_filename = generate_additional_format(
-                                        sqs_pymatgen_structure, additional_format, results['structure_name']
-                                    )
-                                    file_content = additional_content
-                                    download_file_name = additional_filename
-                                    mime_type = get_mime_type(additional_format)
+                                out = StringIO()
+                                current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
+
+                                if use_selective_dynamics:
+                                    constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
+                                    current_ase_structure.set_constraint(constraint)
+
+                                write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=True)
+                                vasp_content_with_options = out.getvalue()
 
                                 st.download_button(
-                                    label=f"📥 Download {additional_format}",
-                                    data=file_content,
-                                    file_name=download_file_name,
-                                    mime=mime_type,
+                                    label="📥 Download POSCAR",
+                                    data=vasp_content_with_options,
+                                    file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
+                                    mime="text/plain",
                                     type="primary",
-                                    key=f"download_{additional_format.lower()}"
+                                    key="download_converted_poscar"
                                 )
-                                st.success(f"✅ {additional_format} file generated!")
-
                             except Exception as e:
-                                st.error(f"Error generating {additional_format}: {str(e)}")
+                                st.error(f"Error generating VASP file: {str(e)}")
 
-                    st.write("**Complete Package:**")
-                    zip_buffer_complete = create_complete_atat_zip(
-                        results, vasp_content, bestsqs_content
-                    )
+                        with col_down2:
+                            # Additional format selector
+                            additional_format = st.selectbox(
+                                "Additional Format:",
+                                ["CIF", "LAMMPS", "XYZ"],
+                                key="additional_format_selector"
+                            )
 
-                    st.download_button(
-                        label="📦 Download Complete Package",
-                        data=zip_buffer_complete,
-                        file_name=f"ATAT_SQS_Complete_{results['structure_name'].split('.')[0]}.zip",
-                        mime="application/zip",
-                        type="primary",
-                        key="download_complete_package"
-                    )
+                            # Show LAMMPS options if LAMMPS is selected
+                            if additional_format == "LAMMPS":
+                                st.markdown("**LAMMPS Export Options**")
+                                atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
+                                                          key="lammps_atom_style")
+                                units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
+                                include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
+                                force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
 
-                    lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
+                        with col_down3:
+                            if st.button("📄 Generate & Download", key="generate_additional_format"):
+                                try:
+                                    if additional_format == "CIF":
+                                        from pymatgen.io.cif import CifWriter
 
-                    element_counts = {}
-                    for _, _, _, element in atoms:
-                        element_counts[element] = element_counts.get(element, 0) + 1
+                                        # Create structure for CIF
+                                        grouped_data = sqs_pymatgen_structure.copy()
+                                        new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
 
-                    # st.write("**Element Distribution:**")
-                    # element_df = pd.DataFrame([
-                    #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
-                    #     for elem, count in sorted(element_counts.items())
-                    # ])
-                    # st.dataframe(element_df, use_container_width=True)
+                                        for site in sqs_pymatgen_structure:
+                                            species_dict = {}
+                                            for element, occupancy in site.species.items():
+                                                species_dict[element] = float(occupancy)
 
-                    st.write("#### **Element Distribution:**")
-                    cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
-                    for i, (elem, count) in enumerate(sorted(element_counts.items())):
-                        percentage = count / len(atoms) * 100
-                        with cols[i % len(cols)]:
-                            if percentage >= 80:
-                                color = "#2E4057"  # Dark Blue-Gray for very high concentration
-                            elif percentage >= 60:
-                                color = "#4A6741"  # Dark Forest Green for high concentration
-                            elif percentage >= 40:
-                                color = "#6B73FF"  # Purple-Blue for medium-high concentration
-                            elif percentage >= 25:
-                                color = "#FF8C00"  # Dark Orange for medium concentration
-                            elif percentage >= 15:
-                                color = "#4ECDC4"  # Teal for medium-low concentration
-                            elif percentage >= 10:
-                                color = "#45B7D1"  # Blue for low-medium concentration
-                            elif percentage >= 5:
-                                color = "#96CEB4"  # Green for low concentration
-                            elif percentage >= 2:
-                                color = "#FECA57"  # Yellow for very low concentration
-                            elif percentage >= 1:
-                                color = "#DDA0DD"  # Plum for trace concentration
-                            else:
-                                color = "#D3D3D3"  # Light Gray for minimal concentration
+                                            new_struct.append(
+                                                species=species_dict,
+                                                coords=site.frac_coords,
+                                                coords_are_cartesian=False,
+                                            )
 
-                            st.markdown(f"""
-                            <div style="
-                                background: linear-gradient(135deg, {color}, {color}CC);
-                                padding: 20px; 
-                                border-radius: 15px; 
-                                text-align: center; 
-                                margin: 10px 0;
-                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-                                border: 2px solid rgba(255,255,255,0.2);
-                            ">
-                                <h1 style="
-                                    color: white; 
-                                    font-size: 3em; 
-                                    margin: 0; 
-                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
-                                    font-weight: bold;
-                                ">{elem}</h1>
-                                <h2 style="
-                                    color: white; 
-                                    font-size: 2em; 
-                                    margin: 10px 0 0 0;
-                                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-                                ">{percentage:.1f}%</h2>
-                                <p style="
-                                    color: white; 
-                                    font-size: 1.8em; 
-                                    margin: 5px 0 0 0;
-                                    opacity: 0.9;
-                                ">{count} atoms</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                                        file_content = CifWriter(new_struct, symprec=0.1,
+                                                                 write_site_properties=True).__str__()
+                                        download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
+                                        mime_type = "chemical/x-cif"
 
-                    st.markdown("---")
-                    st.subheader("📊 PRDF Analysis of SQS Structure")
+                                    elif additional_format == "LAMMPS":
+                                        # Create structure for LAMMPS
+                                        new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
 
-                    col_prdf1, col_prdf2, col_prdf3 = st.columns(3)
-                    with col_prdf1:
-                        prdf_cutoff = st.number_input(
-                            "PRDF cutoff distance (Å):",
-                            min_value=1.0,
-                            max_value=20.0,
-                            value=10.0,
-                            step=0.5,
-                            key="prdf_cutoff"
-                        )
-                    with col_prdf2:
-                        prdf_bin_size = st.number_input(
-                            "Bin size (Å):",
-                            min_value=0.01,
-                            max_value=1.0,
-                            value=0.1,
-                            step=0.01,
-                            key="prdf_bin_size"
-                        )
-                    with col_prdf3:
-                        calculate_prdf_btn = st.button(
-                            "🔬 Calculate PRDF",
-                            type="secondary",
-                            key="calculate_prdf_btn"
+                                        for site in sqs_pymatgen_structure:
+                                            new_struct.append(
+                                                species=site.species,
+                                                coords=site.frac_coords,
+                                                coords_are_cartesian=False,
+                                            )
+
+                                        current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
+                                        out = StringIO()
+                                        write(
+                                            out,
+                                            current_ase_structure,
+                                            format="lammps-data",
+                                            atom_style=atom_style,
+                                            units=units,
+                                            masses=include_masses,
+                                            force_skew=force_skew
+                                        )
+                                        file_content = out.getvalue()
+                                        download_file_name = f"{results['structure_name'].split('.')[0]}.lmp"
+                                        mime_type = "text/plain"
+
+                                    elif additional_format == "XYZ":
+                                        # Generate XYZ format (you'll need to implement this)
+                                        additional_content, additional_filename = generate_additional_format(
+                                            sqs_pymatgen_structure, additional_format, results['structure_name']
+                                        )
+                                        file_content = additional_content
+                                        download_file_name = additional_filename
+                                        mime_type = get_mime_type(additional_format)
+
+                                    st.download_button(
+                                        label=f"📥 Download {additional_format}",
+                                        data=file_content,
+                                        file_name=download_file_name,
+                                        mime=mime_type,
+                                        type="primary",
+                                        key=f"download_{additional_format.lower()}"
+                                    )
+                                    st.success(f"✅ {additional_format} file generated!")
+
+                                except Exception as e:
+                                    st.error(f"Error generating {additional_format}: {str(e)}")
+
+                        st.write("**Complete Package:**")
+                        zip_buffer_complete = create_complete_atat_zip(
+                            results, vasp_content, bestsqs_content
                         )
 
-                    if calculate_prdf_btn:
-                        try:
-                            prdf_structure = prepare_structure_for_prdf(sqs_pymatgen_structure)
-                            calculate_and_display_sqs_prdf(prdf_structure, prdf_cutoff, prdf_bin_size)
+                        st.download_button(
+                            label="📦 Download Complete Package",
+                            data=zip_buffer_complete,
+                            file_name=f"ATAT_SQS_Complete_{results['structure_name'].split('.')[0]}.zip",
+                            mime="application/zip",
+                            type="primary",
+                            key="download_complete_package"
+                        )
 
-                        except Exception as prdf_error:
-                            st.error(f"Error calculating PRDF: {str(prdf_error)}")
-                            st.info("PRDF calculation requires a valid structure with multiple element types.")
-                            import traceback
-                            st.error(f"Debug: {traceback.format_exc()}")
-                    render_vacancy_creation_section(sqs_pymatgen_structure)
+                        lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
 
-                except UnicodeDecodeError:
-                    st.error("Error reading file. Please ensure the file is a text file with UTF-8 encoding.")
-                except Exception as e:
-                    st.error(f"Error processing bestsqs.out file: {str(e)}")
-                    st.error("Please ensure the file is a valid ATAT bestsqs.out format.")
-                    import traceback
-                    st.error(f"Debug info: {traceback.format_exc()}")
-        else:
-            render_batch_structure_converter(
-                working_structure, transformation_matrix)
-    with file_tab2:
-        render_extended_optimization_analysis_tab()
+                        element_counts = {}
+                        for _, _, _, element in atoms:
+                            element_counts[element] = element_counts.get(element, 0) + 1
+
+                        # st.write("**Element Distribution:**")
+                        # element_df = pd.DataFrame([
+                        #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
+                        #     for elem, count in sorted(element_counts.items())
+                        # ])
+                        # st.dataframe(element_df, use_container_width=True)
+
+                        st.write("#### **Element Distribution:**")
+                        cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
+                        for i, (elem, count) in enumerate(sorted(element_counts.items())):
+                            percentage = count / len(atoms) * 100
+                            with cols[i % len(cols)]:
+                                if percentage >= 80:
+                                    color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                                elif percentage >= 60:
+                                    color = "#4A6741"  # Dark Forest Green for high concentration
+                                elif percentage >= 40:
+                                    color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                                elif percentage >= 25:
+                                    color = "#FF8C00"  # Dark Orange for medium concentration
+                                elif percentage >= 15:
+                                    color = "#4ECDC4"  # Teal for medium-low concentration
+                                elif percentage >= 10:
+                                    color = "#45B7D1"  # Blue for low-medium concentration
+                                elif percentage >= 5:
+                                    color = "#96CEB4"  # Green for low concentration
+                                elif percentage >= 2:
+                                    color = "#FECA57"  # Yellow for very low concentration
+                                elif percentage >= 1:
+                                    color = "#DDA0DD"  # Plum for trace concentration
+                                else:
+                                    color = "#D3D3D3"  # Light Gray for minimal concentration
+
+                                st.markdown(f"""
+                                <div style="
+                                    background: linear-gradient(135deg, {color}, {color}CC);
+                                    padding: 20px; 
+                                    border-radius: 15px; 
+                                    text-align: center; 
+                                    margin: 10px 0;
+                                    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                    border: 2px solid rgba(255,255,255,0.2);
+                                ">
+                                    <h1 style="
+                                        color: white; 
+                                        font-size: 3em; 
+                                        margin: 0; 
+                                        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                        font-weight: bold;
+                                    ">{elem}</h1>
+                                    <h2 style="
+                                        color: white; 
+                                        font-size: 2em; 
+                                        margin: 10px 0 0 0;
+                                        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                    ">{percentage:.1f}%</h2>
+                                    <p style="
+                                        color: white; 
+                                        font-size: 1.8em; 
+                                        margin: 5px 0 0 0;
+                                        opacity: 0.9;
+                                    ">{count} atoms</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                        st.markdown("---")
+                        st.subheader("📊 PRDF Analysis of SQS Structure")
+
+                        col_prdf1, col_prdf2, col_prdf3 = st.columns(3)
+                        with col_prdf1:
+                            prdf_cutoff = st.number_input(
+                                "PRDF cutoff distance (Å):",
+                                min_value=1.0,
+                                max_value=20.0,
+                                value=10.0,
+                                step=0.5,
+                                key="prdf_cutoff"
+                            )
+                        with col_prdf2:
+                            prdf_bin_size = st.number_input(
+                                "Bin size (Å):",
+                                min_value=0.01,
+                                max_value=1.0,
+                                value=0.1,
+                                step=0.01,
+                                key="prdf_bin_size"
+                            )
+                        with col_prdf3:
+                            calculate_prdf_btn = st.button(
+                                "🔬 Calculate PRDF",
+                                type="secondary",
+                                key="calculate_prdf_btn"
+                            )
+
+                        if calculate_prdf_btn:
+                            try:
+                                prdf_structure = prepare_structure_for_prdf(sqs_pymatgen_structure)
+                                calculate_and_display_sqs_prdf(prdf_structure, prdf_cutoff, prdf_bin_size)
+
+                            except Exception as prdf_error:
+                                st.error(f"Error calculating PRDF: {str(prdf_error)}")
+                                st.info("PRDF calculation requires a valid structure with multiple element types.")
+                                import traceback
+                                st.error(f"Debug: {traceback.format_exc()}")
+                        render_vacancy_creation_section(sqs_pymatgen_structure)
+
+                    except UnicodeDecodeError:
+                        st.error("Error reading file. Please ensure the file is a text file with UTF-8 encoding.")
+                    except Exception as e:
+                        st.error(f"Error processing bestsqs.out file: {str(e)}")
+                        st.error("Please ensure the file is a valid ATAT bestsqs.out format.")
+                        import traceback
+                        st.error(f"Debug info: {traceback.format_exc()}")
+            else:
+                render_batch_structure_converter(
+                    working_structure, transformation_matrix)
+        with file_tab2:
+            render_extended_optimization_analysis_tab()
 
 
 def prepare_structure_for_prdf(structure):
@@ -3324,10 +3350,8 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
     st.info(f"""
     **Sublattice Mode - Wyckoff Position Control:**
-    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site
-    - Only unique Wyckoff positions are shown below
-    - Settings automatically apply to all equivalent sites
-    - Concentration constraints are per Wyckoff position
+    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site. 
+    Only unique Wyckoff positions are shown below. Settings automatically apply to all equivalent sites. Concentration constraints are per Wyckoff position.
     """)
 
     common_elements = [
@@ -3416,9 +3440,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                 # Show constraint information
                 st.info(f"**Concentration constraints for this Wyckoff position:**\n"
                         f"- Total atoms in supercell: {atoms_per_wyckoff_in_supercell}\n"
-                        f"- Minimum concentration step: {min_concentration_step:.6f}\n"
-                        f"- Valid concentrations: multiples of {min_concentration_step:.6f}")
-
+                        f"- Minimum concentration step: {min_concentration_step:.6f}\n")
                 col_elem, col_conc = st.columns([1, 2])
 
                 with col_elem:
