@@ -849,11 +849,10 @@ def render_sqs_module():
                  - **ATAT mcsqs method** - [VAN DE WALLE, Axel, et al. Efficient stochastic generation of special quasirandom structures. Calphad, 2013](https://www.sciencedirect.com/science/article/pii/S0364591613000540?casa_token=i1iog7eW3lQAAAAA:wxlTn-9Twj38XFx1lMfSazPb6r0JrDV7NPxeums5-2qFXHWItT2ZVu9E-IfuBjRsr7f1BEzcSw).
                  - **ATAT** - [VAN DE WALLE, Axel; ASTA, Mark; CEDER, Gerbrand. The alloy theoretic automated toolkit: A user guide. Calphad, 2002](https://www.sciencedirect.com/science/article/abs/pii/S0364591602800062).
             """)
-
-    read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
-                           )
+    with cl1:
+        read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
+                               )
     if read_more:
-        with cl1:
         with st.expander("Read more", icon="📖", expanded=True):
             st.markdown("""
             ### Read More About SQS and ATAT
