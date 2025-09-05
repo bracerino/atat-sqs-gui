@@ -838,7 +838,7 @@ def render_sqs_module():
                 </div>
                 <div class="sqs-underline"></div>
                 """,
-                height=300
+                height=230
             )
     if how_cite:
         with cl1:
@@ -853,6 +853,7 @@ def render_sqs_module():
     read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
                            )
     if read_more:
+        with cl1:
         with st.expander("Read more", icon="📖", expanded=True):
             st.markdown("""
             ### Read More About SQS and ATAT
@@ -942,9 +943,10 @@ def render_sqs_module():
             This should display the list of mcsqs parameters if the compilation was successful.
         """)
     # -------------- DATABASE ----------
-    show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
-                                       value=False,
-                                       help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
+    with cl1:
+        show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
+                                           value=False,
+                                           help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
     st.markdown("""
            <style>
            div.stButton > button[kind="primary"] {
