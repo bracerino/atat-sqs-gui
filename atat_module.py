@@ -1069,7 +1069,7 @@ def render_atat_sqs_section():
         "1️⃣ + 2️⃣ Composition & Supercell ",
         "3️⃣ Elements Concentrations",
         "4️⃣ Clusters & Generation",
-        "📊 Analyze Atat Outputs"
+        "📊 Analyze ATAT Outputs"
     ])
     with tabs1:
         col1, col2 = st.columns([1, 1])
