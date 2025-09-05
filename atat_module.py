@@ -2230,11 +2230,19 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
     final_lattice_vectors = np.dot(B, A_basis)
     cartesian_coords = []
     species = []
+
     for x, y, z, element in atoms_in_A_coords:
+        if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+            continue
+
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         cartesian_coords.append(cart_pos)
         species.append(element)
+
+    if not species:
+        raise ValueError("All atoms in the structure are vacancies - cannot create a valid structure")
+
     sqs_structure = Structure(
         lattice=final_lattice_vectors,
         species=species,
@@ -2257,10 +2265,20 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
     final_lattice_vectors = np.dot(B, A_basis)
 
     atom_data = []
+    vacancy_count = 0
+
     for x, y, z, element in atoms_in_A_coords:
+        if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+            vacancy_count += 1
+            continue
+
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         atom_data.append({'element': element, 'cart_pos': cart_pos})
+
+    if not atom_data:
+        raise ValueError("All atoms in the structure are vacancies - cannot create a valid POSCAR")
+
     unique_elements = sorted(list(set(atom['element'] for atom in atom_data)))
 
     sorted_atoms_cart = []
@@ -2272,7 +2290,12 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
 
     inv_final_lattice = np.linalg.inv(final_lattice_vectors)
     fractional_coords = [np.dot(pos, inv_final_lattice) for pos in sorted_atoms_cart]
-    poscar_lines = [f"SQS from {structure_name} via ATAT", "1.0"]
+
+    comment = f"SQS from {structure_name} via ATAT"
+    if vacancy_count > 0:
+        comment += f" ({vacancy_count} vacancies removed)"
+
+    poscar_lines = [comment, "1.0"]
     for vec in final_lattice_vectors:
         poscar_lines.append(f"  {vec[0]:15.9f} {vec[1]:15.9f} {vec[2]:15.9f}")
 
@@ -2285,11 +2308,12 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
 
     vasp_content = "\n".join(poscar_lines)
 
-    # --- Create conversion info dictionary for display ---
     supercell_lattice = Lattice(final_lattice_vectors)
     conversion_info = {
         "Source Structure": structure_name,
-        "Total Atoms": len(atoms_in_A_coords),
+        "Total Original Atoms": len(atoms_in_A_coords),
+        "Atoms After Removing Vacancies": len(atom_data),
+        "Vacancies Removed": vacancy_count,
         "Elements & Counts": ", ".join([f"{elem}: {count}" for elem, count in zip(unique_elements, element_counts)]),
         "SQS Lattice (a, b, c)": f"{supercell_lattice.a:.4f} Å, {supercell_lattice.b:.4f} Å, {supercell_lattice.c:.4f} Å",
         "SQS Angles (α, β, γ)": f"{supercell_lattice.alpha:.2f}°, {supercell_lattice.beta:.2f}°, {supercell_lattice.gamma:.2f}°",
@@ -2826,6 +2850,8 @@ def validate_bestsqs_file(content):
                 return False, f"Line {i + 1} contains non-numeric values"
 
         atom_count = 0
+        vacancy_count = 0
+
         for i in range(6, len(lines)):
             line = lines[i].strip()
             if line:
@@ -2834,14 +2860,23 @@ def validate_bestsqs_file(content):
                     return False, f"Line {i + 1} should contain x y z element"
                 try:
                     float(parts[0]), float(parts[1]), float(parts[2])
-                    atom_count += 1
+                    element = parts[3]
+                    if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+                        vacancy_count += 1
+                    else:
+                        atom_count += 1
                 except ValueError:
                     return False, f"Line {i + 1} contains invalid coordinates"
 
-        if atom_count == 0:
+        total_sites = atom_count + vacancy_count
+        if total_sites == 0:
             return False, "No valid atomic positions found"
 
-        return True, f"Valid ATAT file with {atom_count} atoms"
+        message = f"Valid ATAT file with {atom_count} atoms"
+        if vacancy_count > 0:
+            message += f" and {vacancy_count} vacancies"
+
+        return True, message
 
     except Exception as e:
         return False, f"Error parsing file: {str(e)}"
