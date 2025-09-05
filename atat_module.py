@@ -234,7 +234,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             type="primary"
         )
 
-        st.success("Concentration sweep script generated!")
+        st.success("Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
 
         with st.expander("Script Preview", expanded=False):
             st.code(script_content, language="bash")
