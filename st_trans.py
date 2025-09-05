@@ -714,19 +714,7 @@ def render_sqs_module():
     how_cite = st.checkbox(f"📚 How to **cite**"
                            )
     cl1, cl2 = st.columns(2)
-    if how_cite:
-        with cl1:
-            with st.expander("How to cite", icon="📚", expanded=True):
-                st.markdown("""
-                 Please cite the following sources
-                 
-                 - **ATAT mcsqs method** - [VAN DE WALLE, Axel, et al. Efficient stochastic generation of special quasirandom structures. Calphad, 2013](https://www.sciencedirect.com/science/article/pii/S0364591613000540?casa_token=i1iog7eW3lQAAAAA:wxlTn-9Twj38XFx1lMfSazPb6r0JrDV7NPxeums5-2qFXHWItT2ZVu9E-IfuBjRsr7f1BEzcSw).
-                 - **ATAT** - [VAN DE WALLE, Axel; ASTA, Mark; CEDER, Gerbrand. The alloy theoretic automated toolkit: A user guide. Calphad, 2002](https://www.sciencedirect.com/science/article/abs/pii/S0364591602800062).
-            """)
-    
-            read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
-                                   )
-        with cl2:
+    with cl2:
             components.html(
                 """
                 <style>
@@ -852,7 +840,18 @@ def render_sqs_module():
                 """,
                 height=300
             )
-
+    if how_cite:
+        with cl1:
+            with st.expander("How to cite", icon="📚", expanded=True):
+                st.markdown("""
+                 Please cite the following sources
+                 
+                 - **ATAT mcsqs method** - [VAN DE WALLE, Axel, et al. Efficient stochastic generation of special quasirandom structures. Calphad, 2013](https://www.sciencedirect.com/science/article/pii/S0364591613000540?casa_token=i1iog7eW3lQAAAAA:wxlTn-9Twj38XFx1lMfSazPb6r0JrDV7NPxeums5-2qFXHWItT2ZVu9E-IfuBjRsr7f1BEzcSw).
+                 - **ATAT** - [VAN DE WALLE, Axel; ASTA, Mark; CEDER, Gerbrand. The alloy theoretic automated toolkit: A user guide. Calphad, 2002](https://www.sciencedirect.com/science/article/abs/pii/S0364591602800062).
+            """)
+    
+            read_more = st.checkbox(f"📖 Read **more** about **SQS**, **ATAT**, and how to **compile it**"
+                                   )
     if read_more:
         with st.expander("Read more", icon="📖", expanded=True):
             st.markdown("""
