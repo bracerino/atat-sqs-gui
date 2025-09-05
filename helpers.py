@@ -47,9 +47,7 @@ def intro_text():
                "COD databases**) to use the SQS tool.")
 
     st.markdown("""
-
-     ## 🧰 SQS Input File Generator for ATAT mcsqs
-
+---
 ### 🎥 Tutorials
 - 📘 **General Overview of the App**: [Watch on YouTube](https://www.youtube.com/watch?v=GGo_9T5wqus)  
 - ⚡ **Binary Alloy Workflow (Search Across Concentration Range)**: [Watch on YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)
