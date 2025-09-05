@@ -48,47 +48,47 @@ def intro_text():
 
     st.markdown("""
 
-     # 🧰 SQS Input File Generator for ATAT (mcsqs)
+     ## 🧰 SQS Input File Generator for ATAT mcsqs
 
 This tool provides a **graphical interface** for generating input files  
 (`rndstr.in`, `sqscell.out`) to create **Special Quasi-Random Structures (SQS)** using the **ATAT mcsqs** package.  
 
-It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
+It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition range.  
 
 🎥 **Video tutorial:** [Watch on YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)
 
 ---
 
-## ✨ Key Features
+### ✨ Key Features
 
-### 🔬 Crystal Structures
+#### 🔬 Crystal Structures
 - Upload custom crystal structures  
 - Retrieve directly from **Materials Project (MP)**, **AFLOW**, or **COD** databases  
 
 ---
 
-### 🎯 Supercell & Concentrations
-- Define **supercell size**  
+#### 🎯 Supercell & Concentrations
+- Define **supercell size / number of atoms**
 - Set target **sublattice concentrations**  
 - 📊 Automatically recalculate feasible concentrations  
 
 ---
 
-### 💾 Input File Generation
+#### 💾 Input File Generation
 - Generate **`rndstr.in`** and **`sqscell.out`** files instantly  
 
 ---
 
-### 🛠️ Automated Workflows
+#### 🛠️ Automated Workflows
 - Create **bash scripts** to:  
   - Build input files  
   - Run **mcsqs** with optional parallelization  
   - Monitor convergence in real-time  
-- ⚡ Automate full SQS searches **across binary alloy composition ranges**  
+- Automate full SQS searches **across binary alloy composition ranges**  
 
 ---
 
-### 📤 & 📥 File Handling
+#### 📤 & 📥 File Handling
 - Convert **`bestsqs.out`** into:  
   - POSCAR | LMP | CIF | XYZ  
 - Upload log files (`mcsqs.log`, `mcsqs1.log`, …, `mcsqs_progress.csv`) for:  
@@ -97,12 +97,12 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 ---
 
-### 📈 Structure Analysis
+#### 📈 Structure Analysis
 - Compute the **Pair Radial Distribution Function (PRDF)** for `bestsqs.out`  
 
 ---
 
-### 🧹 Vacancy Engineering
+#### 🧹 Vacancy Engineering
 - Introduce **ordered vacancies** by selectively removing elements from SQS  
 
 ---
