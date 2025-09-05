@@ -43,13 +43,13 @@ def calculate_achievable_concentrations(target_concentrations, supercell_multipl
 
 
 def intro_text():
-    st.warning(f"Please upload at **least one structure** file (or search for structure with the implemented interface for **MP, AFLOW, or "
+    st.warning(f"Please upload a **crystal structure** file (or search for the structure with the implemented interface within **MP, AFLOW, or "
                "COD databases**) to use the SQS tool.")
 
     st.markdown("""
 
      This tool provides GUI for generation of input files (rndstr.in, sqscell.out) for creating SQS (special quasi-random structure)
-     using ATAT (Alloy Theoretic Automated Toolkit) mcsqs. 
+     using ATAT (Alloy Theoretic Automated Toolkit) mcsqs. Additionally, it is possible to generate a script for a binary alloy and automatically run the mcsqs search across element concentration range (video tutorial at: **[YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)**.
      
      ### Key Features:
     🔬 Upload or retrieve crystal structures from MP, AFLOW, or COD databases
