@@ -92,11 +92,19 @@ Python 3.12.3
 ![ATAT commands](images_atat_gui/6.png)
 ---
 
-- Download the bash script file which will automatically create the set rndstr.in and sqscell.out, and run the ATAT mcsqs with the given settings from this interface. Additionally, it will create a new file with improved time dependent convergence, and shows updated information in the console every 1 minute 
+- Download bash script file that will automatically create the set rndstr.in and sqscell.out, and run the ATAT mcsqs with the given settings from this interface. Additionally, it will create a new file with improved time dependent convergence, and shows updated information in the console every 1 minute 
 ![Download bash to run it automatically](images_atat_gui/7.png)
 ---
 
 ![Improved console](images_atat_gui/console.png)
+---
+
+
+- Create bash script that will automatically run the mcsqs search across concentration range for the selected two elements on a sublattice or in a global concentration mode
+![Sweep concentration mode for binary alloy](images_atat_gui/Sweep.png)
+---
+
+![Console for sweep concentration mode of a binary alloy](images_atat_gui/Sw2.png)
 ---
 
 - Upload the found SQS (bestsqs.out) and convert it to POSCAR, LMP, CIF, or XYZ format
