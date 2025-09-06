@@ -44,7 +44,7 @@ def calculate_achievable_concentrations(target_concentrations, supercell_multipl
 
 def intro_text():
     st.warning(f"Please upload a **crystal structure** file (or search for the structure with the implemented interface within **MP, AFLOW, or "
-               "COD databases**) to use the SQS tool.")
+               "COD databases**).")
     components.html(
                 """
                 <style>
