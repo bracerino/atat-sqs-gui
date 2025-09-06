@@ -699,7 +699,7 @@ def render_sqs_module():
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
         Generate input and analyze output files for 
         <b><span style='color:#1A7F5D;'>ATAT mcsqs</span></b> 
-        to create <b><em>special quasi-random structures (SQS)</em></b>
+        to create <b><em>special quasirandom structures (SQS)</em></b>
     </h3>
     """,
     unsafe_allow_html=True
@@ -1789,11 +1789,12 @@ def render_sqs_module():
             import traceback
             st.error(traceback.format_exc())
     else:
-        intro_text()
         st.info("""
-            Special Quasi-Random Structures (SQS) approximate random alloys by matching the correlation functions 
+            Special Quasirandom Structures (SQS) approximate random alloys by matching the correlation functions 
             of a truly random alloy in a finite supercell.
         """)
+        intro_text()
+
 
 def check_sqs_mode(calc_mode):
     if "previous_calc_mode" not in st.session_state:
