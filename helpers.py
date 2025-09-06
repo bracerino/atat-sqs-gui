@@ -182,7 +182,7 @@ def intro_text():
 ---
 
 This tool provides a **graphical interface** for generating input files  
-(`rndstr.in`, `sqscell.out`) to create **Special Quasi-Random Structures (SQS)** using the **ATAT mcsqs** package.  
+(`rndstr.in`, `sqscell.out`) to create **Special Quasirandom Structures (SQS)** using the **ATAT mcsqs** package.  
 
 It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
 
@@ -217,7 +217,7 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 ---
 
-#### 📤 & 📥 File Handling
+#### 📤 File Handling
 - Convert **`bestsqs.out`** into:  
   - POSCAR | LMP | CIF | XYZ  
 - Upload log files (`mcsqs.log`, `mcsqs1.log`, …, `mcsqs_progress.csv`) for:  
@@ -231,7 +231,7 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 ---
 
-#### 🧹 Vacancy Engineering
+#### 🧹 Vacancies Creation
 - Introduce **ordered vacancies** by selectively removing elements from SQS  
 
 ---
