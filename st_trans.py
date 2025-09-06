@@ -817,7 +817,7 @@ def render_sqs_module():
         """)
     # -------------- DATABASE ----------
     with cl3:
-        show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
+        show_database_search = st.checkbox("🗃️ Enable **database search** (MP, AFLOW, COD)",
                                            value=False,
                                            help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
     st.markdown("""
