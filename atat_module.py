@@ -3379,10 +3379,10 @@ def integrate_atat_option():
     )
 
     st.title("🛠️ ATAT SQS Input File Generator")
-    st.markdown("**Generate input files for ATAT mcsqs to create Special Quasi-Random Structures**")
+    st.markdown("**Generate input files for ATAT mcsqs to create Special Quasirandom Structures**")
     st.info("""
     This tool generates `rndstr.in` and `sqscell.out` files that can be used with the ATAT (Alloy Theoretic Automated Toolkit) 
-    to create Special Quasi-Random Structures. Use the same composition settings as ICET, but generate files for external ATAT usage.
+    to create Special Quasirandom Structures. Use the same composition settings as ICET, but generate files for external ATAT usage.
 
     **Key Features:**
     - ✅ **Valid Concentrations**: Each site shows concentrations that represent integer atom counts
