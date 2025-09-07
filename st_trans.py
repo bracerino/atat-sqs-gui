@@ -754,7 +754,7 @@ def render_sqs_module():
             First, update your system and install required packages:
             ```bash
             sudo apt-get upgrade
-            sudo apt-get install tcsh
+            sudo apt-get install tcsh make g++
             ```
             
             #### Download and Compile ATAT
