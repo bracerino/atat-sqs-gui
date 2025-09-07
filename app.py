@@ -195,7 +195,7 @@ def update_file_upload_section():
 
 st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
-    "Try also our XRD application **[XRDlicious](xrdlicious.com)** and *[SQS generation using ICET](https://icet-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 **[Quick tutorial here](https://youtu.be/GGo_9T5wqus?si=xJItv-j0shr8hte_)**. Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
+    "Try also our XRD application **[XRDlicious](xrdlicious.com)** and **[SQS generation using ICET](https://icet-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 **[Tutorial here](https://youtu.be/GGo_9T5wqus?si=xJItv-j0shr8hte_)**. Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
     " You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-sqs-gui.git)** for better performance."
 )
 
