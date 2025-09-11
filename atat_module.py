@@ -188,7 +188,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         progress_update_interval = st.number_input(
             "Progress update interval (seconds)",
             min_value=1,
-            max_value=60,
+            max_value=6000,
             value=10,
             step=1,
             help="How often to print the progress update to the console in seconds"
