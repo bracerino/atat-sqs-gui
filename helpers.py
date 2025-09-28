@@ -3592,7 +3592,8 @@ def get_unique_sites(structure):
     try:
         analyzer = SpacegroupAnalyzer(structure)
         symmetry_data = analyzer.get_symmetry_dataset()
-        wyckoff_letters = symmetry_data["wyckoffs"]
+        #wyckoff_letters = symmetry_data["wyckoffs"]
+        wyckoff_letters = symmetry_data.wyckoffs
         equivalent_sites = analyzer.get_symmetrized_structure().equivalent_sites
         equivalent_indices = analyzer.get_symmetrized_structure().equivalent_indices
 
