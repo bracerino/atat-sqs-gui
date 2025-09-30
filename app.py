@@ -73,7 +73,7 @@ def remove_fractional_occupancies_safely(structure):
 
     return ordered_structure
 
-t.markdown(
+st.markdown(
     """
     <style>
         /* Sidebar background with soft transparent red-green gradient */
