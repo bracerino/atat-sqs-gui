@@ -73,7 +73,49 @@ def remove_fractional_occupancies_safely(structure):
 
     return ordered_structure
 
+
+st.markdown(
+    """
+    <style>
+        /* Sidebar background with soft red-green gradient */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(
+                180deg,
+                rgba(231, 76, 60, 0.25),   /* soft red */
+                rgba(46, 204, 113, 0.25)   /* soft green */
+            );
+            backdrop-filter: blur(6px);  /* frosted glass effect */
+        }
+
+        /* Custom caption style */
+        .sidebar-caption {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: inherit;
+            margin: 1rem 0 0.5rem 0;
+            position: relative;
+            display: inline-block;
+        }
+
+        .sidebar-caption::after {
+            content: "";
+            display: block;
+            width: 100%;
+            height: 3px;
+            margin-top: 4px;
+            border-radius: 2px;
+            background: linear-gradient(to right, #e74c3c, #2ecc71);  /* vivid red → green */
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.sidebar.markdown('<div class="sidebar-caption">SQS ATAT</div>', unsafe_allow_html=True)
+
 # File uploader in the sidebar
+
+
 st.sidebar.subheader("📁 Upload Your Structure Files")
 uploaded_files_user_sidebar = st.sidebar.file_uploader(
     "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ):",
