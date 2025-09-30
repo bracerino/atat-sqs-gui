@@ -73,16 +73,15 @@ def remove_fractional_occupancies_safely(structure):
 
     return ordered_structure
 
-
-st.markdown(
+t.markdown(
     """
     <style>
-        /* Sidebar background with soft red-green gradient */
+        /* Sidebar background with soft transparent red-green gradient */
         [data-testid="stSidebar"] {
             background: linear-gradient(
                 180deg,
-                rgba(231, 76, 60, 0.25),   /* soft red */
-                rgba(46, 204, 113, 0.25)   /* soft green */
+                rgba(231, 76, 60, 0.15),   /* very soft red */
+                rgba(46, 204, 113, 0.15)   /* very soft green */
             );
             backdrop-filter: blur(6px);  /* frosted glass effect */
         }
@@ -104,7 +103,7 @@ st.markdown(
             height: 3px;
             margin-top: 4px;
             border-radius: 2px;
-            background: linear-gradient(to right, #e74c3c, #2ecc71);  /* vivid red → green */
+            background: linear-gradient(to right, #e74c3c, #2ecc71);  /* vivid red → green underline */
         }
     </style>
     """,
