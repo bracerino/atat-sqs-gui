@@ -188,7 +188,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         progress_update_interval = st.number_input(
             "Progress update interval (seconds)",
             min_value=1,
-            max_value=60,
+            max_value=6000,
             value=10,
             step=1,
             help="How often to print the progress update to the console in seconds"
@@ -234,7 +234,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             type="primary"
         )
 
-        st.success("Concentration sweep script generated!")
+        st.success("Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
 
         with st.expander("Script Preview", expanded=False):
             st.code(script_content, language="bash")
@@ -325,6 +325,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '    grep "Objective_function=" "$1" | tail -1 | sed "s/.*= *//" 2>/dev/null || echo ""',
         "}",
         "",
+        "extract_latest_step() {",
+        '    grep -c "Objective_function=" "$1" 2>/dev/null || echo "0"',
+        "}",
+        "",
         "get_best_objective_and_run() {",
         "    local best_obj=\"N/A\"",
         "    local best_run=\"N/A\"",
@@ -355,6 +359,83 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    echo \"$best_obj,$best_run\"",
         "}",
         "",
+        "initialize_concentration_csv() {",
+        "    local conc=$1",
+        "    local parallel_runs_per_conc=$2",
+        "    local csv_file=\"optimization_data_${conc}.csv\"",
+        "    ",
+        "    # Create CSV header",
+        "    if [ $parallel_runs_per_conc -gt 1 ]; then",
+        "        header=\"Minute,Timestamp,Best_Objective,Best_Run\"",
+        "        for ((i=1; i<=parallel_runs_per_conc; i++)); do",
+        "            header=\"$header,Run${i}_Steps,Run${i}_Objective,Run${i}_Status\"",
+        "        done",
+        "    else",
+        "        header=\"Minute,Timestamp,Steps,Objective_Function,Status\"",
+        "    fi",
+        "    ",
+        "    echo \"$header\" > \"$csv_file\"",
+        "    echo \"$csv_file\"",
+        "}",
+        "",
+        # NEW FUNCTION: Log data to CSV
+        "log_to_csv() {",
+        "    local csv_file=$1",
+        "    local conc=$2",
+        "    local parallel_runs_per_conc=$3",
+        "    local elapsed_minutes=$4",
+        "    ",
+        "    local current_time=$(date +'%Y-%m-%d %H:%M:%S')",
+        "    local result=$(get_best_objective_and_run $parallel_runs_per_conc)",
+        "    local best_obj=$(echo $result | cut -d',' -f1)",
+        "    local best_run=$(echo $result | cut -d',' -f2)",
+        "    ",
+        "    if [ $parallel_runs_per_conc -gt 1 ]; then",
+        "        # Parallel runs: log all runs data",
+        "        row_data=\"$elapsed_minutes,$current_time,$best_obj,$best_run\"",
+        "        ",
+        "        for ((i=1; i<=parallel_runs_per_conc; i++)); do",
+        "            local log_file=\"mcsqs$i.log\"",
+        "            local steps=\"0\"",
+        "            local objective=\"N/A\"",
+        "            local status=\"STOPPED\"",
+        "            ",
+        "            if pgrep -f \"mcsqs.*-ip=$i\" > /dev/null; then",
+        "                status=\"RUNNING\"",
+        "            fi",
+        "            ",
+        "            if [ -f \"$log_file\" ]; then",
+        "                steps=$(extract_latest_step \"$log_file\")",
+        "                objective=$(extract_latest_objective \"$log_file\")",
+        "                steps=${steps:-\"0\"}",
+        "                objective=${objective:-\"N/A\"}",
+        "            fi",
+        "            ",
+        "            row_data=\"$row_data,$steps,$objective,$status\"",
+        "        done",
+        "    else",
+        "        # Single run: log single run data",
+        "        local steps=\"0\"",
+        "        local objective=\"N/A\"",
+        "        local status=\"STOPPED\"",
+        "        ",
+        "        if pgrep -f \"mcsqs\" > /dev/null; then",
+        "            status=\"RUNNING\"",
+        "        fi",
+        "        ",
+        "        if [ -f \"mcsqs.log\" ]; then",
+        "            steps=$(extract_latest_step \"mcsqs.log\")",
+        "            objective=$(extract_latest_objective \"mcsqs.log\")",
+        "            steps=${steps:-\"0\"}",
+        "            objective=${objective:-\"N/A\"}",
+        "        fi",
+        "        ",
+        "        row_data=\"$elapsed_minutes,$current_time,$steps,$objective,$status\"",
+        "    fi",
+        "    ",
+        "    echo \"$row_data\" >> \"$csv_file\"",
+        "}",
+        "",
         "convert_bestsqs_to_poscar() {",
         "    local bestsqs_file=$1",
         "    local poscar_file=$2",
@@ -382,12 +463,15 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        final_lattice = np.dot(B, A_scaled)",
         "        ",
         "        atoms = []",
+        "        atoms = []",
         "        for i in range(6, len(lines)):",
         "            line = lines[i].strip()",
         "            if line:",
         "                parts = line.split()",
         "                if len(parts) >= 4:",
         "                    x, y, z, element = float(parts[0]), float(parts[1]), float(parts[2]), parts[3]",
+        "                    if element.lower() in ['vac', \"'vac\", 'vacancy', 'x']:",
+        "                        continue",
         "                    cart_pos = np.dot([x, y, z], A_scaled)",
         "                    atoms.append((element, cart_pos))",
         "        ",
@@ -437,6 +521,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    local conc=$1",
         "    local parallel_runs_per_conc=$2",
         "    local total_time_seconds=$3",
+        "    local csv_file=$4",
         "    local elapsed_seconds=0",
         "    ",
         "    while [ $elapsed_seconds -lt $total_time_seconds ]; do",
@@ -446,6 +531,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        local current_time=$(date +%s)",
         "        local global_elapsed=$((current_time - GLOBAL_START_TIME))",
         "        local conc_elapsed=$((current_time - CONC_START_TIMES[$conc]))",
+        "        local elapsed_minutes=$((conc_elapsed / 60))",
         "        ",
         "        local result=$(get_best_objective_and_run $parallel_runs_per_conc)",
         "        local best_obj=$(echo $result | cut -d',' -f1)",
@@ -453,6 +539,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        ",
         "        CONC_BEST_SCORES[$conc]=\"$best_obj\"",
         "        CONC_BEST_RUNS[$conc]=\"$best_run\"",
+        "        ",
+        "        log_to_csv \"$csv_file\" \"$conc\" \"$parallel_runs_per_conc\" \"$elapsed_minutes\"",
         "        ",
         "        local global_time_str=$(format_elapsed_time $global_elapsed)",
         "        local conc_time_str=$(format_elapsed_time $conc_elapsed)",
@@ -500,6 +588,9 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '    echo "=========================================="',
         '    mkdir -p "$folder"',
         '    cd "$folder"',
+        "    ",
+        "    local csv_file=$(initialize_concentration_csv \"$conc\" \"$parallel_runs_per_conc_current\")",
+        '    echo "📊 CSV logging initialized: $csv_file"',
         "    ",
         "    cat > rndstr.in << EOF",
         f"{original_lattice.a / max_param:.6f} {original_lattice.b / max_param:.6f} {original_lattice.c / max_param:.6f} {original_lattice.alpha:.2f} {original_lattice.beta:.2f} {original_lattice.gamma:.2f}",
@@ -562,7 +653,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '            echo "  ✅ Started single mcsqs run for concentration $conc (PID: $!)"',
         "    fi",
         "    ",
-        "    monitor_progress $conc $parallel_runs_per_conc_current $total_time_seconds_current &",
+        "    monitor_progress $conc $parallel_runs_per_conc_current $total_time_seconds_current \"$csv_file\" &",
         "    local monitor_pid=$!",
         "    ",
         "    for pid in \"${pids[@]}\"; do",
@@ -571,6 +662,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    ",
         "    kill $monitor_pid 2>/dev/null || true",
         "    wait $monitor_pid 2>/dev/null || true",
+        "    ",
+        "    local final_elapsed_minutes=$(echo \"scale=1; $time_per_conc_current\" | bc)",
+        "    log_to_csv \"$csv_file\" \"$conc\" \"$parallel_runs_per_conc_current\" \"$final_elapsed_minutes\"",
+        '    echo "📊 Final optimization data logged to $csv_file"',
         "    ",
         '    echo ""',
         '    echo "=========================================="',
@@ -701,6 +796,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "export -f get_best_objective_and_run",
         "export -f convert_bestsqs_to_poscar",
         "export -f extract_latest_objective",
+        "export -f extract_latest_objective",
+        "export -f extract_latest_step",
+        "export -f initialize_concentration_csv",
+        "export -f log_to_csv",
         "",
         "concentrations=("
     ])
@@ -758,7 +857,7 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
     normalized_structure = structure.copy()
     normalized_structure.lattice = normalized_lattice
     sga = SpacegroupAnalyzer(normalized_structure)
-    wyckoff_symbols = sga.get_symmetry_dataset()['wyckoffs']
+    wyckoff_symbols = sga.get_symmetry_dataset().wyckoffs
 
     active_sites = []
     if use_sublattice_mode and chem_symbols:
@@ -1064,11 +1163,15 @@ def render_atat_sqs_section():
     st.write(f"**Selected structure:** {atat_structure.composition.reduced_formula}")
     st.write(f"**Number of atoms:** {len(atat_structure)}")
 
+    #tabs2, tabs4, tabs1, tabs5 = st.tabs([
+    #    "1️⃣ + 2️⃣ + 3️⃣ Composition & Supercell ",
+    #    "4️⃣ Clusters & Generation",
+    #    "📊 Initial Structure View",
+    #    "📊 Analyze ATAT Outputs"
+    #])
+
     col1, col2 = st.columns([1, 1])
-
     with col1:
-        st.subheader("Structure Preparation")
-
         reduce_to_primitive = st.checkbox(
             "Convert to primitive cell before ATAT input generation",
             value=False,
@@ -1200,6 +1303,46 @@ def render_atat_sqs_section():
     total_supercell_atoms = len(supercell_preview)
 
     if composition_mode == "🔄 Global Composition":
+        css = '''
+        <style>
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:focus {
+            outline: none !important;
+        }
+        </style>
+        '''
+        st.markdown(css, unsafe_allow_html=True)
         common_elements = [
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
             'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
@@ -1209,7 +1352,7 @@ def render_atat_sqs_section():
             'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
             'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn',
             'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
-            'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+            'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og', 'Vac'
         ]
 
         all_elements_list = sorted(common_elements)
@@ -1231,11 +1374,11 @@ def render_atat_sqs_section():
 
         st.subheader("🔵3️⃣ Step 3: Select Elements and Concentrations")
         element_list = st.multiselect(
-            "Select elements for ATAT SQS (use 'X' for vacancy):",
+            "Select elements for ATAT SQS",
             options=all_elements_list,
             default=sorted(list(structure_elements)),
             key="atat_composition_global",
-            help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy, or 'O' and 'X' for oxygen with vacancies"
+            help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy"
         )
 
         if len(element_list) == 0:
@@ -1243,6 +1386,8 @@ def render_atat_sqs_section():
             st.stop()
 
         composition_input = ", ".join(element_list)
+
+
 
         st.info(f"""
         **Global Mode Concentration Constraints:**
@@ -1312,6 +1457,7 @@ def render_atat_sqs_section():
         )
 
     if composition_mode == "🔄 Global Composition":
+
         try:
             achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
                 target_concentrations, supercell_multiplicity)
@@ -1329,9 +1475,9 @@ def render_atat_sqs_section():
                     "Element": element,
                     "Target (%)": f"{target_frac * 100:.3f}",
                     "Achievable (%)": f"{achievable_frac * 100:.3f}",
-                    "Atoms per Site": achievable_count,
+                    #"Atoms per Site": achievable_count,
                     "Total Atoms": total_element_atoms,
-                    "Status": status
+                   # "Status": status
                 })
             conc_df = pd.DataFrame(conc_data)
             st.dataframe(conc_df, use_container_width=True)
@@ -1755,6 +1901,8 @@ def render_atat_sqs_section():
 
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("---")
+
+
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
 
@@ -1782,12 +1930,21 @@ def render_atat_sqs_section():
                 try:
                     bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
 
+                    if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                        results = st.session_state.atat_results
+                    else:
+                        results = {
+                            'structure_name': selected_atat_file,
+                            'supercell_size': f"{nx}×{ny}×{nz}" if 'nx' in locals() else "Unknown",
+                            'total_atoms': len(supercell_preview) if 'supercell_preview' in locals() else 0
+                        }
+
                     is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
 
                     if not is_valid:
                         st.error(f"Invalid bestsqs.out file: {validation_message}")
                         st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
-                        return
+                        #return
 
                     st.success(f"✅ Valid ATAT file detected: {validation_message}")
                     vasp_content, conversion_info = convert_bestsqs_to_vasp(
@@ -1961,19 +2118,27 @@ def render_atat_sqs_section():
                                 st.error(f"Error generating {additional_format}: {str(e)}")
 
                     st.write("**Complete Package:**")
-                    zip_buffer_complete = create_complete_atat_zip(
-                        results, vasp_content, bestsqs_content
-                    )
+                    if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                        zip_buffer_complete = create_complete_atat_zip(
+                            st.session_state.atat_results, vasp_content, bestsqs_content
+                        )
 
-                    st.download_button(
-                        label="📦 Download Complete Package",
-                        data=zip_buffer_complete,
-                        file_name=f"ATAT_SQS_Complete_{results['structure_name'].split('.')[0]}.zip",
-                        mime="application/zip",
-                        type="primary",
-                        key="download_complete_package"
-                    )
-
+                        st.download_button(
+                            label="📦 Download Complete Package",
+                            data=zip_buffer_complete,
+                            file_name=f"ATAT_SQS_Complete_{st.session_state.atat_results['structure_name'].split('.')[0]}.zip",
+                            mime="application/zip",
+                            type="primary",
+                            key="download_complete_package"
+                        )
+                    else:
+                        st.warning(
+                            "⚠️ Complete package not available. Please generate ATAT input files in Step 4 first.")
+                        st.button(
+                            "📦 Complete Package (Unavailable)",
+                            disabled=True,
+                            help="Generate ATAT input files first to enable complete package download"
+                        )
                     lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
 
                     element_counts = {}
@@ -2204,11 +2369,19 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
     final_lattice_vectors = np.dot(B, A_basis)
     cartesian_coords = []
     species = []
+
     for x, y, z, element in atoms_in_A_coords:
+        if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+            continue
+
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         cartesian_coords.append(cart_pos)
         species.append(element)
+
+    if not species:
+        raise ValueError("All atoms in the structure are vacancies - cannot create a valid structure")
+
     sqs_structure = Structure(
         lattice=final_lattice_vectors,
         species=species,
@@ -2231,10 +2404,20 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
     final_lattice_vectors = np.dot(B, A_basis)
 
     atom_data = []
+    vacancy_count = 0
+
     for x, y, z, element in atoms_in_A_coords:
+        if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+            vacancy_count += 1
+            continue
+
         atom_coord_in_A = np.array([x, y, z])
         cart_pos = np.dot(atom_coord_in_A, A_basis)
         atom_data.append({'element': element, 'cart_pos': cart_pos})
+
+    if not atom_data:
+        raise ValueError("All atoms in the structure are vacancies - cannot create a valid POSCAR")
+
     unique_elements = sorted(list(set(atom['element'] for atom in atom_data)))
 
     sorted_atoms_cart = []
@@ -2246,7 +2429,12 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
 
     inv_final_lattice = np.linalg.inv(final_lattice_vectors)
     fractional_coords = [np.dot(pos, inv_final_lattice) for pos in sorted_atoms_cart]
-    poscar_lines = [f"SQS from {structure_name} via ATAT", "1.0"]
+
+    comment = f"SQS from {structure_name} via ATAT"
+    if vacancy_count > 0:
+        comment += f" ({vacancy_count} vacancies removed)"
+
+    poscar_lines = [comment, "1.0"]
     for vec in final_lattice_vectors:
         poscar_lines.append(f"  {vec[0]:15.9f} {vec[1]:15.9f} {vec[2]:15.9f}")
 
@@ -2259,11 +2447,12 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
 
     vasp_content = "\n".join(poscar_lines)
 
-    # --- Create conversion info dictionary for display ---
     supercell_lattice = Lattice(final_lattice_vectors)
     conversion_info = {
         "Source Structure": structure_name,
-        "Total Atoms": len(atoms_in_A_coords),
+        "Total Original Atoms": len(atoms_in_A_coords),
+        "Atoms After Removing Vacancies": len(atom_data),
+        "Vacancies Removed": vacancy_count,
         "Elements & Counts": ", ".join([f"{elem}: {count}" for elem, count in zip(unique_elements, element_counts)]),
         "SQS Lattice (a, b, c)": f"{supercell_lattice.a:.4f} Å, {supercell_lattice.b:.4f} Å, {supercell_lattice.c:.4f} Å",
         "SQS Angles (α, β, γ)": f"{supercell_lattice.alpha:.2f}°, {supercell_lattice.beta:.2f}°, {supercell_lattice.gamma:.2f}°",
@@ -2800,6 +2989,8 @@ def validate_bestsqs_file(content):
                 return False, f"Line {i + 1} contains non-numeric values"
 
         atom_count = 0
+        vacancy_count = 0
+
         for i in range(6, len(lines)):
             line = lines[i].strip()
             if line:
@@ -2808,14 +2999,23 @@ def validate_bestsqs_file(content):
                     return False, f"Line {i + 1} should contain x y z element"
                 try:
                     float(parts[0]), float(parts[1]), float(parts[2])
-                    atom_count += 1
+                    element = parts[3]
+                    if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+                        vacancy_count += 1
+                    else:
+                        atom_count += 1
                 except ValueError:
                     return False, f"Line {i + 1} contains invalid coordinates"
 
-        if atom_count == 0:
+        total_sites = atom_count + vacancy_count
+        if total_sites == 0:
             return False, "No valid atomic positions found"
 
-        return True, f"Valid ATAT file with {atom_count} atoms"
+        message = f"Valid ATAT file with {atom_count} atoms"
+        if vacancy_count > 0:
+            message += f" and {vacancy_count} vacancies"
+
+        return True, message
 
     except Exception as e:
         return False, f"Error parsing file: {str(e)}"
@@ -3298,10 +3498,10 @@ def integrate_atat_option():
     )
 
     st.title("🛠️ ATAT SQS Input File Generator")
-    st.markdown("**Generate input files for ATAT mcsqs to create Special Quasi-Random Structures**")
+    st.markdown("**Generate input files for ATAT mcsqs to create Special Quasirandom Structures**")
     st.info("""
     This tool generates `rndstr.in` and `sqscell.out` files that can be used with the ATAT (Alloy Theoretic Automated Toolkit) 
-    to create Special Quasi-Random Structures. Use the same composition settings as ICET, but generate files for external ATAT usage.
+    to create Special Quasirandom Structures. Use the same composition settings as ICET, but generate files for external ATAT usage.
 
     **Key Features:**
     - ✅ **Valid Concentrations**: Each site shows concentrations that represent integer atom counts
@@ -3313,7 +3513,7 @@ def integrate_atat_option():
     render_atat_sqs_section()
 
 
-def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity):
+def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,stable_key="default"):
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
@@ -3324,10 +3524,8 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
     st.info(f"""
     **Sublattice Mode - Wyckoff Position Control:**
-    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site
-    - Only unique Wyckoff positions are shown below
-    - Settings automatically apply to all equivalent sites
-    - Concentration constraints are per Wyckoff position
+    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site. 
+    Only unique Wyckoff positions are shown below. Settings automatically apply to all equivalent sites. Concentration constraints are per Wyckoff position.
     """)
 
     common_elements = [
@@ -3339,7 +3537,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
         'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn',
         'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
-        'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+        'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og', 'Vac'
     ]
 
     target_concentrations = {}
@@ -3386,15 +3584,41 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         tabs = st.tabs(tab_names)
         css = '''
         <style>
-            .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-                font-size: 1.1rem !important;
-                color: #1e3a8a !important;
-                font-weight: bold !important;
-            }
-
-            .stTabs [data-baseweb="tab-list"] {
-                gap: 25px !important;
-            }
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:focus {
+            outline: none !important;
+        }
         </style>
         '''
 
@@ -3416,11 +3640,9 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                 # Show constraint information
                 st.info(f"**Concentration constraints for this Wyckoff position:**\n"
                         f"- Total atoms in supercell: {atoms_per_wyckoff_in_supercell}\n"
-                        f"- Minimum concentration step: {min_concentration_step:.6f}\n"
-                        f"- Valid concentrations: multiples of {min_concentration_step:.6f}")
-
+                        f"- Minimum concentration step: {min_concentration_step:.6f}\n")
                 col_elem, col_conc = st.columns([1, 2])
-
+                element_key = f"{stable_key}_sublattice_{sublattice_letter}_elements_v2"
                 with col_elem:
                     current_elements = [element]
 
@@ -3428,7 +3650,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                         f"Elements for sublattice {sublattice_letter}:",
                         options=common_elements,
                         default=current_elements,
-                        key=f"sublattice_{sublattice_letter}_elements",
+                        key=element_key,
                         help=f"Select elements that can occupy {wyckoff_letter} positions"
                     )
                     if len(selected_elements) < 1:
@@ -3442,6 +3664,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                     remaining = 1.0
 
                     for i, elem in enumerate(selected_elements[:-1]):
+                        slider_key = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_frac_v2"
                         frac_val = st.slider(
                             f"**{elem} fraction:**",
                             min_value=0.0,
@@ -3451,7 +3674,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                                 remaining),
                             step=min_concentration_step,
                             format="%.6f",
-                            key=f"sublattice_{sublattice_letter}_{elem}_frac"
+                            key=slider_key
                         )
                         sublattice_concentrations[elem] = frac_val
                         remaining -= frac_val
@@ -4102,15 +4325,15 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         improvement_rate = 0
 
     result = {
-        "Convergence Status": convergence_status,
-        "Final Trend": final_trend,
+        #"Convergence Status": convergence_status,
+        #"Final Trend": final_trend,
         "Stability": stability,
         "Recent Std Dev": f"{final_std:.6f}",
         "Total Improvement": f"{total_improvement:.6f}",
         "Recent Improvement": f"{recent_improvement:.6f}",
         "Improvement Rate": f"{improvement_rate:.6f} per minute",
         "Total Runtime": f"{minutes[-1] - minutes[0]:.0f} minutes" if len(minutes) > 1 else "N/A",
-        "Recommendation": recommendation
+        #"Recommendation": recommendation
     }
 
     if additional_data and 'Step_Count' in additional_data:
@@ -4319,17 +4542,17 @@ def render_extended_optimization_analysis_tab():
                     for key, value in convergence_info.items():
                         st.write(f"- **{key}:** {value}")
 
-                with col_conv_info2:
+                #with col_conv_info2:
 
-                    if convergence_info['Convergence Status'] == "✅ Converged":
-                        st.success("🎯 **Optimization Status: CONVERGED**")
-                        st.info("The objective function has stabilized. This SQS is ready for use.")
-                    elif convergence_info['Convergence Status'] == "⚠️ Improving":
-                        st.warning("📈 **Optimization Status: STILL IMPROVING**")
-                        st.info("Consider running ATAT longer for better results.")
-                    else:
-                        st.warning("🔄 **Optimization Status: FLUCTUATING**")
-                        st.info("The optimization may need more time or different parameters.")
+                    #if convergence_info['Convergence Status'] == "✅ Converged":
+                    #    st.success("🎯 **Optimization Status: CONVERGED**")
+                    #    st.info("The objective function has stabilized. This SQS is ready for use.")
+                   # if convergence_info['Convergence Status'] == "⚠️ Improving":
+                   #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
+                   #     st.info("Consider running ATAT longer for better results.")
+                   # else:
+                   #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
+                   #     st.info("The optimization may need more time or different parameters.")
 
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
