@@ -134,10 +134,42 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             st.write(f"**Available {sweep_element} concentrations:** {len(possible_concentrations)}")
             st.write("**Valid concentrations:** " + ", ".join([f"{c:.3f}" for c in possible_concentrations]))
 
+        st.write("**Concentration Sampling:**")
+        col_sample1, col_sample2 = st.columns(2)
+
+        with col_sample1:
+            sample_every_nth = st.number_input(
+                "Sample every nth concentration:",
+                min_value=1,
+                max_value=len(possible_concentrations),
+                value=1,
+                step=1,
+                help="Select every nth concentration (1 = all, 2 = every other, 3 = every third, etc.)",
+                key="sample_every_nth"
+            )
+
+        with col_sample2:
+            start_from = st.number_input(
+                "Start from index:",
+                min_value=0,
+                max_value=len(possible_concentrations) - 1,
+                value=0,
+                step=1,
+                help="Starting index for sampling (0 = first concentration)",
+                key="start_from_index"
+            )
+
+        sampled_indices = list(range(start_from, len(possible_concentrations), sample_every_nth))
+        default_concentrations = [possible_concentrations[i] for i in sampled_indices]
+
+        if sample_every_nth > 1 or start_from > 0:
+            st.info(
+                f"📊 Sampling: {len(default_concentrations)} concentrations selected (every {sample_every_nth} starting from index {start_from})")
+
         selected_concentrations = st.multiselect(
             f"Select {sweep_element} concentrations for SQS generation:",
             options=possible_concentrations,
-            default=possible_concentrations,
+            default=default_concentrations,
             help="Choose from achievable concentrations" + (
                 " based on sublattice size" if selected_sublattice else " (multiples of 1/supercell_multiplicity)")
         )
