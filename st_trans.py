@@ -1462,7 +1462,7 @@ def render_sqs_module():
 
                                         # alphabet sorting
                                         alphabet_form = sort_formula_alphabetically(formula_input)
-                                        print(alphabet_form)
+                                        #print(alphabet_form)
                                         params = {'format': 'json', 'detail': '1', 'formula': alphabet_form}
                                         cod_entries = get_cod_entries(params)
 
