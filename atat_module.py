@@ -4081,7 +4081,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                         if occ > 1e-6:
                             conc_parts.append(f"{sp.symbol}={occ:.6f}")
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
-            print(lines)
     else:
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
