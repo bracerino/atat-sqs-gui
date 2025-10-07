@@ -134,10 +134,42 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             st.write(f"**Available {sweep_element} concentrations:** {len(possible_concentrations)}")
             st.write("**Valid concentrations:** " + ", ".join([f"{c:.3f}" for c in possible_concentrations]))
 
+        st.write("**Concentration Sampling:**")
+        col_sample1, col_sample2 = st.columns(2)
+
+        with col_sample1:
+            sample_every_nth = st.number_input(
+                "Sample every nth concentration:",
+                min_value=1,
+                max_value=len(possible_concentrations),
+                value=1,
+                step=1,
+                help="Select every nth concentration (1 = all, 2 = every other, 3 = every third, etc.)",
+                key="sample_every_nth"
+            )
+
+        with col_sample2:
+            start_from = st.number_input(
+                "Start from index:",
+                min_value=0,
+                max_value=len(possible_concentrations) - 1,
+                value=0,
+                step=1,
+                help="Starting index for sampling (0 = first concentration)",
+                key="start_from_index"
+            )
+
+        sampled_indices = list(range(start_from, len(possible_concentrations), sample_every_nth))
+        default_concentrations = [possible_concentrations[i] for i in sampled_indices]
+
+        if sample_every_nth > 1 or start_from > 0:
+            st.info(
+                f"📊 Sampling: {len(default_concentrations)} concentrations selected (every {sample_every_nth} starting from index {start_from})")
+
         selected_concentrations = st.multiselect(
             f"Select {sweep_element} concentrations for SQS generation:",
             options=possible_concentrations,
-            default=possible_concentrations,
+            default=default_concentrations,
             help="Choose from achievable concentrations" + (
                 " based on sublattice size" if selected_sublattice else " (multiples of 1/supercell_multiplicity)")
         )
@@ -325,6 +357,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '    grep "Objective_function=" "$1" | tail -1 | sed "s/.*= *//" 2>/dev/null || echo ""',
         "}",
         "",
+        "extract_latest_step() {",
+        '    grep -c "Objective_function=" "$1" 2>/dev/null || echo "0"',
+        "}",
+        "",
         "get_best_objective_and_run() {",
         "    local best_obj=\"N/A\"",
         "    local best_run=\"N/A\"",
@@ -353,6 +389,83 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    fi",
         "    ",
         "    echo \"$best_obj,$best_run\"",
+        "}",
+        "",
+        "initialize_concentration_csv() {",
+        "    local conc=$1",
+        "    local parallel_runs_per_conc=$2",
+        "    local csv_file=\"optimization_data_${conc}.csv\"",
+        "    ",
+        "    # Create CSV header",
+        "    if [ $parallel_runs_per_conc -gt 1 ]; then",
+        "        header=\"Minute,Timestamp,Best_Objective,Best_Run\"",
+        "        for ((i=1; i<=parallel_runs_per_conc; i++)); do",
+        "            header=\"$header,Run${i}_Steps,Run${i}_Objective,Run${i}_Status\"",
+        "        done",
+        "    else",
+        "        header=\"Minute,Timestamp,Steps,Objective_Function,Status\"",
+        "    fi",
+        "    ",
+        "    echo \"$header\" > \"$csv_file\"",
+        "    echo \"$csv_file\"",
+        "}",
+        "",
+        # NEW FUNCTION: Log data to CSV
+        "log_to_csv() {",
+        "    local csv_file=$1",
+        "    local conc=$2",
+        "    local parallel_runs_per_conc=$3",
+        "    local elapsed_minutes=$4",
+        "    ",
+        "    local current_time=$(date +'%Y-%m-%d %H:%M:%S')",
+        "    local result=$(get_best_objective_and_run $parallel_runs_per_conc)",
+        "    local best_obj=$(echo $result | cut -d',' -f1)",
+        "    local best_run=$(echo $result | cut -d',' -f2)",
+        "    ",
+        "    if [ $parallel_runs_per_conc -gt 1 ]; then",
+        "        # Parallel runs: log all runs data",
+        "        row_data=\"$elapsed_minutes,$current_time,$best_obj,$best_run\"",
+        "        ",
+        "        for ((i=1; i<=parallel_runs_per_conc; i++)); do",
+        "            local log_file=\"mcsqs$i.log\"",
+        "            local steps=\"0\"",
+        "            local objective=\"N/A\"",
+        "            local status=\"STOPPED\"",
+        "            ",
+        "            if pgrep -f \"mcsqs.*-ip=$i\" > /dev/null; then",
+        "                status=\"RUNNING\"",
+        "            fi",
+        "            ",
+        "            if [ -f \"$log_file\" ]; then",
+        "                steps=$(extract_latest_step \"$log_file\")",
+        "                objective=$(extract_latest_objective \"$log_file\")",
+        "                steps=${steps:-\"0\"}",
+        "                objective=${objective:-\"N/A\"}",
+        "            fi",
+        "            ",
+        "            row_data=\"$row_data,$steps,$objective,$status\"",
+        "        done",
+        "    else",
+        "        # Single run: log single run data",
+        "        local steps=\"0\"",
+        "        local objective=\"N/A\"",
+        "        local status=\"STOPPED\"",
+        "        ",
+        "        if pgrep -f \"mcsqs\" > /dev/null; then",
+        "            status=\"RUNNING\"",
+        "        fi",
+        "        ",
+        "        if [ -f \"mcsqs.log\" ]; then",
+        "            steps=$(extract_latest_step \"mcsqs.log\")",
+        "            objective=$(extract_latest_objective \"mcsqs.log\")",
+        "            steps=${steps:-\"0\"}",
+        "            objective=${objective:-\"N/A\"}",
+        "        fi",
+        "        ",
+        "        row_data=\"$elapsed_minutes,$current_time,$steps,$objective,$status\"",
+        "    fi",
+        "    ",
+        "    echo \"$row_data\" >> \"$csv_file\"",
         "}",
         "",
         "convert_bestsqs_to_poscar() {",
@@ -440,6 +553,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    local conc=$1",
         "    local parallel_runs_per_conc=$2",
         "    local total_time_seconds=$3",
+        "    local csv_file=$4",
         "    local elapsed_seconds=0",
         "    ",
         "    while [ $elapsed_seconds -lt $total_time_seconds ]; do",
@@ -449,6 +563,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        local current_time=$(date +%s)",
         "        local global_elapsed=$((current_time - GLOBAL_START_TIME))",
         "        local conc_elapsed=$((current_time - CONC_START_TIMES[$conc]))",
+        "        local elapsed_minutes=$((conc_elapsed / 60))",
         "        ",
         "        local result=$(get_best_objective_and_run $parallel_runs_per_conc)",
         "        local best_obj=$(echo $result | cut -d',' -f1)",
@@ -456,6 +571,8 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        ",
         "        CONC_BEST_SCORES[$conc]=\"$best_obj\"",
         "        CONC_BEST_RUNS[$conc]=\"$best_run\"",
+        "        ",
+        "        log_to_csv \"$csv_file\" \"$conc\" \"$parallel_runs_per_conc\" \"$elapsed_minutes\"",
         "        ",
         "        local global_time_str=$(format_elapsed_time $global_elapsed)",
         "        local conc_time_str=$(format_elapsed_time $conc_elapsed)",
@@ -503,6 +620,9 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '    echo "=========================================="',
         '    mkdir -p "$folder"',
         '    cd "$folder"',
+        "    ",
+        "    local csv_file=$(initialize_concentration_csv \"$conc\" \"$parallel_runs_per_conc_current\")",
+        '    echo "📊 CSV logging initialized: $csv_file"',
         "    ",
         "    cat > rndstr.in << EOF",
         f"{original_lattice.a / max_param:.6f} {original_lattice.b / max_param:.6f} {original_lattice.c / max_param:.6f} {original_lattice.alpha:.2f} {original_lattice.beta:.2f} {original_lattice.gamma:.2f}",
@@ -565,7 +685,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         '            echo "  ✅ Started single mcsqs run for concentration $conc (PID: $!)"',
         "    fi",
         "    ",
-        "    monitor_progress $conc $parallel_runs_per_conc_current $total_time_seconds_current &",
+        "    monitor_progress $conc $parallel_runs_per_conc_current $total_time_seconds_current \"$csv_file\" &",
         "    local monitor_pid=$!",
         "    ",
         "    for pid in \"${pids[@]}\"; do",
@@ -574,6 +694,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "    ",
         "    kill $monitor_pid 2>/dev/null || true",
         "    wait $monitor_pid 2>/dev/null || true",
+        "    ",
+        "    local final_elapsed_minutes=$(echo \"scale=1; $time_per_conc_current\" | bc)",
+        "    log_to_csv \"$csv_file\" \"$conc\" \"$parallel_runs_per_conc_current\" \"$final_elapsed_minutes\"",
+        '    echo "📊 Final optimization data logged to $csv_file"',
         "    ",
         '    echo ""',
         '    echo "=========================================="',
@@ -704,6 +828,10 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "export -f get_best_objective_and_run",
         "export -f convert_bestsqs_to_poscar",
         "export -f extract_latest_objective",
+        "export -f extract_latest_objective",
+        "export -f extract_latest_step",
+        "export -f initialize_concentration_csv",
+        "export -f log_to_csv",
         "",
         "concentrations=("
     ])
@@ -1209,15 +1337,41 @@ def render_atat_sqs_section():
     if composition_mode == "🔄 Global Composition":
         css = '''
         <style>
-            .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-                font-size: 1.1rem !important;
-                color: #1e3a8a !important;
-                font-weight: bold !important;
-            }
-
-            .stTabs [data-baseweb="tab-list"] {
-                gap: 25px !important;
-            }
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:focus {
+            outline: none !important;
+        }
         </style>
         '''
         st.markdown(css, unsafe_allow_html=True)
@@ -3462,15 +3616,41 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         tabs = st.tabs(tab_names)
         css = '''
         <style>
-            .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-                font-size: 1.1rem !important;
-                color: #1e3a8a !important;
-                font-weight: bold !important;
-            }
-
-            .stTabs [data-baseweb="tab-list"] {
-                gap: 25px !important;
-            }
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] button:focus {
+            outline: none !important;
+        }
         </style>
         '''
 
@@ -3901,7 +4081,6 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                         if occ > 1e-6:
                             conc_parts.append(f"{sp.symbol}={occ:.6f}")
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
-            print(lines)
     else:
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
@@ -4177,15 +4356,15 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         improvement_rate = 0
 
     result = {
-        "Convergence Status": convergence_status,
-        "Final Trend": final_trend,
+        #"Convergence Status": convergence_status,
+        #"Final Trend": final_trend,
         "Stability": stability,
         "Recent Std Dev": f"{final_std:.6f}",
         "Total Improvement": f"{total_improvement:.6f}",
         "Recent Improvement": f"{recent_improvement:.6f}",
         "Improvement Rate": f"{improvement_rate:.6f} per minute",
         "Total Runtime": f"{minutes[-1] - minutes[0]:.0f} minutes" if len(minutes) > 1 else "N/A",
-        "Recommendation": recommendation
+        #"Recommendation": recommendation
     }
 
     if additional_data and 'Step_Count' in additional_data:
@@ -4394,17 +4573,17 @@ def render_extended_optimization_analysis_tab():
                     for key, value in convergence_info.items():
                         st.write(f"- **{key}:** {value}")
 
-                with col_conv_info2:
+                #with col_conv_info2:
 
-                    if convergence_info['Convergence Status'] == "✅ Converged":
-                        st.success("🎯 **Optimization Status: CONVERGED**")
-                        st.info("The objective function has stabilized. This SQS is ready for use.")
-                    elif convergence_info['Convergence Status'] == "⚠️ Improving":
-                        st.warning("📈 **Optimization Status: STILL IMPROVING**")
-                        st.info("Consider running ATAT longer for better results.")
-                    else:
-                        st.warning("🔄 **Optimization Status: FLUCTUATING**")
-                        st.info("The optimization may need more time or different parameters.")
+                    #if convergence_info['Convergence Status'] == "✅ Converged":
+                    #    st.success("🎯 **Optimization Status: CONVERGED**")
+                    #    st.info("The objective function has stabilized. This SQS is ready for use.")
+                   # if convergence_info['Convergence Status'] == "⚠️ Improving":
+                   #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
+                   #     st.info("Consider running ATAT longer for better results.")
+                   # else:
+                   #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
+                   #     st.info("The optimization may need more time or different parameters.")
 
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
