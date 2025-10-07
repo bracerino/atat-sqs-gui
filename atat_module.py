@@ -8,8 +8,6 @@ from helpers import *
 from parallel_analysis import *
 
 
-
-
 def render_concentration_sweep_section(chemical_symbols, target_concentrations, transformation_matrix,
                                        primitive_structure, cutoffs, total_atoms_in_supercell):
     if not target_concentrations:
@@ -91,7 +89,6 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         return
 
     supercell_factor = calculate_supercell_factor(transformation_matrix)
-
 
     if selected_sublattice:
         sublattice_sites = 0
@@ -255,7 +252,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             cutoffs,
             total_sites_for_sublattice,
             progress_update_interval,
-            mcsqs_mode,total_atoms_in_supercell
+            mcsqs_mode, total_atoms_in_supercell
         )
 
         st.download_button(
@@ -266,15 +263,18 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             type="primary"
         )
 
-        st.success("Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
+        st.success(
+            "Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
 
         with st.expander("Script Preview", expanded=False):
             st.code(script_content, language="bash")
 
+
 def generate_concentration_sweep_script(sweep_element, complement_element, selected_concentrations,
                                         time_per_conc, max_parallel, parallel_runs_per_conc,
                                         target_concentrations, chemical_symbols, transformation_matrix,
-                                        primitive_structure, cutoffs, total_sites, progress_update_interval, mcsqs_mode, total_atoms_in_supercell):
+                                        primitive_structure, cutoffs, total_sites, progress_update_interval, mcsqs_mode,
+                                        total_atoms_in_supercell):
     corrdump_cmd = "corrdump -l=rndstr.in -ro -noe -nop -clus"
     if len(cutoffs) >= 1 and cutoffs[0] is not None:
         corrdump_cmd += f" -2={cutoffs[0]}"
@@ -1195,12 +1195,12 @@ def render_atat_sqs_section():
     st.write(f"**Selected structure:** {atat_structure.composition.reduced_formula}")
     st.write(f"**Number of atoms:** {len(atat_structure)}")
 
-    #tabs2, tabs4, tabs1, tabs5 = st.tabs([
+    # tabs2, tabs4, tabs1, tabs5 = st.tabs([
     #    "1️⃣ + 2️⃣ + 3️⃣ Composition & Supercell ",
     #    "4️⃣ Clusters & Generation",
     #    "📊 Initial Structure View",
     #    "📊 Analyze ATAT Outputs"
-    #])
+    # ])
 
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -1343,11 +1343,11 @@ def render_atat_sqs_section():
             font-weight: 600 !important;
             margin: 0 !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] {
             gap: 20px !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button {
             background-color: #f0f4ff !important;
             border-radius: 12px !important;
@@ -1356,19 +1356,19 @@ def render_atat_sqs_section():
             border: none !important;
             color: #1e3a8a !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button:hover {
             background-color: #dbe5ff !important;
             cursor: pointer;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
             background-color: #e0e7ff !important;
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button:focus {
             outline: none !important;
         }
@@ -1418,8 +1418,6 @@ def render_atat_sqs_section():
             st.stop()
 
         composition_input = ", ".join(element_list)
-
-
 
         st.info(f"""
         **Global Mode Concentration Constraints:**
@@ -1507,9 +1505,9 @@ def render_atat_sqs_section():
                     "Element": element,
                     "Target (%)": f"{target_frac * 100:.3f}",
                     "Achievable (%)": f"{achievable_frac * 100:.3f}",
-                    #"Atoms per Site": achievable_count,
+                    # "Atoms per Site": achievable_count,
                     "Total Atoms": total_element_atoms,
-                   # "Status": status
+                    # "Status": status
                 })
             conc_df = pd.DataFrame(conc_data)
             st.dataframe(conc_df, use_container_width=True)
@@ -1825,7 +1823,7 @@ def render_atat_sqs_section():
             target_concentrations,
             transformation_matrix,
             working_structure,
-            cutoffs,len(supercell_preview)
+            cutoffs, len(supercell_preview)
         )
 
         st.subheader("📁 Generated Files")
@@ -1934,7 +1932,6 @@ def render_atat_sqs_section():
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("---")
 
-
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
 
@@ -1976,7 +1973,7 @@ def render_atat_sqs_section():
                     if not is_valid:
                         st.error(f"Invalid bestsqs.out file: {validation_message}")
                         st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
-                        #return
+                        # return
 
                     st.success(f"✅ Valid ATAT file detected: {validation_message}")
                     vasp_content, conversion_info = convert_bestsqs_to_vasp(
@@ -2024,18 +2021,34 @@ def render_atat_sqs_section():
                         use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
                                                              value=False, key="poscar_sd")
 
-                        # Generate VASP content with options
                         try:
-                            grouped_data = sqs_pymatgen_structure.copy() if 'sqs_pymatgen_structure' in locals() else None
-                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                            from pymatgen.core import Element
 
-                            # Add atoms to structure (simplified version)
+                            # Sort species by atomic weight
+                            unique_species = []
                             for site in sqs_pymatgen_structure:
-                                new_struct.append(
-                                    species=site.species,
-                                    coords=site.frac_coords,
-                                    coords_are_cartesian=False,
-                                )
+                                if site.specie not in unique_species:
+                                    unique_species.append(site.specie)
+
+                            species_weights = {}
+                            for species in unique_species:
+                                try:
+                                    species_weights[species] = Element(species.symbol).atomic_mass
+                                except:
+                                    species_weights[species] = 999.0
+
+                            sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
+
+
+                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                            for species in sorted_species:
+                                for site in sqs_pymatgen_structure:
+                                    if site.specie == species:
+                                        new_struct.append(
+                                            species=site.species,
+                                            coords=site.frac_coords,
+                                            coords_are_cartesian=False,
+                                        )
 
                             out = StringIO()
                             current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
@@ -2044,7 +2057,7 @@ def render_atat_sqs_section():
                                 constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
                                 current_ase_structure.set_constraint(constraint)
 
-                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=True)
+                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=False)
                             vasp_content_with_options = out.getvalue()
 
                             st.download_button(
@@ -2425,7 +2438,7 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
 
 
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
-    from pymatgen.core import Lattice
+    from pymatgen.core import Lattice, Element
     import numpy as np
 
     A_basis = original_structure.lattice.matrix
@@ -2450,7 +2463,18 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
     if not atom_data:
         raise ValueError("All atoms in the structure are vacancies - cannot create a valid POSCAR")
 
-    unique_elements = sorted(list(set(atom['element'] for atom in atom_data)))
+    from pymatgen.core import Element
+
+    unique_elements_set = set(atom['element'] for atom in atom_data)
+
+    element_weights = {}
+    for elem in unique_elements_set:
+        try:
+            element_weights[elem] = Element(elem).atomic_mass
+        except:
+            element_weights[elem] = 999.0
+
+    unique_elements = sorted(list(unique_elements_set), key=lambda x: element_weights[x])
 
     sorted_atoms_cart = []
     element_counts = []
@@ -2488,6 +2512,7 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
         "Elements & Counts": ", ".join([f"{elem}: {count}" for elem, count in zip(unique_elements, element_counts)]),
         "SQS Lattice (a, b, c)": f"{supercell_lattice.a:.4f} Å, {supercell_lattice.b:.4f} Å, {supercell_lattice.c:.4f} Å",
         "SQS Angles (α, β, γ)": f"{supercell_lattice.alpha:.2f}°, {supercell_lattice.beta:.2f}°, {supercell_lattice.gamma:.2f}°",
+        "Element Order": f"Sorted by atomic weight: {' < '.join([f'{elem}({element_weights[elem]:.2f})' for elem in unique_elements])}"
     }
 
     return vasp_content, conversion_info
@@ -2675,7 +2700,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format2:
             st.markdown("**CIF Options:**")
             include_cif = st.checkbox(
-                "Include CIF", value=True, key="batch_include_cif")
+                "Include CIF", value=False, key="batch_include_cif")
             if include_cif:
                 cif_symprec = st.number_input("Symmetry precision", value=0.1, min_value=0.001, max_value=1.0,
                                               step=0.001, format="%.3f", key="batch_cif_symprec")
@@ -2683,7 +2708,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format3:
             st.markdown("**LAMMPS Options:**")
             include_lammps = st.checkbox(
-                "Include LAMMPS", value=True, key="batch_include_lammps")
+                "Include LAMMPS", value=False, key="batch_include_lammps")
             if include_lammps:
                 lammps_atom_style = st.selectbox(
                     "Atom style", ["atomic", "charge", "full"], index=0, key="batch_lammps_style")
@@ -2697,7 +2722,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format4:
             st.markdown("**XYZ Options:**")
             include_xyz = st.checkbox(
-                "Include XYZ", value=True, key="batch_include_xyz")
+                "Include XYZ", value=False, key="batch_include_xyz")
             if include_xyz:
                 xyz_extended = st.checkbox(
                     "Extended XYZ format", value=True, key="batch_xyz_extended")
@@ -2796,13 +2821,32 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
 
                 if include_vasp:
                     try:
-                        new_struct = Structure(sqs_structure.lattice, [], [])
+                        from pymatgen.core import Element
+
+                        # Sort species by atomic weight
+                        unique_species = []
                         for site in sqs_structure:
-                            new_struct.append(
-                                species=site.species,
-                                coords=site.frac_coords,
-                                coords_are_cartesian=False,
-                            )
+                            if site.specie not in unique_species:
+                                unique_species.append(site.specie)
+
+                        species_weights = {}
+                        for species in unique_species:
+                            try:
+                                species_weights[species] = Element(species.symbol).atomic_mass
+                            except:
+                                species_weights[species] = 999.0
+
+                        sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
+
+                        new_struct = Structure(sqs_structure.lattice, [], [])
+                        for species in sorted_species:
+                            for site in sqs_structure:
+                                if site.specie == species:
+                                    new_struct.append(
+                                        species=site.species,
+                                        coords=site.frac_coords,
+                                        coords_are_cartesian=False,
+                                    )
 
                         ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
 
@@ -2812,7 +2856,7 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
 
                         out = StringIO()
                         write(out, ase_structure, format="vasp",
-                              direct=vasp_fractional, sort=True)
+                              direct=vasp_fractional, sort=False)
                         vasp_content = out.getvalue()
 
                         zip_file.writestr(
@@ -3545,7 +3589,8 @@ def integrate_atat_option():
     render_atat_sqs_section()
 
 
-def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,stable_key="default"):
+def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,
+                                          stable_key="default"):
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
@@ -3622,11 +3667,11 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             font-weight: 600 !important;
             margin: 0 !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] {
             gap: 20px !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button {
             background-color: #f0f4ff !important;
             border-radius: 12px !important;
@@ -3635,19 +3680,19 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             border: none !important;
             color: #1e3a8a !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button:hover {
             background-color: #dbe5ff !important;
             cursor: pointer;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
             background-color: #e0e7ff !important;
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
         }
-        
+
         .stTabs [data-baseweb="tab-list"] button:focus {
             outline: none !important;
         }
@@ -4356,15 +4401,15 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         improvement_rate = 0
 
     result = {
-        #"Convergence Status": convergence_status,
-        #"Final Trend": final_trend,
+        # "Convergence Status": convergence_status,
+        # "Final Trend": final_trend,
         "Stability": stability,
         "Recent Std Dev": f"{final_std:.6f}",
         "Total Improvement": f"{total_improvement:.6f}",
         "Recent Improvement": f"{recent_improvement:.6f}",
         "Improvement Rate": f"{improvement_rate:.6f} per minute",
         "Total Runtime": f"{minutes[-1] - minutes[0]:.0f} minutes" if len(minutes) > 1 else "N/A",
-        #"Recommendation": recommendation
+        # "Recommendation": recommendation
     }
 
     if additional_data and 'Step_Count' in additional_data:
@@ -4573,17 +4618,17 @@ def render_extended_optimization_analysis_tab():
                     for key, value in convergence_info.items():
                         st.write(f"- **{key}:** {value}")
 
-                #with col_conv_info2:
+                # with col_conv_info2:
 
-                    #if convergence_info['Convergence Status'] == "✅ Converged":
-                    #    st.success("🎯 **Optimization Status: CONVERGED**")
-                    #    st.info("The objective function has stabilized. This SQS is ready for use.")
-                   # if convergence_info['Convergence Status'] == "⚠️ Improving":
-                   #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
-                   #     st.info("Consider running ATAT longer for better results.")
-                   # else:
-                   #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
-                   #     st.info("The optimization may need more time or different parameters.")
+                # if convergence_info['Convergence Status'] == "✅ Converged":
+                #    st.success("🎯 **Optimization Status: CONVERGED**")
+                #    st.info("The objective function has stabilized. This SQS is ready for use.")
+                # if convergence_info['Convergence Status'] == "⚠️ Improving":
+                #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
+                #     st.info("Consider running ATAT longer for better results.")
+                # else:
+                #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
+                #     st.info("The optimization may need more time or different parameters.")
 
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
