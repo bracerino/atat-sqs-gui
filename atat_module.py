@@ -338,11 +338,14 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "",
         "cleanup() {",
         '    echo "🧹 Cleaning up background processes..."',
-        "    jobs -p | xargs -r kill 2>/dev/null || true",
-        "    wait",
+        '    pkill -9 -f "mcsqs" 2>/dev/null || true',
+        '    pkill -9 -f "monitor_progress" 2>/dev/null || true',
+        '    jobs -p | xargs -r kill -9 2>/dev/null || true',
+        "    wait 2>/dev/null || true",
+        '    echo "✅ Cleanup complete."',
         "}",
         "",
-        "trap cleanup EXIT INT TERM",
+        "trap cleanup EXIT INT TERM SIGINT SIGTERM",
         "",
         "format_elapsed_time() {",
         "    local elapsed=$1",
@@ -857,6 +860,9 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "done",
         "",
         "wait",
+        "",
+        'pkill -9 -f "mcsqs" 2>/dev/null || true',
+        'sleep 2',
         "",
         'echo ""',
         'echo "========================================"',
@@ -3660,44 +3666,44 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
         tabs = st.tabs(tab_names)
         css = '''
-        <style>
-        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-            font-size: 1.15rem !important;
-            color: #1e3a8a !important;
-            font-weight: 600 !important;
-            margin: 0 !important;
-        }
+                <style>
+                .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+                    font-size: 1.15rem !important;
+                    color: #065f46 !important;
+                    font-weight: 600 !important;
+                    margin: 0 !important;
+                }
 
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 20px !important;
-        }
+                .stTabs [data-baseweb="tab-list"] {
+                    gap: 20px !important;
+                }
 
-        .stTabs [data-baseweb="tab-list"] button {
-            background-color: #f0f4ff !important;
-            border-radius: 12px !important;
-            padding: 8px 16px !important;
-            transition: all 0.3s ease !important;
-            border: none !important;
-            color: #1e3a8a !important;
-        }
+                .stTabs [data-baseweb="tab-list"] button {
+                    background-color: #ecfdf5 !important;
+                    border-radius: 12px !important;
+                    padding: 8px 16px !important;
+                    transition: all 0.3s ease !important;
+                    border: none !important;
+                    color: #065f46 !important;
+                }
 
-        .stTabs [data-baseweb="tab-list"] button:hover {
-            background-color: #dbe5ff !important;
-            cursor: pointer;
-        }
+                .stTabs [data-baseweb="tab-list"] button:hover {
+                    background-color: #d1fae5 !important;
+                    cursor: pointer;
+                }
 
-        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-            background-color: #e0e7ff !important;
-            color: #1e3a8a !important;
-            font-weight: 700 !important;
-            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
-        }
+                .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+                    background-color: #1f2937 !important;
+                    color: #10b981 !important;
+                    font-weight: 700 !important;
+                    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3) !important;
+                }
 
-        .stTabs [data-baseweb="tab-list"] button:focus {
-            outline: none !important;
-        }
-        </style>
-        '''
+                .stTabs [data-baseweb="tab-list"] button:focus {
+                    outline: none !important;
+                }
+                </style>
+                '''
 
         st.markdown(css, unsafe_allow_html=True)
         for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
