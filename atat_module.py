@@ -3698,6 +3698,10 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        
+            /* Added underline (thicker) */
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
         }
         
         .stTabs [data-baseweb="tab-list"] button:focus {
@@ -3705,6 +3709,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         }
         </style>
         '''
+
 
         st.markdown(css, unsafe_allow_html=True)
         for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
