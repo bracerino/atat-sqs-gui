@@ -1674,7 +1674,7 @@ def render_atat_sqs_section():
             "Pair cutoff distance:",
             min_value=0.1,
             max_value=5.0,
-            value=1.1,
+            value=1.5,
             step=0.1,
             format="%.1f",
             help="Maximum distance for pair correlations. Usually 1.1 includes first 2 nearest neighbor shells.",
@@ -1688,7 +1688,7 @@ def render_atat_sqs_section():
                 "Triplet cutoff:",
                 min_value=0.1,
                 max_value=3.0,
-                value=1.0,
+                value=1.2,
                 step=0.1,
                 format="%.1f",
                 key="atat_triplet_cutoff_val"
