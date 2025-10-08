@@ -5625,7 +5625,7 @@ def render_monitor_script_section(results):
 
             2. **Make it executable:**
                ```bash
-               sudo chmod +x monitor.sh
+               sudo chmod +x monitor.sh # or 'bash monitor.sh'
                ```
 
             3. **Run the script:**
