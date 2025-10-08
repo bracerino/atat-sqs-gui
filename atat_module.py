@@ -1795,7 +1795,8 @@ def render_atat_sqs_section():
                 'rndstr_content': rndstr_content,
                 'sqscell_content': sqscell_content,
                 'atat_commands': atat_commands,
-                'final_concentrations': final_concentrations
+                'final_concentrations': final_concentrations,
+                'max_param': max(working_structure.lattice.a, working_structure.lattice.b, working_structure.lattice.c)
             }
 
             st.success("✅ ATAT input files generated successfully with corrected per-site concentrations!")
@@ -4940,7 +4941,7 @@ def render_extended_optimization_analysis_tab():
 
 
 def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1, pair_cutoff=1.1, triplet_cutoff=None,
-                                 quadruplet_cutoff=None):
+                                 quadruplet_cutoff=None,max_param=1.0):
     if use_atom_count:
         mcsqs_base_cmd = f"mcsqs -n {results['total_atoms']}"
     else:
@@ -5088,8 +5089,8 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
        echo "$minute,$current_time,$step_count,$objective,$correlation,$corr_count,$status" >> "$output_file"
 
-       printf "Minute %3d | Steps: %6s | Objective: %12s | 1st Corr: %12s | Status: %s\\n" \\
-              "$minute" "$step_count" "$objective" "$correlation" "$status"
+       printf "Minute %3d | Steps: %6s | Objective: %12s | Status: %s\\n" \\
+              "$minute" "$step_count" "$objective" "$status"
 
        if [ "$status" = "STOPPED" ]; then
            echo "MCSQS process stopped. Monitoring will collect final data before exiting."
@@ -5154,6 +5155,106 @@ is_mcsqs_running() {{
    return $?
 }}
 
+convert_bestsqs_to_poscar() {{
+    local bestsqs_file="$1"
+    local poscar_file="$2"
+    
+    if [ ! -f "$bestsqs_file" ]; then
+        echo "⚠️  Warning: $bestsqs_file not found"
+        return 1
+    fi
+    
+    echo "🔄 Converting $bestsqs_file to $poscar_file..."
+    
+    python3 - "$bestsqs_file" "$poscar_file" << 'PYEOF'
+import sys
+import numpy as np
+
+def parse_bestsqs(filename):
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    
+    A = np.array([[float(x) for x in lines[i].split()] for i in range(3)])
+    B = np.array([[float(x) for x in lines[i].split()] for i in range(3, 6)])
+    
+    A_scaled = A * {max_param:.6f}
+    final_lattice = np.dot(B, A_scaled)
+    
+    atoms = []
+    for i in range(6, len(lines)):
+        line = lines[i].strip()
+        if line:
+            parts = line.split()
+            if len(parts) >= 4:
+                x, y, z, element = float(parts[0]), float(parts[1]), float(parts[2]), parts[3]
+                if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+                    continue
+                cart_pos = np.dot([x, y, z], A_scaled)
+                atoms.append((element, cart_pos))
+    
+    return final_lattice, atoms
+
+def write_poscar(lattice, atoms, filename, comment):
+    from collections import defaultdict
+    
+    element_groups = defaultdict(list)
+    for element, pos in atoms:
+        element_groups[element].append(pos)
+    
+    atomic_weights = {{
+        'H': 1.008, 'He': 4.003, 'Li': 6.941, 'Be': 9.012, 'B': 10.81, 'C': 12.01, 'N': 14.01, 'O': 16.00,
+        'F': 19.00, 'Ne': 20.18, 'Na': 22.99, 'Mg': 24.31, 'Al': 26.98, 'Si': 28.09, 'P': 30.97, 'S': 32.07,
+        'Cl': 35.45, 'Ar': 39.95, 'K': 39.10, 'Ca': 40.08, 'Sc': 44.96, 'Ti': 47.87, 'V': 50.94, 'Cr': 52.00,
+        'Mn': 54.94, 'Fe': 55.85, 'Co': 58.93, 'Ni': 58.69, 'Cu': 63.55, 'Zn': 65.38, 'Ga': 69.72, 'Ge': 72.63,
+        'As': 74.92, 'Se': 78.96, 'Br': 79.90, 'Kr': 83.80, 'Rb': 85.47, 'Sr': 87.62, 'Y': 88.91, 'Zr': 91.22,
+        'Nb': 92.91, 'Mo': 95.96, 'Tc': 98.00, 'Ru': 101.1, 'Rh': 102.9, 'Pd': 106.4, 'Ag': 107.9, 'Cd': 112.4,
+        'In': 114.8, 'Sn': 118.7, 'Sb': 121.8, 'Te': 127.6, 'I': 126.9, 'Xe': 131.3, 'Cs': 132.9, 'Ba': 137.3,
+        'La': 138.9, 'Ce': 140.1, 'Pr': 140.9, 'Nd': 144.2, 'Pm': 145.0, 'Sm': 150.4, 'Eu': 152.0, 'Gd': 157.3,
+        'Tb': 158.9, 'Dy': 162.5, 'Ho': 164.9, 'Er': 167.3, 'Tm': 168.9, 'Yb': 173.0, 'Lu': 175.0, 'Hf': 178.5,
+        'Ta': 180.9, 'W': 183.8, 'Re': 186.2, 'Os': 190.2, 'Ir': 192.2, 'Pt': 195.1, 'Au': 197.0, 'Hg': 200.6,
+        'Tl': 204.4, 'Pb': 207.2, 'Bi': 209.0, 'Po': 209.0, 'At': 210.0, 'Rn': 222.0, 'Fr': 223.0, 'Ra': 226.0,
+        'Ac': 227.0, 'Th': 232.0, 'Pa': 231.0, 'U': 238.0, 'Np': 237.0, 'Pu': 244.0, 'Am': 243.0, 'Cm': 247.0,
+        'Bk': 247.0, 'Cf': 251.0, 'Es': 252.0, 'Fm': 257.0, 'Md': 258.0, 'No': 259.0, 'Lr': 262.0
+    }}
+    
+    elements = sorted(element_groups.keys(), key=lambda x: atomic_weights.get(x, 999.0))
+    
+    with open(filename, 'w') as f:
+        f.write(f'{{comment}}\\n')
+        f.write('1.0\\n')
+        
+        for vec in lattice:
+            f.write(f'  {{vec[0]:15.9f}} {{vec[1]:15.9f}} {{vec[2]:15.9f}}\\n')
+        
+        f.write(' '.join(elements) + '\\n')
+        f.write(' '.join(str(len(element_groups[el])) for el in elements) + '\\n')
+        
+        f.write('Direct\\n')
+        inv_lattice = np.linalg.inv(lattice)
+        for element in elements:
+            for cart_pos in element_groups[element]:
+                frac_pos = np.dot(cart_pos, inv_lattice)
+                f.write(f'  {{frac_pos[0]:15.9f}} {{frac_pos[1]:15.9f}} {{frac_pos[2]:15.9f}}\\n')
+
+try:
+    import sys
+    bestsqs_file = sys.argv[1] if len(sys.argv) > 1 else "$bestsqs_file"
+    poscar_file = sys.argv[2] if len(sys.argv) > 2 else "$poscar_file"
+    
+    comment = f"SQS from {{bestsqs_file}}"
+    lattice, atoms = parse_bestsqs(bestsqs_file)
+    write_poscar(lattice, atoms, poscar_file, comment)
+    print(f"✅ Successfully converted {{bestsqs_file}} to {{poscar_file}}")
+except Exception as e:
+    print(f"❌ Error: {{e}}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+PYEOF
+    
+    return $?
+}}
+
 {monitoring_function}
 
 # --- Main Script Logic ---
@@ -5173,15 +5274,82 @@ check_prerequisites() {{
    echo "✅ Clusters generated successfully."
    echo "✅ All prerequisites satisfied."
 }}
-
 cleanup() {{
    echo ""
-   echo "Interrupt signal received. Cleaning up background processes..."
+   echo "=========================================="
+   echo "🛑 Interrupt signal received or process completed"
+   echo "=========================================="
+   
+   echo "🧹 Stopping MCSQS processes..."
    if [ -n "$MCSQS_PID" ]; then kill "$MCSQS_PID" 2>/dev/null; fi
    if [ -n "$MONITOR_PID" ]; then kill "$MONITOR_PID" 2>/dev/null; fi
-   pkill -f "mcsqs" 2>/dev/null
-   echo "Cleanup complete."
-   exit 1
+   pkill -9 -f "mcsqs" 2>/dev/null || true
+   sleep 2
+   
+   echo ""
+   echo "=========================================="
+   echo "📄 Converting bestsqs*.out files to POSCAR format..."
+   echo "=========================================="
+   
+   found_files=0
+   best_run=""
+   best_objective=""
+   
+   if [ -f "$PROGRESS_FILE" ]; then
+       last_line=$(tail -1 "$PROGRESS_FILE")
+       {"best_objective=$(echo \"$last_line\" | cut -d',' -f$((3 + 3 * " + str(parallel_runs) + ")))" if parallel_runs > 1 else "best_objective=$(echo \"$last_line\" | cut -d',' -f4)"}
+       {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
+   fi
+   
+   for outfile in bestsqs*.out; do
+       if [ -f "$outfile" ]; then
+           found_files=1
+           basename="${{outfile%.out}}"
+           poscar_file="${{basename}}_POSCAR"
+           
+           if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
+               echo "  ✅ $outfile → $poscar_file"
+           else
+               echo "  ❌ Failed to convert $outfile"
+           fi
+       fi
+   done
+   
+   if [ $found_files -eq 0 ]; then
+       echo "  ⚠️  No bestsqs*.out files found"
+   else
+       if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
+           if [ {parallel_runs} -gt 1 ]; then
+               best_poscar="bestsqs${{best_run}}_POSCAR"
+           else
+               best_poscar="bestsqs_POSCAR"
+           fi
+           
+           if [ -f "$best_poscar" ]; then
+               cp "$best_poscar" "POSCAR_best_overall"
+               echo ""
+               echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+               if [ {parallel_runs} -gt 1 ]; then
+                   echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
+               else
+                   echo "    Source: bestsqs.out"
+               fi
+           else
+               echo ""
+               echo "⚠️  Could not find best POSCAR file: $best_poscar"
+           fi
+       else
+           echo ""
+           echo "⚠️  Could not determine best structure (no progress data found)"
+       fi
+       
+       echo ""
+       echo "=========================================="
+       echo "✅ Conversion complete!"
+       echo "=========================================="
+   fi
+   
+   exit 0
 }}
 
 trap cleanup SIGINT SIGTERM
@@ -5331,7 +5499,8 @@ def render_monitor_script_section(results):
                     parallel_runs=parallel_runs,
                     pair_cutoff=pair_cutoff,
                     triplet_cutoff=triplet_cutoff,
-                    quadruplet_cutoff=quadruplet_cutoff
+                    quadruplet_cutoff=quadruplet_cutoff,
+                    max_param=results.get('max_param', 1.0)
                 )
 
                 st.download_button(
@@ -5344,7 +5513,8 @@ def render_monitor_script_section(results):
                 )
 
                 st.success("✅ Monitor script generated successfully!")
-
+                with st.expander("Script Preview", expanded=False):
+                    st.code(script_content, language="bash")
             except Exception as e:
                 st.error(f"Error generating script: {str(e)}")
 
@@ -5385,6 +5555,7 @@ def render_monitor_script_section(results):
 
              **The generated CSV file can be uploaded back to this tool for analysis!**
             """)
+
 
 
 def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
