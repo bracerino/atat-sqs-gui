@@ -125,6 +125,7 @@ It also enables **automated script generation** for binary alloys and batch exec
   - Build input files  
   - Run **mcsqs** with optional parallelization  
   - Monitor convergence in real-time  
+  - Convert automatically bestsqs.out into POSCAR
 - Automate full SQS searches **across binary alloy composition ranges**  
 
 ---
