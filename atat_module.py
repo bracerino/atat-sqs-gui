@@ -1349,11 +1349,11 @@ def render_atat_sqs_section():
             font-weight: 600 !important;
             margin: 0 !important;
         }
-
+        
         .stTabs [data-baseweb="tab-list"] {
             gap: 20px !important;
         }
-
+        
         .stTabs [data-baseweb="tab-list"] button {
             background-color: #f0f4ff !important;
             border-radius: 12px !important;
@@ -1362,24 +1362,29 @@ def render_atat_sqs_section():
             border: none !important;
             color: #1e3a8a !important;
         }
-
+        
         .stTabs [data-baseweb="tab-list"] button:hover {
             background-color: #dbe5ff !important;
             cursor: pointer;
         }
-
+        
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
             background-color: #e0e7ff !important;
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        
+            /* Added underline (thicker) */
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
         }
-
+        
         .stTabs [data-baseweb="tab-list"] button:focus {
             outline: none !important;
         }
         </style>
         '''
+
         st.markdown(css, unsafe_allow_html=True)
         common_elements = [
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
