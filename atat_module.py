@@ -5508,6 +5508,7 @@ def render_monitor_script_section(results):
     - ✅ **Executes mcsqs** with real-time monitoring
     - ✅ **Generates CSV progress** data every minute
     - ✅ **Supports parallel execution** for faster results
+    - ✅ **Creates POSCAR from bestsqs.out** automatically
     """)
 
     # Configuration options
@@ -5639,6 +5640,7 @@ def render_monitor_script_section(results):
             - 🚀 **Starts mcsqs** in single instance (or in parallel if enabled)
             - 📊 **Monitors progress** every minute
             - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
+            - 📁 **Converts bestsqs.out to POSCAR** automatically when stopped
 
             ### Output files:
             - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
