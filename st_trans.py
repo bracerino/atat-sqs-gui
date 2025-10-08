@@ -736,6 +736,7 @@ def render_sqs_module():
             - [Tutorial explaining how to generate SQS using ATAT mcsqs](https://github.com/CMSLabIITK/SQS_generation).
             - [User guide for ATAT](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual.pdf).
             - [User guide specifically for ATAT mcsqs](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual/node48.html).
+            - [ATAT forum](https://matsci.org/c/atat/67).
             - [C++ code for converting bestsqs.out into POSCAR format](https://github.com/c-niu/sqs2poscar). 
             - [Python code for converting bestsqs.out into POSCAR format](https://github.com/JianboHIT/sqs2vasp).
 
