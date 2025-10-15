@@ -104,7 +104,7 @@ It also enables **automated script generation** for binary alloys and batch exec
 ### ✨ Key Features
 
 #### 🔬 Crystal Structures
-- Upload custom crystal structures  
+- Upload custom crystal structures (CIF, POSCAR, LMP, XYZ with lattice)
 - Retrieve directly from **Materials Project (MP)**, **AFLOW**, or **COD** databases  
 
 ---
@@ -117,17 +117,17 @@ It also enables **automated script generation** for binary alloys and batch exec
 ---
 
 #### 💾 Input File Generation
-- Generate **`rndstr.in`** and **`sqscell.out`** files instantly  
+- Automatically generate **`rndstr.in`** and **`sqscell.out`** files   
 
 ---
 
 #### 🛠️ Automated Workflows
 - Create **bash scripts** to:  
-  - Build input files  
+  - Build input files (**`rndstr.in`**, **`sqscell.out`**)
   - Run **mcsqs** with optional parallelization  
   - Monitor convergence in real-time  
   - Convert automatically bestsqs.out into POSCAR
-- Automate full SQS searches **across binary alloy composition ranges**  
+- Automate full SQS searches **across binary alloy composition ranges** (e.g. Ba₁₋ₓSrₓTiO₃)
 
 ---
 
