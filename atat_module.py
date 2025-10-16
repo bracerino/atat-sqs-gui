@@ -6083,7 +6083,7 @@ def render_correlation_analysis_tab():
             correlation_df['Abs_Difference'] = correlation_df['Difference'].abs()
 
             correlation_df['Quality'] = correlation_df['Abs_Difference'].apply(
-                lambda x: "Perfect" if x < 0.001 else "Weak" if x <= 0.05 else "Moderate" if x <= 0.1 else "Strong"
+                lambda x: "Perfect" if x < 0.001 else "Very good" if x <= 0.05 else "Moderate" if x <= 0.1 else "Large deviations"
             )
 
             correlation_df = correlation_df.round(6)
