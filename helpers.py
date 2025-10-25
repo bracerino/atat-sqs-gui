@@ -95,7 +95,7 @@ def intro_text():
 ---
 
 This tool provides a **graphical interface** for generating input files  
-(`rndstr.in`, `sqscell.out`) to create **Special Quasirandom Structures (SQS)** using the **ATAT mcsqs** package.  
+(`rndstr.in`, `sqscell.out`, `monitor.sh`) to create **Special Quasirandom Structures (SQS)** using the **ATAT mcsqs** package.  
 
 It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
 
