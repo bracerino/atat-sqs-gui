@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the following article."
+title: "SimplySQS: Simplifying Generation of Special Quasirandom Structures with ATAT Using Interactive Online Interface"
+authors:
+  - family-names: Lebeda
+    given-names: Miroslav
+  - family-names: Drahokoupil
+    given-names: Jan
+  - family-names: Vlčák
+    given-names: Petr
+  - family-names: Svoboda
+    given-names: Šimon
+  - family-names: van de Walle
+    given-names: Axel
+version: 1.0.0
+identifiers:
+  - type: arxiv
+    value: 2510.18020
+date-released: 2025-10-24
+type: software
+url: "https://arxiv.org/abs/2510.18020"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Lebeda
+      given-names: Miroslav
+    - family-names: Drahokoupil
+      given-names: Jan
+    - family-names: Vlčák
+      given-names: Petr
+    - family-names: Svoboda
+      given-names: Šimon
+    - family-names: van de Walle
+      given-names: Axel
+  title: "Simplifying Generation of Special Quasirandom Structures with ATAT Using Interactive Online Interface — SimplySQS"
+  journal: "arXiv preprint"
+  year: 2025
+  arxiv: 2510.18020
+  url: "https://arxiv.org/abs/2510.18020"
