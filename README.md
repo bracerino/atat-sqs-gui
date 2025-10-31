@@ -6,7 +6,7 @@
 ### Tutorials 
  **Video tutorial at: [YouTube](https://youtu.be/GGo_9T5wqus?si=d3ATtFdfy1NYUCO8)**  
  **Video tutorial for running ATAT mcsqs search across concentration range of binary alloys at: [YouTube](https://youtu.be/wL5re3Fu1nQ?si=anuqQD88x4xLYmec)**  
- 
+ **Video tutorial for creating SQS for BCC HEA: [YouTube](https://youtu.be/U6JI2j3BfMg).**  
  
 
 
