@@ -8,8 +8,6 @@ from helpers import *
 from parallel_analysis import *
 
 
-
-
 def render_concentration_sweep_section(chemical_symbols, target_concentrations, transformation_matrix,
                                        primitive_structure, cutoffs, total_atoms_in_supercell):
     if not target_concentrations:
@@ -91,7 +89,6 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
         return
 
     supercell_factor = calculate_supercell_factor(transformation_matrix)
-
 
     if selected_sublattice:
         sublattice_sites = 0
@@ -255,7 +252,7 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             cutoffs,
             total_sites_for_sublattice,
             progress_update_interval,
-            mcsqs_mode,total_atoms_in_supercell
+            mcsqs_mode, total_atoms_in_supercell
         )
 
         st.download_button(
@@ -266,15 +263,18 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             type="primary"
         )
 
-        st.success("Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
+        st.success(
+            "Concentration sweep script generated! Make sure to have these prerequisites: **`ATAT mcsqs`**, **`NumPy module in Python`**")
 
         with st.expander("Script Preview", expanded=False):
             st.code(script_content, language="bash")
 
+
 def generate_concentration_sweep_script(sweep_element, complement_element, selected_concentrations,
                                         time_per_conc, max_parallel, parallel_runs_per_conc,
                                         target_concentrations, chemical_symbols, transformation_matrix,
-                                        primitive_structure, cutoffs, total_sites, progress_update_interval, mcsqs_mode, total_atoms_in_supercell):
+                                        primitive_structure, cutoffs, total_sites, progress_update_interval, mcsqs_mode,
+                                        total_atoms_in_supercell):
     corrdump_cmd = "corrdump -l=rndstr.in -ro -noe -nop -clus"
     if len(cutoffs) >= 1 and cutoffs[0] is not None:
         corrdump_cmd += f" -2={cutoffs[0]}"
@@ -338,11 +338,14 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "",
         "cleanup() {",
         '    echo "🧹 Cleaning up background processes..."',
-        "    jobs -p | xargs -r kill 2>/dev/null || true",
-        "    wait",
+        '    pkill -9 -f "mcsqs" 2>/dev/null || true',
+        '    pkill -9 -f "monitor_progress" 2>/dev/null || true',
+        '    jobs -p | xargs -r kill -9 2>/dev/null || true',
+        "    wait 2>/dev/null || true",
+        '    echo "✅ Cleanup complete."',
         "}",
         "",
-        "trap cleanup EXIT INT TERM",
+        "trap cleanup EXIT INT TERM SIGINT SIGTERM",
         "",
         "format_elapsed_time() {",
         "    local elapsed=$1",
@@ -858,6 +861,9 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "",
         "wait",
         "",
+        'pkill -9 -f "mcsqs" 2>/dev/null || true',
+        'sleep 2',
+        "",
         'echo ""',
         'echo "========================================"',
         'echo "🏁 All concentrations completed!"',
@@ -1195,12 +1201,12 @@ def render_atat_sqs_section():
     st.write(f"**Selected structure:** {atat_structure.composition.reduced_formula}")
     st.write(f"**Number of atoms:** {len(atat_structure)}")
 
-    #tabs2, tabs4, tabs1, tabs5 = st.tabs([
+    # tabs2, tabs4, tabs1, tabs5 = st.tabs([
     #    "1️⃣ + 2️⃣ + 3️⃣ Composition & Supercell ",
     #    "4️⃣ Clusters & Generation",
     #    "📊 Initial Structure View",
     #    "📊 Analyze ATAT Outputs"
-    #])
+    # ])
 
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -1367,6 +1373,10 @@ def render_atat_sqs_section():
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        
+            /* Added underline (thicker) */
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
         }
         
         .stTabs [data-baseweb="tab-list"] button:focus {
@@ -1374,6 +1384,7 @@ def render_atat_sqs_section():
         }
         </style>
         '''
+
         st.markdown(css, unsafe_allow_html=True)
         common_elements = [
             'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
@@ -1418,8 +1429,6 @@ def render_atat_sqs_section():
             st.stop()
 
         composition_input = ", ".join(element_list)
-
-
 
         st.info(f"""
         **Global Mode Concentration Constraints:**
@@ -1507,9 +1516,9 @@ def render_atat_sqs_section():
                     "Element": element,
                     "Target (%)": f"{target_frac * 100:.3f}",
                     "Achievable (%)": f"{achievable_frac * 100:.3f}",
-                    #"Atoms per Site": achievable_count,
+                    # "Atoms per Site": achievable_count,
                     "Total Atoms": total_element_atoms,
-                   # "Status": status
+                    # "Status": status
                 })
             conc_df = pd.DataFrame(conc_data)
             st.dataframe(conc_df, use_container_width=True)
@@ -1665,7 +1674,7 @@ def render_atat_sqs_section():
             "Pair cutoff distance:",
             min_value=0.1,
             max_value=5.0,
-            value=1.1,
+            value=1.5,
             step=0.1,
             format="%.1f",
             help="Maximum distance for pair correlations. Usually 1.1 includes first 2 nearest neighbor shells.",
@@ -1679,7 +1688,7 @@ def render_atat_sqs_section():
                 "Triplet cutoff:",
                 min_value=0.1,
                 max_value=3.0,
-                value=1.0,
+                value=1.2,
                 step=0.1,
                 format="%.1f",
                 key="atat_triplet_cutoff_val"
@@ -1786,7 +1795,8 @@ def render_atat_sqs_section():
                 'rndstr_content': rndstr_content,
                 'sqscell_content': sqscell_content,
                 'atat_commands': atat_commands,
-                'final_concentrations': final_concentrations
+                'final_concentrations': final_concentrations,
+                'max_param': max(working_structure.lattice.a, working_structure.lattice.b, working_structure.lattice.c)
             }
 
             st.success("✅ ATAT input files generated successfully with corrected per-site concentrations!")
@@ -1825,7 +1835,7 @@ def render_atat_sqs_section():
             target_concentrations,
             transformation_matrix,
             working_structure,
-            cutoffs,len(supercell_preview)
+            cutoffs, len(supercell_preview)
         )
 
         st.subheader("📁 Generated Files")
@@ -1934,7 +1944,6 @@ def render_atat_sqs_section():
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("---")
 
-
     st.subheader("🔄 Analyze ATAT Outputs (convert bestsqs to VASP, LMP, CIF, XYZ, calculate PRDF, monitor logs)")
     st.info("Upload your ATAT output files to convert and analyze the results.")
 
@@ -1976,7 +1985,7 @@ def render_atat_sqs_section():
                     if not is_valid:
                         st.error(f"Invalid bestsqs.out file: {validation_message}")
                         st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
-                        #return
+                        # return
 
                     st.success(f"✅ Valid ATAT file detected: {validation_message}")
                     vasp_content, conversion_info = convert_bestsqs_to_vasp(
@@ -2024,18 +2033,34 @@ def render_atat_sqs_section():
                         use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
                                                              value=False, key="poscar_sd")
 
-                        # Generate VASP content with options
                         try:
-                            grouped_data = sqs_pymatgen_structure.copy() if 'sqs_pymatgen_structure' in locals() else None
-                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                            from pymatgen.core import Element
 
-                            # Add atoms to structure (simplified version)
+                            # Sort species by atomic weight
+                            unique_species = []
                             for site in sqs_pymatgen_structure:
-                                new_struct.append(
-                                    species=site.species,
-                                    coords=site.frac_coords,
-                                    coords_are_cartesian=False,
-                                )
+                                if site.specie not in unique_species:
+                                    unique_species.append(site.specie)
+
+                            species_weights = {}
+                            for species in unique_species:
+                                try:
+                                    species_weights[species] = Element(species.symbol).atomic_mass
+                                except:
+                                    species_weights[species] = 999.0
+
+                            sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
+
+
+                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                            for species in sorted_species:
+                                for site in sqs_pymatgen_structure:
+                                    if site.specie == species:
+                                        new_struct.append(
+                                            species=site.species,
+                                            coords=site.frac_coords,
+                                            coords_are_cartesian=False,
+                                        )
 
                             out = StringIO()
                             current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
@@ -2044,7 +2069,7 @@ def render_atat_sqs_section():
                                 constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
                                 current_ase_structure.set_constraint(constraint)
 
-                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=True)
+                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=False)
                             vasp_content_with_options = out.getvalue()
 
                             st.download_button(
@@ -2425,7 +2450,7 @@ def convert_atat_to_pymatgen_structure(bestsqs_content, original_structure, tran
 
 
 def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_matrix, structure_name):
-    from pymatgen.core import Lattice
+    from pymatgen.core import Lattice, Element
     import numpy as np
 
     A_basis = original_structure.lattice.matrix
@@ -2450,7 +2475,18 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
     if not atom_data:
         raise ValueError("All atoms in the structure are vacancies - cannot create a valid POSCAR")
 
-    unique_elements = sorted(list(set(atom['element'] for atom in atom_data)))
+    from pymatgen.core import Element
+
+    unique_elements_set = set(atom['element'] for atom in atom_data)
+
+    element_weights = {}
+    for elem in unique_elements_set:
+        try:
+            element_weights[elem] = Element(elem).atomic_mass
+        except:
+            element_weights[elem] = 999.0
+
+    unique_elements = sorted(list(unique_elements_set), key=lambda x: element_weights[x])
 
     sorted_atoms_cart = []
     element_counts = []
@@ -2488,6 +2524,7 @@ def convert_bestsqs_to_vasp(bestsqs_content, original_structure, transformation_
         "Elements & Counts": ", ".join([f"{elem}: {count}" for elem, count in zip(unique_elements, element_counts)]),
         "SQS Lattice (a, b, c)": f"{supercell_lattice.a:.4f} Å, {supercell_lattice.b:.4f} Å, {supercell_lattice.c:.4f} Å",
         "SQS Angles (α, β, γ)": f"{supercell_lattice.alpha:.2f}°, {supercell_lattice.beta:.2f}°, {supercell_lattice.gamma:.2f}°",
+        "Element Order": f"Sorted by atomic weight: {' < '.join([f'{elem}({element_weights[elem]:.2f})' for elem in unique_elements])}"
     }
 
     return vasp_content, conversion_info
@@ -2675,7 +2712,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format2:
             st.markdown("**CIF Options:**")
             include_cif = st.checkbox(
-                "Include CIF", value=True, key="batch_include_cif")
+                "Include CIF", value=False, key="batch_include_cif")
             if include_cif:
                 cif_symprec = st.number_input("Symmetry precision", value=0.1, min_value=0.001, max_value=1.0,
                                               step=0.001, format="%.3f", key="batch_cif_symprec")
@@ -2683,7 +2720,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format3:
             st.markdown("**LAMMPS Options:**")
             include_lammps = st.checkbox(
-                "Include LAMMPS", value=True, key="batch_include_lammps")
+                "Include LAMMPS", value=False, key="batch_include_lammps")
             if include_lammps:
                 lammps_atom_style = st.selectbox(
                     "Atom style", ["atomic", "charge", "full"], index=0, key="batch_lammps_style")
@@ -2697,7 +2734,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
         with col_format4:
             st.markdown("**XYZ Options:**")
             include_xyz = st.checkbox(
-                "Include XYZ", value=True, key="batch_include_xyz")
+                "Include XYZ", value=False, key="batch_include_xyz")
             if include_xyz:
                 xyz_extended = st.checkbox(
                     "Extended XYZ format", value=True, key="batch_xyz_extended")
@@ -2796,13 +2833,32 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
 
                 if include_vasp:
                     try:
-                        new_struct = Structure(sqs_structure.lattice, [], [])
+                        from pymatgen.core import Element
+
+                        # Sort species by atomic weight
+                        unique_species = []
                         for site in sqs_structure:
-                            new_struct.append(
-                                species=site.species,
-                                coords=site.frac_coords,
-                                coords_are_cartesian=False,
-                            )
+                            if site.specie not in unique_species:
+                                unique_species.append(site.specie)
+
+                        species_weights = {}
+                        for species in unique_species:
+                            try:
+                                species_weights[species] = Element(species.symbol).atomic_mass
+                            except:
+                                species_weights[species] = 999.0
+
+                        sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
+
+                        new_struct = Structure(sqs_structure.lattice, [], [])
+                        for species in sorted_species:
+                            for site in sqs_structure:
+                                if site.specie == species:
+                                    new_struct.append(
+                                        species=site.species,
+                                        coords=site.frac_coords,
+                                        coords_are_cartesian=False,
+                                    )
 
                         ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
 
@@ -2812,7 +2868,7 @@ def create_batch_conversion_zip(valid_files, working_structure, transformation_m
 
                         out = StringIO()
                         write(out, ase_structure, format="vasp",
-                              direct=vasp_fractional, sort=True)
+                              direct=vasp_fractional, sort=False)
                         vasp_content = out.getvalue()
 
                         zip_file.writestr(
@@ -3545,7 +3601,8 @@ def integrate_atat_option():
     render_atat_sqs_section()
 
 
-def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,stable_key="default"):
+def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,
+                                          stable_key="default"):
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #8B0000; border-radius: 8px; margin: 20px 0;">
@@ -3614,6 +3671,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     if sublattice_data:
         tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
         tabs = st.tabs(tab_names)
+        
         css = '''
         <style>
         .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -3646,6 +3704,10 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+        
+            /* Added underline (thicker) */
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
         }
         
         .stTabs [data-baseweb="tab-list"] button:focus {
@@ -3653,6 +3715,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
         }
         </style>
         '''
+
 
         st.markdown(css, unsafe_allow_html=True)
         for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
@@ -4356,15 +4419,15 @@ def analyze_convergence_csv(minutes, objective_values, additional_data=None):
         improvement_rate = 0
 
     result = {
-        #"Convergence Status": convergence_status,
-        #"Final Trend": final_trend,
+        # "Convergence Status": convergence_status,
+        # "Final Trend": final_trend,
         "Stability": stability,
         "Recent Std Dev": f"{final_std:.6f}",
         "Total Improvement": f"{total_improvement:.6f}",
         "Recent Improvement": f"{recent_improvement:.6f}",
         "Improvement Rate": f"{improvement_rate:.6f} per minute",
         "Total Runtime": f"{minutes[-1] - minutes[0]:.0f} minutes" if len(minutes) > 1 else "N/A",
-        #"Recommendation": recommendation
+        # "Recommendation": recommendation
     }
 
     if additional_data and 'Step_Count' in additional_data:
@@ -4573,17 +4636,17 @@ def render_extended_optimization_analysis_tab():
                     for key, value in convergence_info.items():
                         st.write(f"- **{key}:** {value}")
 
-                #with col_conv_info2:
+                # with col_conv_info2:
 
-                    #if convergence_info['Convergence Status'] == "✅ Converged":
-                    #    st.success("🎯 **Optimization Status: CONVERGED**")
-                    #    st.info("The objective function has stabilized. This SQS is ready for use.")
-                   # if convergence_info['Convergence Status'] == "⚠️ Improving":
-                   #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
-                   #     st.info("Consider running ATAT longer for better results.")
-                   # else:
-                   #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
-                   #     st.info("The optimization may need more time or different parameters.")
+                # if convergence_info['Convergence Status'] == "✅ Converged":
+                #    st.success("🎯 **Optimization Status: CONVERGED**")
+                #    st.info("The objective function has stabilized. This SQS is ready for use.")
+                # if convergence_info['Convergence Status'] == "⚠️ Improving":
+                #     st.warning("📈 **Optimization Status: STILL IMPROVING**")
+                #     st.info("Consider running ATAT longer for better results.")
+                # else:
+                #     st.warning("🔄 **Optimization Status: FLUCTUATING**")
+                #     st.info("The optimization may need more time or different parameters.")
 
                 if additional_data:
                     with st.expander("📊 Additional Data Analysis", expanded=False):
@@ -4878,7 +4941,7 @@ def render_extended_optimization_analysis_tab():
 
 
 def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1, pair_cutoff=1.1, triplet_cutoff=None,
-                                 quadruplet_cutoff=None):
+                                 quadruplet_cutoff=None,max_param=1.0,time_limit_minutes=None):
     if use_atom_count:
         mcsqs_base_cmd = f"mcsqs -n {results['total_atoms']}"
     else:
@@ -4893,7 +4956,11 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
     if parallel_runs > 1:
         mcsqs_commands = []
         for i in range(1, parallel_runs + 1):
-            mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} &")
+            if time_limit_minutes:
+                mcsqs_commands.append(
+                    f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} -ip={i} > mcsqs{i}.log 2>&1 || true &")
+            else:
+                mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} > mcsqs{i}.log 2>&1 &")
         mcsqs_execution = "\n".join(mcsqs_commands)
         log_file = "mcsqs1.log"
         mcsqs_display_cmd = f"{mcsqs_base_cmd} -ip=1 & {mcsqs_base_cmd} -ip=2 & ... (parallel execution)"
@@ -4986,7 +5053,13 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
         monitor_call = "start_parallel_monitoring_process \"$PROGRESS_FILE\" &"
 
     else:
-        mcsqs_execution = f"{mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 &"
+        if time_limit_minutes:
+            mcsqs_execution = f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 || true &"
+        else:
+            if time_limit_minutes:
+                mcsqs_execution = f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 || true &"
+            else:
+                mcsqs_execution = f"{mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 &"
         log_file = "mcsqs.log"
         mcsqs_display_cmd = mcsqs_base_cmd
         progress_file = "mcsqs_progress.csv"
@@ -5026,8 +5099,8 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
        echo "$minute,$current_time,$step_count,$objective,$correlation,$corr_count,$status" >> "$output_file"
 
-       printf "Minute %3d | Steps: %6s | Objective: %12s | 1st Corr: %12s | Status: %s\\n" \\
-              "$minute" "$step_count" "$objective" "$correlation" "$status"
+       printf "Minute %3d | Steps: %6s | Objective: %12s | Status: %s\\n" \\
+              "$minute" "$step_count" "$objective" "$status"
 
        if [ "$status" = "STOPPED" ]; then
            echo "MCSQS process stopped. Monitoring will collect final data before exiting."
@@ -5053,6 +5126,8 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 LOG_FILE="{log_file}"
 PROGRESS_FILE="{progress_file}"
 DEFAULT_MCSQS_ARGS="{mcsqs_base_cmd.split('mcsqs ')[1]}"
+{"TIME_LIMIT_MINUTES=" + str(time_limit_minutes) if time_limit_minutes else "TIME_LIMIT_MINUTES=0"}
+TIME_LIMIT_SECONDS=$((TIME_LIMIT_MINUTES * 60))
 
 # --- Auto-generate ATAT Input Files ---
 create_input_files() {{
@@ -5092,6 +5167,106 @@ is_mcsqs_running() {{
    return $?
 }}
 
+convert_bestsqs_to_poscar() {{
+    local bestsqs_file="$1"
+    local poscar_file="$2"
+    
+    if [ ! -f "$bestsqs_file" ]; then
+        echo "⚠️  Warning: $bestsqs_file not found"
+        return 1
+    fi
+    
+    echo "🔄 Converting $bestsqs_file to $poscar_file..."
+    
+    python3 - "$bestsqs_file" "$poscar_file" << 'PYEOF'
+import sys
+import numpy as np
+
+def parse_bestsqs(filename):
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    
+    A = np.array([[float(x) for x in lines[i].split()] for i in range(3)])
+    B = np.array([[float(x) for x in lines[i].split()] for i in range(3, 6)])
+    
+    A_scaled = A * {max_param:.6f}
+    final_lattice = np.dot(B, A_scaled)
+    
+    atoms = []
+    for i in range(6, len(lines)):
+        line = lines[i].strip()
+        if line:
+            parts = line.split()
+            if len(parts) >= 4:
+                x, y, z, element = float(parts[0]), float(parts[1]), float(parts[2]), parts[3]
+                if element.lower() in ['vac', "'vac", 'vacancy', 'x']:
+                    continue
+                cart_pos = np.dot([x, y, z], A_scaled)
+                atoms.append((element, cart_pos))
+    
+    return final_lattice, atoms
+
+def write_poscar(lattice, atoms, filename, comment):
+    from collections import defaultdict
+    
+    element_groups = defaultdict(list)
+    for element, pos in atoms:
+        element_groups[element].append(pos)
+    
+    atomic_weights = {{
+        'H': 1.008, 'He': 4.003, 'Li': 6.941, 'Be': 9.012, 'B': 10.81, 'C': 12.01, 'N': 14.01, 'O': 16.00,
+        'F': 19.00, 'Ne': 20.18, 'Na': 22.99, 'Mg': 24.31, 'Al': 26.98, 'Si': 28.09, 'P': 30.97, 'S': 32.07,
+        'Cl': 35.45, 'Ar': 39.95, 'K': 39.10, 'Ca': 40.08, 'Sc': 44.96, 'Ti': 47.87, 'V': 50.94, 'Cr': 52.00,
+        'Mn': 54.94, 'Fe': 55.85, 'Co': 58.93, 'Ni': 58.69, 'Cu': 63.55, 'Zn': 65.38, 'Ga': 69.72, 'Ge': 72.63,
+        'As': 74.92, 'Se': 78.96, 'Br': 79.90, 'Kr': 83.80, 'Rb': 85.47, 'Sr': 87.62, 'Y': 88.91, 'Zr': 91.22,
+        'Nb': 92.91, 'Mo': 95.96, 'Tc': 98.00, 'Ru': 101.1, 'Rh': 102.9, 'Pd': 106.4, 'Ag': 107.9, 'Cd': 112.4,
+        'In': 114.8, 'Sn': 118.7, 'Sb': 121.8, 'Te': 127.6, 'I': 126.9, 'Xe': 131.3, 'Cs': 132.9, 'Ba': 137.3,
+        'La': 138.9, 'Ce': 140.1, 'Pr': 140.9, 'Nd': 144.2, 'Pm': 145.0, 'Sm': 150.4, 'Eu': 152.0, 'Gd': 157.3,
+        'Tb': 158.9, 'Dy': 162.5, 'Ho': 164.9, 'Er': 167.3, 'Tm': 168.9, 'Yb': 173.0, 'Lu': 175.0, 'Hf': 178.5,
+        'Ta': 180.9, 'W': 183.8, 'Re': 186.2, 'Os': 190.2, 'Ir': 192.2, 'Pt': 195.1, 'Au': 197.0, 'Hg': 200.6,
+        'Tl': 204.4, 'Pb': 207.2, 'Bi': 209.0, 'Po': 209.0, 'At': 210.0, 'Rn': 222.0, 'Fr': 223.0, 'Ra': 226.0,
+        'Ac': 227.0, 'Th': 232.0, 'Pa': 231.0, 'U': 238.0, 'Np': 237.0, 'Pu': 244.0, 'Am': 243.0, 'Cm': 247.0,
+        'Bk': 247.0, 'Cf': 251.0, 'Es': 252.0, 'Fm': 257.0, 'Md': 258.0, 'No': 259.0, 'Lr': 262.0
+    }}
+    
+    elements = sorted(element_groups.keys(), key=lambda x: atomic_weights.get(x, 999.0))
+    
+    with open(filename, 'w') as f:
+        f.write(f'{{comment}}\\n')
+        f.write('1.0\\n')
+        
+        for vec in lattice:
+            f.write(f'  {{vec[0]:15.9f}} {{vec[1]:15.9f}} {{vec[2]:15.9f}}\\n')
+        
+        f.write(' '.join(elements) + '\\n')
+        f.write(' '.join(str(len(element_groups[el])) for el in elements) + '\\n')
+        
+        f.write('Direct\\n')
+        inv_lattice = np.linalg.inv(lattice)
+        for element in elements:
+            for cart_pos in element_groups[element]:
+                frac_pos = np.dot(cart_pos, inv_lattice)
+                f.write(f'  {{frac_pos[0]:15.9f}} {{frac_pos[1]:15.9f}} {{frac_pos[2]:15.9f}}\\n')
+
+try:
+    import sys
+    bestsqs_file = sys.argv[1] if len(sys.argv) > 1 else "$bestsqs_file"
+    poscar_file = sys.argv[2] if len(sys.argv) > 2 else "$poscar_file"
+    
+    comment = f"SQS from {{bestsqs_file}}"
+    lattice, atoms = parse_bestsqs(bestsqs_file)
+    write_poscar(lattice, atoms, poscar_file, comment)
+    print(f"✅ Successfully converted {{bestsqs_file}} to {{poscar_file}}")
+except Exception as e:
+    print(f"❌ Error: {{e}}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+PYEOF
+    
+    return $?
+}}
+
 {monitoring_function}
 
 # --- Main Script Logic ---
@@ -5111,15 +5286,83 @@ check_prerequisites() {{
    echo "✅ Clusters generated successfully."
    echo "✅ All prerequisites satisfied."
 }}
-
 cleanup() {{
    echo ""
-   echo "Interrupt signal received. Cleaning up background processes..."
+   echo "=========================================="
+   echo "🛑 Interrupt signal received or process completed"
+   echo "=========================================="
+   
+   echo "🧹 Stopping MCSQS processes..."
    if [ -n "$MCSQS_PID" ]; then kill "$MCSQS_PID" 2>/dev/null; fi
    if [ -n "$MONITOR_PID" ]; then kill "$MONITOR_PID" 2>/dev/null; fi
-   pkill -f "mcsqs" 2>/dev/null
-   echo "Cleanup complete."
-   exit 1
+   if [ -n "$TIMER_PID" ]; then kill "$TIMER_PID" 2>/dev/null; fi
+   pkill -9 -f "mcsqs" 2>/dev/null || true
+   sleep 2
+   
+   echo ""
+   echo "=========================================="
+   echo "📄 Converting bestsqs*.out files to POSCAR format..."
+   echo "=========================================="
+   
+   found_files=0
+   best_run=""
+   best_objective=""
+   
+   if [ -f "$PROGRESS_FILE" ]; then
+       last_line=$(tail -1 "$PROGRESS_FILE")
+       {"best_objective=$(echo \"$last_line\" | cut -d',' -f$((3 + 3 * " + str(parallel_runs) + ")))" if parallel_runs > 1 else "best_objective=$(echo \"$last_line\" | cut -d',' -f4)"}
+       {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
+   fi
+   
+   for outfile in bestsqs*.out; do
+       if [ -f "$outfile" ]; then
+           found_files=1
+           basename="${{outfile%.out}}"
+           poscar_file="${{basename}}_POSCAR"
+           
+           if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
+               echo "  ✅ $outfile → $poscar_file"
+           else
+               echo "  ❌ Failed to convert $outfile"
+           fi
+       fi
+   done
+   
+   if [ $found_files -eq 0 ]; then
+       echo "  ⚠️  No bestsqs*.out files found"
+   else
+       if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
+           if [ {parallel_runs} -gt 1 ]; then
+               best_poscar="bestsqs${{best_run}}_POSCAR"
+           else
+               best_poscar="bestsqs_POSCAR"
+           fi
+           
+           if [ -f "$best_poscar" ]; then
+               cp "$best_poscar" "POSCAR_best_overall"
+               echo ""
+               echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+               if [ {parallel_runs} -gt 1 ]; then
+                   echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
+               else
+                   echo "    Source: bestsqs.out"
+               fi
+           else
+               echo ""
+               echo "⚠️  Could not find best POSCAR file: $best_poscar"
+           fi
+       else
+           echo ""
+           echo "⚠️  Could not determine best structure (no progress data found)"
+       fi
+       
+       echo ""
+       echo "=========================================="
+       echo "✅ Conversion complete!"
+       echo "=========================================="
+   fi
+   
+   exit 0
 }}
 
 trap cleanup SIGINT SIGTERM
@@ -5133,6 +5376,7 @@ echo "  - Structure: {results['structure_name']}"
 echo "  - Supercell: {results['supercell_size']} ({results['total_atoms']} atoms)"
 echo "  - Parallel runs: {parallel_runs}"
 echo "  - Command: {mcsqs_display_cmd}"
+{"echo \"  - Time limit: $TIME_LIMIT_MINUTES minutes\"" if time_limit_minutes else "echo \"  - Time limit: None (manual stop)\""}
 echo "  - Log file: $LOG_FILE"
 echo "  - Progress file: $PROGRESS_FILE"
 echo "================================================"
@@ -5140,12 +5384,13 @@ echo "================================================"
 check_prerequisites
 
 rm -f "$LOG_FILE" "$PROGRESS_FILE" mcsqs*.log
-
 echo ""
 echo "Starting ATAT MCSQS optimization and progress monitor..."
 
 {mcsqs_execution}
 MCSQS_PID=$!
+
+
 
 {monitor_call}
 MONITOR_PID=$!
@@ -5154,31 +5399,93 @@ echo "✅ MCSQS started"
 echo "✅ Monitor started (PID: $MONITOR_PID)"
 echo ""
 echo "Real-time progress logged to: $PROGRESS_FILE"
-echo "Press Ctrl+C to stop optimization and monitoring."
+if [ $TIME_LIMIT_MINUTES -gt 0 ]; then
+    echo "⏱️  Will auto-stop after $TIME_LIMIT_MINUTES minutes"
+    echo "Press Ctrl+C to stop earlier and auto-convert to POSCAR."
+else
+    echo "Press Ctrl+C to stop optimization and auto-convert to POSCAR."
+fi
 echo "================================================"
 
 {"wait" if parallel_runs > 1 else "wait $MCSQS_PID"}
 MCSQS_EXIT_CODE=$?
 
 echo ""
-echo "MCSQS process finished with exit code: $MCSQS_EXIT_CODE."
+if [ $MCSQS_EXIT_CODE -eq 124 ]; then
+    echo "⏱️  Time limit reached ($TIME_LIMIT_MINUTES minutes). MCSQS stopped automatically."
+else
+    echo "MCSQS process finished with exit code: $MCSQS_EXIT_CODE."
+fi
 
 echo "Allowing monitor to capture final data..."
-sleep 65
+sleep 5
 
 kill $MONITOR_PID 2>/dev/null
 wait $MONITOR_PID 2>/dev/null
 
 echo ""
+echo "=========================================="
+echo "🔄 Converting bestsqs files to POSCAR..."
+echo "=========================================="
+
+found_files=0
+best_run=""
+best_objective=""
+
+if [ -f "$PROGRESS_FILE" ]; then
+    last_line=$(tail -1 "$PROGRESS_FILE")
+    {"best_objective=$(echo \"$last_line\" | cut -d',' -f$((3 + 3 * " + str(parallel_runs) + ")))" if parallel_runs > 1 else "best_objective=$(echo \"$last_line\" | cut -d',' -f4)"}
+    {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
+fi
+
+for outfile in bestsqs*.out; do
+    if [ -f "$outfile" ]; then
+        found_files=1
+        basename="${{outfile%.out}}"
+        poscar_file="${{basename}}_POSCAR"
+        
+        if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
+            echo "  ✅ $outfile → $poscar_file"
+        else
+            echo "  ❌ Failed to convert $outfile"
+        fi
+    fi
+done
+
+if [ $found_files -eq 0 ]; then
+    echo "  ⚠️  No bestsqs*.out files found"
+else
+    if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
+        if [ {parallel_runs} -gt 1 ]; then
+            best_poscar="bestsqs${{best_run}}_POSCAR"
+        else
+            best_poscar="bestsqs_POSCAR"
+        fi
+        
+        if [ -f "$best_poscar" ]; then
+            cp "$best_poscar" "POSCAR_best_overall"
+            echo ""
+            echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+            if [ {parallel_runs} -gt 1 ]; then
+                echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
+            else
+                echo "    Source: bestsqs.out"
+            fi
+        else
+            echo ""
+            echo "⚠️  Could not find best POSCAR file: $best_poscar"
+        fi
+    else
+        echo ""
+        echo "⚠️  Could not determine best structure (no progress data found)"
+    fi
+fi
+
+echo ""
 echo "================================================"
 echo "              Optimization Complete"
 echo "================================================"
-echo "Results:"
-echo "  - MCSQS log:       $LOG_FILE"
-echo "  - Progress data:   $PROGRESS_FILE"
-echo "  - Best structure:  bestsqs.out (if generated)"
-echo "  - Correlation data: bestcorr.out (if generated)"
-echo ""
+
 
 if [ -f "$PROGRESS_FILE" ]; then
    echo "Progress Summary:"
@@ -5201,6 +5508,7 @@ def render_monitor_script_section(results):
     - ✅ **Executes mcsqs** with real-time monitoring
     - ✅ **Generates CSV progress** data every minute
     - ✅ **Supports parallel execution** for faster results
+    - ✅ **Creates POSCAR from bestsqs.out** automatically
     """)
 
     # Configuration options
@@ -5236,6 +5544,26 @@ def render_monitor_script_section(results):
         else:
             parallel_runs = 1
 
+        st.write("**Time Limit:**")
+        enable_time_limit = st.checkbox(
+            "Set automatic time limit",
+            value=False,
+            help="Automatically stop mcsqs after specified time",
+            key="monitor_enable_time_limit"
+        )
+
+        if enable_time_limit:
+            time_limit_minutes = st.number_input(
+                "Time limit (minutes):",
+                min_value=1,
+                max_value=10080,
+                value=30,
+                step=5,
+                key="monitor_time_limit"
+            )
+        else:
+            time_limit_minutes = None
+
     with col_opt3:
         st.write("**Cluster Settings:**")
         pair_cutoff = results.get('pair_cutoff', 1.1)
@@ -5269,7 +5597,9 @@ def render_monitor_script_section(results):
                     parallel_runs=parallel_runs,
                     pair_cutoff=pair_cutoff,
                     triplet_cutoff=triplet_cutoff,
-                    quadruplet_cutoff=quadruplet_cutoff
+                    quadruplet_cutoff=quadruplet_cutoff,
+                    max_param=results.get('max_param', 1.0),
+                    time_limit_minutes=time_limit_minutes
                 )
 
                 st.download_button(
@@ -5282,7 +5612,8 @@ def render_monitor_script_section(results):
                 )
 
                 st.success("✅ Monitor script generated successfully!")
-
+                with st.expander("Script Preview", expanded=False):
+                    st.code(script_content, language="bash")
             except Exception as e:
                 st.error(f"Error generating script: {str(e)}")
 
@@ -5295,7 +5626,7 @@ def render_monitor_script_section(results):
 
             2. **Make it executable:**
                ```bash
-               sudo chmod +x monitor.sh
+               sudo chmod +x monitor.sh # or 'bash monitor.sh'
                ```
 
             3. **Run the script:**
@@ -5309,6 +5640,7 @@ def render_monitor_script_section(results):
             - 🚀 **Starts mcsqs** in single instance (or in parallel if enabled)
             - 📊 **Monitors progress** every minute
             - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
+            - 📁 **Converts bestsqs.out to POSCAR** automatically when stopped
 
             ### Output files:
             - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
@@ -5323,6 +5655,7 @@ def render_monitor_script_section(results):
 
              **The generated CSV file can be uploaded back to this tool for analysis!**
             """)
+
 
 
 def create_vacancies_from_sqs(sqs_structure, elements_to_remove):
@@ -5750,7 +6083,7 @@ def render_correlation_analysis_tab():
             correlation_df['Abs_Difference'] = correlation_df['Difference'].abs()
 
             correlation_df['Quality'] = correlation_df['Abs_Difference'].apply(
-                lambda x: "Perfect" if x < 0.001 else "Weak" if x <= 0.05 else "Moderate" if x <= 0.1 else "Strong"
+                lambda x: "Perfect" if x < 0.001 else "Very good" if x <= 0.05 else "Moderate" if x <= 0.1 else "Large deviations"
             )
 
             correlation_df = correlation_df.round(6)
