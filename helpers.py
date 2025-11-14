@@ -2857,7 +2857,7 @@ def identify_structure_type(structure):
         formula = structure.composition.reduced_formula
         formula_type = get_formula_type(formula)
        # print("------")
-        print(formula)
+       # print(formula)
        # print(formula_type)
         #print(spg_number)
         if spg_number in STRUCTURE_TYPES and spg_number == 62 and formula_type in STRUCTURE_TYPES[spg_number] and formula == "CaCO3":
@@ -3199,14 +3199,13 @@ STRUCTURE_TYPES = {
 }
 
 def get_full_conventional_structure(structure, symprec=1e-3):
-    # Create the spglib cell tuple: (lattice, fractional coords, atomic numbers)
     cell = (structure.lattice.matrix, structure.frac_coords,
             [max(site.species, key=site.species.get).number for site in structure])
 
     dataset = spglib.get_symmetry_dataset(cell, symprec=symprec)
-    std_lattice = dataset['std_lattice']
-    std_positions = dataset['std_positions']
-    std_types = dataset['std_types']
+    std_lattice = dataset.std_lattice
+    std_positions = dataset.std_positions
+    std_types = dataset.std_types
 
     conv_structure = Structure(std_lattice, std_types, std_positions)
     return conv_structure
@@ -3447,7 +3446,7 @@ def get_structure_from_cif_url(cif_url):
 
 def get_cod_str(cif_content):
     parser = CifParser.from_str(cif_content)
-    structure = parser.get_structures(primitive=False)[0]
+    structure = parser.parse_structures(primitive=False)[0]
     return structure
 
 def sort_formula_alphabetically(formula_input):
@@ -3470,7 +3469,7 @@ def fetch_and_parse_cod_cif(entry):
         cif_content = response.text
         parser = CifParser.from_str(cif_content)
 
-        structure = parser.get_structures(primitive=False)[0]
+        structure = parser.parse_structures(primitive=False)[0]
         cod_id = f"cod_{file_id}"
         return cod_id, structure, entry, None
 
@@ -3483,7 +3482,7 @@ def get_all_sites(structure):
     try:
         sga = SpacegroupAnalyzer(structure)
         sym_data = sga.get_symmetry_dataset()
-        wyckoffs = sym_data.get("wyckoffs", ["?"] * len(structure))
+        wyckoffs = sym_data.wyckoffs if sym_data else ["?"] * len(structure)
     except Exception:
         wyckoffs = ["?"] * len(structure)
 
