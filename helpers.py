@@ -91,6 +91,7 @@ def intro_text():
 ### 🎥 Tutorials
 - 📘 **General Overview of the App**: [Watch on YouTube](https://www.youtube.com/watch?v=GGo_9T5wqus)  
 - ⚡ **Binary Alloy Workflow (Search Across Concentration Range)**: [Watch on YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)
+- 🎲 **How to create bcc HEA** [Watch on YouTube](https://youtu.be/U6JI2j3BfMg?si=Oeal6MueVzYRLlmc)
 
 ---
 
