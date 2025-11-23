@@ -88,10 +88,13 @@ def intro_text():
     
 
     st.markdown("""
-### 🎥 Tutorials
+### 🎥 Tutorials and References
 - 📘 **General Overview of the App**: [Watch on YouTube](https://www.youtube.com/watch?v=GGo_9T5wqus)  
 - ⚡ **Binary Alloy Workflow (Search Across Concentration Range)**: [Watch on YouTube](https://youtu.be/wL5re3Fu1nQ?si=4HGRmIQBX39zs-0B)
 - 🎲 **How to create bcc HEA** [Watch on YouTube](https://youtu.be/U6JI2j3BfMg?si=Oeal6MueVzYRLlmc)
+- 📖 [**Preprint (arXiv)**](https://arxiv.org/abs/2510.18020): 
+Read about the SimplySQS workflow and its application to the Pb<sub>1-x</sub>Sr<sub>x</sub>TiO<sub>3</sub> system. The study show automated SQS generation across the entire concentration range using an all-in-one bash script, and evaluates the performance of a universal MLIP (MACE-MATPES-r2SCAN) for the cubic-to-tetragonal phase transition.
+
 
 ---
 
