@@ -1306,11 +1306,11 @@ def render_atat_sqs_section():
 
     col_x, col_y, col_z = st.columns(3)
     with col_x:
-        nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nx")
+        nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=31, step=1, key="atat_nx")
     with col_y:
-        ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_ny")
+        ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=21, step=1, key="atat_ny")
     with col_z:
-        nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nz")
+        nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=21, step=1, key="atat_nz")
 
     transformation_matrix = np.array([
         [nx, 0, 0],
