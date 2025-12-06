@@ -156,7 +156,8 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 🚀 This tool streamlines the **entire SQS workflow** — from structure input to automated search, analysis, and output conversion.
      
-     """)
+     """,
+               unsafe_allow_html=True)
 
 
 
