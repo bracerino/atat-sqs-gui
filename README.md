@@ -4,9 +4,9 @@
  📖 If you like the app, **please cite [this preprint (arXiv)](https://arxiv.org/abs/2510.18020)**.  
 
 ### Tutorials 
- 🎥 **Video tutorial about the main features at: [YouTube](https://youtu.be/GGo_9T5wqus?si=d3ATtFdfy1NYUCO8)**  
- 🎥 **Video tutorial for running ATAT mcsqs search across concentration range of binary alloys at: [YouTube](https://youtu.be/wL5re3Fu1nQ?si=anuqQD88x4xLYmec)**  
- 🎥 **Video tutorial for creating SQS for BCC HEA: [YouTube](https://youtu.be/U6JI2j3BfMg).**  
+ 🎥 **Video tutorial about the main features: [YouTube](https://youtu.be/GGo_9T5wqus?si=d3ATtFdfy1NYUCO8)**  
+ 🎥 **Video tutorial for running ATAT mcsqs search across concentration range of binary alloys: [YouTube](https://youtu.be/wL5re3Fu1nQ?si=anuqQD88x4xLYmec)**  
+ 🎥 **Video tutorial for creating SQS for bcc HEA: [YouTube](https://youtu.be/U6JI2j3BfMg).**  
  
 
 
