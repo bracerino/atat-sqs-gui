@@ -5598,7 +5598,7 @@ def render_monitor_script_section(results):
     col_download, col_info = st.columns([1, 1])
 
     with col_download:
-        if st.button("🛠️ Generate Monitor Script", type="tertiary", key="generate_monitor_script"):
+        if st.button("🛠️ Generate All-in-One Bash Script for SQS Search", type="tertiary", key="generate_monitor_script"):
             try:
                 script_content = generate_atat_monitor_script(
                     results=results,
