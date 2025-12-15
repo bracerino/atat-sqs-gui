@@ -1436,6 +1436,7 @@ def render_atat_sqs_section():
         - Valid concentrations must be multiples of 1/{supercell_multiplicity}
         - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
         - Each concentration applies to ALL atomic sites equally
+        - For vacancies, use symbol 'Vac'
         """)
 
         st.write("**Set target composition fractions:**")
@@ -3624,6 +3625,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     **Sublattice Mode - Wyckoff Position Control:**
     - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site. 
     Only unique Wyckoff positions are shown below. Settings automatically apply to all equivalent sites. Concentration constraints are per Wyckoff position.
+    - For vacancies, use symbol 'Vac'.
     """)
 
     common_elements = [
