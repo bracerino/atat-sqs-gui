@@ -608,7 +608,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        time_per_conc_current=0.1",
         "        parallel_runs_per_conc_current=1",
         '        echo ""',
-        '        echo "ℹ️  Note: Single or very few atoms detected. Reducing time to $time_per_conc_current min and parallel runs to $parallel_runs_per_conc_current."',
+        '        echo "ℹ️  Note: Single atom detected. Reducing time to $time_per_conc_current min and parallel runs to $parallel_runs_per_conc_current."',
         "    fi",
         "    ",
         "    local total_time_seconds_current=$(echo \"$time_per_conc_current * 60\" | bc | xargs printf \"%.0f\")",
