@@ -2010,8 +2010,6 @@ def render_sqs_module():
                                             type="primary"
                                         )
 
-                                    st.info(
-                                        f"**Note**: Structures retrieved via OPTIMADE API from Materials Cloud MC3D database.")
                             tab_index += 1
 
     if "sqs_mode_initialized" not in st.session_state:
