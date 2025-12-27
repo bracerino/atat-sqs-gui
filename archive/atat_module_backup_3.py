@@ -608,7 +608,7 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
         "        time_per_conc_current=0.1",
         "        parallel_runs_per_conc_current=1",
         '        echo ""',
-        '        echo "ℹ️  Note: Single or very few atoms detected. Reducing time to $time_per_conc_current min and parallel runs to $parallel_runs_per_conc_current."',
+        '        echo "ℹ️  Note: Single atom detected. Reducing time to $time_per_conc_current min and parallel runs to $parallel_runs_per_conc_current."',
         "    fi",
         "    ",
         "    local total_time_seconds_current=$(echo \"$time_per_conc_current * 60\" | bc | xargs printf \"%.0f\")",
@@ -1306,11 +1306,11 @@ def render_atat_sqs_section():
 
     col_x, col_y, col_z = st.columns(3)
     with col_x:
-        nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nx")
+        nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=31, step=1, key="atat_nx")
     with col_y:
-        ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_ny")
+        ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=21, step=1, key="atat_ny")
     with col_z:
-        nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1, key="atat_nz")
+        nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=21, step=1, key="atat_nz")
 
     transformation_matrix = np.array([
         [nx, 0, 0],
@@ -1436,6 +1436,7 @@ def render_atat_sqs_section():
         - Valid concentrations must be multiples of 1/{supercell_multiplicity}
         - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
         - Each concentration applies to ALL atomic sites equally
+        - For vacancies, use symbol 'Vac'
         """)
 
         st.write("**Set target composition fractions:**")
@@ -1750,12 +1751,14 @@ def render_atat_sqs_section():
                 st.rerun()
 
     if generate_atat_button:
+
         try:
             if composition_mode == "🔄 Global Composition":
                 achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
                     target_concentrations, supercell_multiplicity)
 
                 use_concentrations = achievable_concentrations_for_atat
+                print(f'Successfully generated ATAT mcsqs input files for: {use_concentrations}')
                 use_sublattice_mode_final = False
                 use_chem_symbols = None
             else:
@@ -1764,6 +1767,13 @@ def render_atat_sqs_section():
                 )
 
                 use_concentrations = achievable_concentrations_for_atat
+                print("Successfully generated ATAT mcsqs input files for: " +
+                      "; ".join(
+                          f"Site {site}: " +
+                          ", ".join(f"{elem}-{float(val):g}" for elem, val in species.items())
+                          for site, species in use_concentrations.items()
+                      )
+                      )
                 use_sublattice_mode_final = True
                 use_chem_symbols = chem_symbols
 
@@ -3615,6 +3625,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     **Sublattice Mode - Wyckoff Position Control:**
     - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site. 
     Only unique Wyckoff positions are shown below. Settings automatically apply to all equivalent sites. Concentration constraints are per Wyckoff position.
+    - For vacancies, use symbol 'Vac'.
     """)
 
     common_elements = [
@@ -4941,7 +4952,7 @@ def render_extended_optimization_analysis_tab():
 
 
 def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1, pair_cutoff=1.1, triplet_cutoff=None,
-                                 quadruplet_cutoff=None,max_param=1.0):
+                                 quadruplet_cutoff=None,max_param=1.0,time_limit_minutes=None):
     if use_atom_count:
         mcsqs_base_cmd = f"mcsqs -n {results['total_atoms']}"
     else:
@@ -4956,7 +4967,11 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
     if parallel_runs > 1:
         mcsqs_commands = []
         for i in range(1, parallel_runs + 1):
-            mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} &")
+            if time_limit_minutes:
+                mcsqs_commands.append(
+                    f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} -ip={i} > mcsqs{i}.log 2>&1 || true &")
+            else:
+                mcsqs_commands.append(f"{mcsqs_base_cmd} -ip={i} > mcsqs{i}.log 2>&1 &")
         mcsqs_execution = "\n".join(mcsqs_commands)
         log_file = "mcsqs1.log"
         mcsqs_display_cmd = f"{mcsqs_base_cmd} -ip=1 & {mcsqs_base_cmd} -ip=2 & ... (parallel execution)"
@@ -5049,7 +5064,13 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
         monitor_call = "start_parallel_monitoring_process \"$PROGRESS_FILE\" &"
 
     else:
-        mcsqs_execution = f"{mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 &"
+        if time_limit_minutes:
+            mcsqs_execution = f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 || true &"
+        else:
+            if time_limit_minutes:
+                mcsqs_execution = f"timeout {time_limit_minutes * 60}s {mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 || true &"
+            else:
+                mcsqs_execution = f"{mcsqs_base_cmd} > \"$LOG_FILE\" 2>&1 &"
         log_file = "mcsqs.log"
         mcsqs_display_cmd = mcsqs_base_cmd
         progress_file = "mcsqs_progress.csv"
@@ -5116,6 +5137,8 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 LOG_FILE="{log_file}"
 PROGRESS_FILE="{progress_file}"
 DEFAULT_MCSQS_ARGS="{mcsqs_base_cmd.split('mcsqs ')[1]}"
+{"TIME_LIMIT_MINUTES=" + str(time_limit_minutes) if time_limit_minutes else "TIME_LIMIT_MINUTES=0"}
+TIME_LIMIT_SECONDS=$((TIME_LIMIT_MINUTES * 60))
 
 # --- Auto-generate ATAT Input Files ---
 create_input_files() {{
@@ -5283,6 +5306,7 @@ cleanup() {{
    echo "🧹 Stopping MCSQS processes..."
    if [ -n "$MCSQS_PID" ]; then kill "$MCSQS_PID" 2>/dev/null; fi
    if [ -n "$MONITOR_PID" ]; then kill "$MONITOR_PID" 2>/dev/null; fi
+   if [ -n "$TIMER_PID" ]; then kill "$TIMER_PID" 2>/dev/null; fi
    pkill -9 -f "mcsqs" 2>/dev/null || true
    sleep 2
    
@@ -5363,6 +5387,7 @@ echo "  - Structure: {results['structure_name']}"
 echo "  - Supercell: {results['supercell_size']} ({results['total_atoms']} atoms)"
 echo "  - Parallel runs: {parallel_runs}"
 echo "  - Command: {mcsqs_display_cmd}"
+{"echo \"  - Time limit: $TIME_LIMIT_MINUTES minutes\"" if time_limit_minutes else "echo \"  - Time limit: None (manual stop)\""}
 echo "  - Log file: $LOG_FILE"
 echo "  - Progress file: $PROGRESS_FILE"
 echo "================================================"
@@ -5370,12 +5395,13 @@ echo "================================================"
 check_prerequisites
 
 rm -f "$LOG_FILE" "$PROGRESS_FILE" mcsqs*.log
-
 echo ""
 echo "Starting ATAT MCSQS optimization and progress monitor..."
 
 {mcsqs_execution}
 MCSQS_PID=$!
+
+
 
 {monitor_call}
 MONITOR_PID=$!
@@ -5384,31 +5410,93 @@ echo "✅ MCSQS started"
 echo "✅ Monitor started (PID: $MONITOR_PID)"
 echo ""
 echo "Real-time progress logged to: $PROGRESS_FILE"
-echo "Press Ctrl+C to stop optimization and monitoring."
+if [ $TIME_LIMIT_MINUTES -gt 0 ]; then
+    echo "⏱️  Will auto-stop after $TIME_LIMIT_MINUTES minutes"
+    echo "Press Ctrl+C to stop earlier and auto-convert to POSCAR."
+else
+    echo "Press Ctrl+C to stop optimization and auto-convert to POSCAR."
+fi
 echo "================================================"
 
 {"wait" if parallel_runs > 1 else "wait $MCSQS_PID"}
 MCSQS_EXIT_CODE=$?
 
 echo ""
-echo "MCSQS process finished with exit code: $MCSQS_EXIT_CODE."
+if [ $MCSQS_EXIT_CODE -eq 124 ]; then
+    echo "⏱️  Time limit reached ($TIME_LIMIT_MINUTES minutes). MCSQS stopped automatically."
+else
+    echo "MCSQS process finished with exit code: $MCSQS_EXIT_CODE."
+fi
 
 echo "Allowing monitor to capture final data..."
-sleep 65
+sleep 5
 
 kill $MONITOR_PID 2>/dev/null
 wait $MONITOR_PID 2>/dev/null
 
 echo ""
+echo "=========================================="
+echo "🔄 Converting bestsqs files to POSCAR..."
+echo "=========================================="
+
+found_files=0
+best_run=""
+best_objective=""
+
+if [ -f "$PROGRESS_FILE" ]; then
+    last_line=$(tail -1 "$PROGRESS_FILE")
+    {"best_objective=$(echo \"$last_line\" | cut -d',' -f$((3 + 3 * " + str(parallel_runs) + ")))" if parallel_runs > 1 else "best_objective=$(echo \"$last_line\" | cut -d',' -f4)"}
+    {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
+fi
+
+for outfile in bestsqs*.out; do
+    if [ -f "$outfile" ]; then
+        found_files=1
+        basename="${{outfile%.out}}"
+        poscar_file="${{basename}}_POSCAR"
+        
+        if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
+            echo "  ✅ $outfile → $poscar_file"
+        else
+            echo "  ❌ Failed to convert $outfile"
+        fi
+    fi
+done
+
+if [ $found_files -eq 0 ]; then
+    echo "  ⚠️  No bestsqs*.out files found"
+else
+    if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
+        if [ {parallel_runs} -gt 1 ]; then
+            best_poscar="bestsqs${{best_run}}_POSCAR"
+        else
+            best_poscar="bestsqs_POSCAR"
+        fi
+        
+        if [ -f "$best_poscar" ]; then
+            cp "$best_poscar" "POSCAR_best_overall"
+            echo ""
+            echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+            if [ {parallel_runs} -gt 1 ]; then
+                echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
+            else
+                echo "    Source: bestsqs.out"
+            fi
+        else
+            echo ""
+            echo "⚠️  Could not find best POSCAR file: $best_poscar"
+        fi
+    else
+        echo ""
+        echo "⚠️  Could not determine best structure (no progress data found)"
+    fi
+fi
+
+echo ""
 echo "================================================"
 echo "              Optimization Complete"
 echo "================================================"
-echo "Results:"
-echo "  - MCSQS log:       $LOG_FILE"
-echo "  - Progress data:   $PROGRESS_FILE"
-echo "  - Best structure:  bestsqs.out (if generated)"
-echo "  - Correlation data: bestcorr.out (if generated)"
-echo ""
+
 
 if [ -f "$PROGRESS_FILE" ]; then
    echo "Progress Summary:"
@@ -5431,7 +5519,7 @@ def render_monitor_script_section(results):
     - ✅ **Executes mcsqs** with real-time monitoring
     - ✅ **Generates CSV progress** data every minute
     - ✅ **Supports parallel execution** for faster results
-    - ✅ **Creates POSCAR** automatically from bestsqs.out
+    - ✅ **Creates POSCAR from bestsqs.out** automatically
     """)
 
     # Configuration options
@@ -5467,6 +5555,26 @@ def render_monitor_script_section(results):
         else:
             parallel_runs = 1
 
+        st.write("**Time Limit:**")
+        enable_time_limit = st.checkbox(
+            "Set automatic time limit",
+            value=False,
+            help="Automatically stop mcsqs after specified time",
+            key="monitor_enable_time_limit"
+        )
+
+        if enable_time_limit:
+            time_limit_minutes = st.number_input(
+                "Time limit (minutes):",
+                min_value=1,
+                max_value=10080,
+                value=30,
+                step=5,
+                key="monitor_time_limit"
+            )
+        else:
+            time_limit_minutes = None
+
     with col_opt3:
         st.write("**Cluster Settings:**")
         pair_cutoff = results.get('pair_cutoff', 1.1)
@@ -5492,7 +5600,7 @@ def render_monitor_script_section(results):
     col_download, col_info = st.columns([1, 1])
 
     with col_download:
-        if st.button("🛠️ Generate Monitor Script", type="tertiary", key="generate_monitor_script"):
+        if st.button("🛠️ Generate All-in-One Bash Script for SQS Search", type="tertiary", key="generate_monitor_script"):
             try:
                 script_content = generate_atat_monitor_script(
                     results=results,
@@ -5501,7 +5609,8 @@ def render_monitor_script_section(results):
                     pair_cutoff=pair_cutoff,
                     triplet_cutoff=triplet_cutoff,
                     quadruplet_cutoff=quadruplet_cutoff,
-                    max_param=results.get('max_param', 1.0)
+                    max_param=results.get('max_param', 1.0),
+                    time_limit_minutes=time_limit_minutes
                 )
 
                 st.download_button(
@@ -5528,7 +5637,7 @@ def render_monitor_script_section(results):
 
             2. **Make it executable:**
                ```bash
-               sudo chmod +x monitor.sh
+               sudo chmod +x monitor.sh # or 'bash monitor.sh'
                ```
 
             3. **Run the script:**
@@ -5542,6 +5651,7 @@ def render_monitor_script_section(results):
             - 🚀 **Starts mcsqs** in single instance (or in parallel if enabled)
             - 📊 **Monitors progress** every minute
             - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
+            - 📁 **Converts bestsqs.out to POSCAR** automatically when stopped
 
             ### Output files:
             - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
@@ -5984,7 +6094,7 @@ def render_correlation_analysis_tab():
             correlation_df['Abs_Difference'] = correlation_df['Difference'].abs()
 
             correlation_df['Quality'] = correlation_df['Abs_Difference'].apply(
-                lambda x: "Perfect" if x < 0.001 else "Weak" if x <= 0.05 else "Moderate" if x <= 0.1 else "Strong"
+                lambda x: "Perfect" if x < 0.001 else "Very good" if x <= 0.05 else "Moderate" if x <= 0.1 else "Large deviations"
             )
 
             correlation_df = correlation_df.round(6)
