@@ -1,6 +1,3 @@
-# random_vs_sqs_analysis_standalone.py - NO ATAT REQUIRED VERSION
-# Custom randomness quantification using Warren-Cowley parameters
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -12,10 +9,6 @@ import random
 import time
 from collections import defaultdict
 
-
-# ==========================================
-#  CORE ANALYSIS LOGIC (Rigorous Physics)
-# ==========================================
 
 def get_mic_distance_matrix(frac_coords, lattice_matrix):
     n = len(frac_coords)
@@ -92,8 +85,8 @@ class GeometryCacheUI:
 
             shells = sorted(list(dists_set))[:3]
 
-            # UPDATED: Added site count information
-            self.debug_info.append(f"Sublattice {sid + 1} [{sp}] ({len(indices)} sites) Shells: {shells}")
+            shells_clean = [float(s) for s in shells]
+            self.debug_info.append(f"Sublattice {sid + 1} [{sp}] ({len(indices)} sites) Shells: {shells_clean}")
 
             self.sublattice_shells[sid] = {'shells': shells, 'map': neighbor_map}
 
@@ -103,7 +96,6 @@ class GeometryCacheUI:
 
         final_elements = [None] * len(self.sub_ids)
 
-        # Group indices by sublattice ID
         sub_indices = defaultdict(list)
         for idx, sid in enumerate(self.sub_ids):
             sub_indices[sid].append(idx)
@@ -113,7 +105,6 @@ class GeometryCacheUI:
             n_sites = len(indices)
 
             if '=' in spec:
-                # Mixed sublattice: Ensure exact counts
                 atoms_for_sublattice = []
                 parts = spec.split(',')
                 els, fracs = [], []
@@ -122,14 +113,11 @@ class GeometryCacheUI:
                     els.append(e)
                     fracs.append(float(f))
 
-                # Calculate exact counts
                 counts = [int(round(f * n_sites)) for f in fracs]
 
-                # Fix rounding errors
                 diff = n_sites - sum(counts)
                 if diff != 0: counts[-1] += diff
 
-                # Create list and shuffle
                 for el, count in zip(els, counts):
                     atoms_for_sublattice.extend([el] * count)
 
@@ -138,7 +126,6 @@ class GeometryCacheUI:
                 for i, atom in zip(indices, atoms_for_sublattice):
                     final_elements[i] = atom
             else:
-                # Fixed sublattice
                 for i in indices:
                     final_elements[i] = spec
 
@@ -159,12 +146,10 @@ def perform_live_analysis_rigorous(cache, elements):
         concs = {e: np.sum(act_els == e) / len(act_els) for e in unq}
 
         shell_alphas = []
-        shell_expected_sigmas = []  # NEW: Track expected fluctuations
 
         for shell_d in data['shells']:
             n_map = data['map'][shell_d]
             alphas = []
-            expected_vars = []  # NEW: Expected variance for each pair
 
             for e1 in unq:
                 for e2 in unq:
@@ -179,36 +164,17 @@ def perform_live_analysis_rigorous(cache, elements):
                     if tot > 0 and concs[e2] > 0:
                         alpha = 1.0 - (obs / tot) / concs[e2]
                         alphas.append(alpha)
-
-                        # NEW: Calculate expected variance for finite random system
-                        # Var(α_αβ) ≈ (1 - c_β) / (c_β × N_neighbors)
-                        expected_var = (1.0 - concs[e2]) / (concs[e2] * tot)
-                        expected_vars.append(expected_var)
                     else:
                         alphas.append(0.0)
-                        expected_vars.append(0.0)
 
             if alphas:
-                shell_rmse_obs = np.sqrt(np.mean(np.array(alphas) ** 2))
-
-                shell_rmse_expected = np.sqrt(np.mean(expected_vars))
-
-                shell_rmse_corrected = max(0.0, shell_rmse_obs - shell_rmse_expected)
-
-                shell_alphas.append(shell_rmse_corrected)
-                shell_expected_sigmas.append(shell_rmse_expected)
+                shell_rmse = np.sqrt(np.mean(np.array(alphas) ** 2))
+                shell_alphas.append(shell_rmse)
             else:
                 shell_alphas.append(0.0)
-                shell_expected_sigmas.append(0.0)
 
         sub_rmse = np.mean(shell_alphas) if shell_alphas else 0.0
-        avg_expected_sigma = np.mean(shell_expected_sigmas) if shell_expected_sigmas else 0.0
-
-        max_possible_score = 1.0 - avg_expected_sigma
-        if max_possible_score > 0:
-            sub_score = max(0.0, max_possible_score - sub_rmse)
-        else:
-            sub_score = 0.0  # System too small to assess randomness
+        sub_score = max(0.0, 1.0 - sub_rmse)
 
         total_rmse += sub_rmse
         sub_count += 1
@@ -219,35 +185,7 @@ def perform_live_analysis_rigorous(cache, elements):
         sublattice_scores[label] = sub_score
 
     avg_rmse = total_rmse / sub_count if sub_count > 0 else 0.0
-
-    overall_noise_floor = 0.0
-    for sid, data in cache.sublattice_shells.items():
-        mask = (cache.sub_ids == sid)
-        act_els = elements[mask]
-        unq = np.unique(act_els)
-        concs = {e: np.sum(act_els == e) / len(act_els) for e in unq}
-
-        shell_noise = []
-        for shell_d in data['shells']:
-            n_map = data['map'][shell_d]
-            pair_vars = []
-            for e1 in unq:
-                for e2 in unq:
-                    tot = 0
-                    for idx in np.where((cache.sub_ids == sid) & (elements == e1))[0]:
-                        neighs = n_map.get(idx, [])
-                        if neighs: tot += len(neighs)
-                    if tot > 0 and concs[e2] > 0:
-                        pair_vars.append((1.0 - concs[e2]) / (concs[e2] * tot))
-            if pair_vars:
-                shell_noise.append(np.sqrt(np.mean(pair_vars)))
-        if shell_noise:
-            overall_noise_floor += np.mean(shell_noise)
-
-    overall_noise_floor /= max(1, sub_count)
-    max_overall_score = 1.0 - overall_noise_floor
-
-    final_score = max(0.0, max_overall_score - avg_rmse)
+    final_score = max(0.0, 1.0 - avg_rmse)
 
     return final_score, avg_rmse, " | ".join(breakdown_list), sublattice_scores
 
@@ -295,13 +233,12 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
     with st.expander("ℹ️ What is this feature?", expanded=False):
 
         st.markdown("""
-    **Purpose**  
-    Quantitatively assess whether a randomly occupied supercell adequately represents a
-    random alloy, or whether Special Quasirandom Structure (SQS) optimization is required.
+    ### Purpose
+    Quantitatively assess whether a randomly occupied supercell could adequately represents a
+    random alloy, or whether SQS optimization is likely required.
 
     The analysis measures short-range order (SRO) using Warren–Cowley parameters, which
-    compare local atomic environments to ideal random-alloy statistics, with finite-size
-    corrections to account for statistical fluctuations in small supercells.
+    compare local atomic environments to ideal random-alloy statistics.
     """)
 
         st.markdown("---")
@@ -311,16 +248,11 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
     **Sublattice-resolved analysis**  
     Only chemically active sublattices (those allowing multiple species) are analyzed.
-    Fixed sublattices are excluded, consistent with the ATAT/cluster-expansion formalism.
-
-    **Periodic boundary conditions (PBC)**  
-    All neighbor distances are computed using the minimum image convention (MIC) to correctly
-    handle coordination across supercell boundaries. The distance between atoms is calculated
-    using the metric tensor derived from the supercell lattice vectors.
+    Fixed sublattices are excluded.
 
     **Coordination shell identification**  
     For each sublattice:
-    1. All pairwise distances between atoms on that sublattice are computed using MIC
+    1. All pairwise distances between atoms on that sublattice are computed using minimum image convention (MIC) 
     2. Distances are rounded to 3 decimal places to group equivalent neighbors
     3. The three shortest unique distances define the 1st, 2nd, and 3rd coordination shells
     4. A neighbor map is constructed: for each atom and each shell, all neighbors at that distance are stored
@@ -342,37 +274,17 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
     Warren–Cowley parameters quantify **pair correlations**: the probability of finding 
     species β at a specific distance from species α. Higher-order correlations (triplets, 
     quadruplets, etc.) describe the joint probability of finding specific atomic configurations 
-    involving 3+ atoms.
-
-    **Why pair correlations are sufficient for randomness assessment:**
-
-    1. **Random alloys have zero correlations at all orders**  
-       A truly random alloy has zero pair, triplet, and higher-order correlations. If pair 
-       correlations are already near zero, higher-order correlations will also be negligible.
-
-    2. **Pair correlations dominate energetics**  
-       In most systems, interatomic interactions are dominated by nearest-neighbor (2-body) 
+    involving 3+ atoms. In most systems, interatomic interactions are dominated by nearest-neighbor (2-body) 
        effects. If the pair distribution is random, the structure effectively samples the 
        canonical ensemble.
-
-    3. **Computational practicality**  
-       Triplet and higher-order correlations scale combinatorially:
-       - Pairs: ~N_species² × N_shells calculations
-       - Triplets: ~N_species³ × N_shells² calculations  
-       - For binary alloys with 3 shells: pairs require ~12 terms, triplets require ~54+ terms
-
-    4. **Sufficient for deciding random vs SQS**  
-       The goal of this analysis is to determine whether random generation is adequate, or 
-       whether SQS optimization is needed. If random structures show:
+       The goal of this analysis is to determine whether random generation could be adequate, or 
+       whether SQS optimization is likely needed. If random structures show:
        - **Low pair SRO** → random generation works, higher-order terms are also random
        - **High pair SRO** → SQS is needed, and SQS optimization will target pair + higher-order correlations
 
-    **When triplets matter:**
-
     Triplet and higher-order correlations become important during **SQS optimization**, where 
     the goal is to perfectly reproduce random-alloy statistics for cluster-expansion training. 
-    Tools like ATAT's `mcsqs` minimize correlations for pairs, triplets, and quadruplets 
-    simultaneously. However, for the **initial assessment** of whether random structures are 
+    However, for the **initial assessment** of whether random structures are 
     adequate, pair correlations provide sufficient diagnostic information.
     """)
 
@@ -453,104 +365,20 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
         st.markdown("---")
 
-        st.markdown("### Finite-size corrections")
-
-        st.markdown("""
-    **The challenge of small supercells**
-
-    In finite systems, truly random configurations exhibit non-zero Warren–Cowley parameters 
-    due to statistical fluctuations. A 40-atom supercell cannot achieve α_αβ = 0 for all pairs, 
-    even when perfectly random. Without correction, this leads to:
-    - Small cells incorrectly flagged as "ordered"
-    - Misleading comparisons between different supercell sizes
-    - Overestimation of SQS necessity
-
-    **Expected variance for random alloys**
-
-    For a truly random configuration with N_α^(n) total neighbors around species α atoms, the 
-    expected variance of the Warren–Cowley parameter is:
-    """)
-
-        st.latex(r"\text{Var}(\alpha_{\alpha\beta}^{(n)}) \approx \frac{1 - c_\beta}{c_\beta \cdot N_{\alpha}^{(n)}}")
-
-        st.markdown("""
-    This arises from binomial sampling statistics: each of the N_α^(n) neighbor sites has 
-    independent probability c_β of being occupied by species β.
-
-    **Corrected RMSE calculation**
-
-    For each coordination shell, we calculate:
-    """)
-
-        st.latex(
-            r"\text{RMSE}_{\text{obs}} = \sqrt{\frac{1}{|\text{pairs}|} \sum_{\alpha,\beta} \left(\alpha_{\alpha\beta}^{(n)}\right)^2}")
-
-        st.latex(
-            r"\text{RMSE}_{\text{expected}} = \sqrt{\frac{1}{|\text{pairs}|} \sum_{\alpha,\beta} \text{Var}(\alpha_{\alpha\beta}^{(n)})}")
-
-        st.latex(
-            r"\text{RMSE}_{\text{corrected}} = \max\left(0, \text{RMSE}_{\text{obs}} - \text{RMSE}_{\text{expected}}\right)")
-
-        st.markdown("""
-    This corrected RMSE quantifies **ordering beyond statistical noise**. Only deviations 
-    exceeding the expected random fluctuations are penalized.
-
-    **Score normalization**
-
-    The expected noise floor for each sublattice is:
-    """)
-
-        st.latex(r"\sigma_{\text{sublattice}} = \frac{1}{3} \sum_{n=1}^{3} \text{RMSE}_{\text{expected},n}")
-
-        st.markdown("""
-    The maximum achievable score (perfect randomness) for that sublattice is:
-    """)
-
-        st.latex(r"\text{Score}_{\text{max}} = 1.0 - \sigma_{\text{sublattice}}")
-
-        st.markdown("""
-    The final sublattice score accounts for deviations beyond noise:
-    """)
-
-        st.latex(
-            r"\text{Score}_{\text{sublattice}} = \max\left(0, \text{Score}_{\text{max}} - \text{RMSE}_{\text{corrected}}\right)")
-
-        st.markdown("""
-    The overall structure score averages over all active sublattices using the same methodology.
-
-    **Physical interpretation**
-
-    - **Small cells** (16-40 atoms): Expected noise ~0.15-0.25 → max achievable score ~0.75-0.85
-    - **Medium cells** (80-150 atoms): Expected noise ~0.08-0.12 → max achievable score ~0.88-0.92
-    - **Large cells** (200+ atoms): Expected noise ~0.03-0.05 → max achievable score ~0.95-0.97
-
-    A 40-atom cell scoring 0.82 is **excellent randomness** (at its statistical limit), 
-    while a 200-atom cell scoring 0.82 indicates **significant ordering** (far below its limit).
-    """)
-
-        st.markdown("---")
-
         st.markdown("### Aggregate metrics")
 
         st.markdown("""
-    For each sublattice and shell, the root-mean-square Warren–Cowley parameter (observed) is:
+    For each sublattice and shell, the root-mean-square Warren–Cowley parameter is:
     """)
 
         st.latex(
-            r"\text{RMSE}_{\text{shell,obs}} = \sqrt{\frac{1}{|\text{pairs}|} \sum_{\alpha,\beta} \left(\alpha_{\alpha\beta}^{(n)}\right)^2}")
-
-        st.markdown("""
-    After finite-size correction:
-    """)
-
-        st.latex(
-            r"\text{RMSE}_{\text{shell,corrected}} = \max\left(0, \text{RMSE}_{\text{shell,obs}} - \text{RMSE}_{\text{shell,expected}}\right)")
+            r"\text{RMSE}_{\text{shell}} = \sqrt{\frac{1}{|\text{pairs}|} \sum_{\alpha,\beta} \left(\alpha_{\alpha\beta}^{(n)}\right)^2}")
 
         st.markdown("""
     The sublattice RMSE averages over its three coordination shells:
     """)
 
-        st.latex(r"\text{RMSE}_{\text{sublattice}} = \frac{1}{3} \sum_{n=1}^{3} \text{RMSE}_{\text{shell,corrected},n}")
+        st.latex(r"\text{RMSE}_{\text{sublattice}} = \frac{1}{3} \sum_{n=1}^{3} \text{RMSE}_{\text{shell},n}")
 
         st.markdown("""
     The overall structure RMSE averages over all active sublattices:
@@ -560,81 +388,27 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
             r"\text{RMSE}_{\text{overall}} = \frac{1}{N_{\text{sublattices}}} \sum_{\text{sublattices}} \text{RMSE}_{\text{sublattice}}")
 
         st.markdown("""
-    The score is then:
+    The score is:
     """)
 
-        st.latex(r"\text{Score} = 1.0 - \sigma_{\text{overall}} - \text{RMSE}_{\text{overall}}")
-
-        st.markdown("""
-    where σ_overall is the overall expected noise floor.
-    """)
+        st.latex(r"\text{Score} = 1.0 - \text{RMSE}_{\text{overall}}")
 
         st.markdown("---")
 
         st.markdown("### Interpretation guidelines")
 
         st.markdown("""
-    **Size-independent interpretation**
+    - **Score > 0.95**: Great random-alloy behavior (negligible short-range order), SQS could not be needed.
+    - **0.85 < Score ≤ 0.95**: Good randomness; random structures likely adequate, but SQS could improve precision and is recommended.
+    - **Score ≤ 0.85**: Ordering, SQS is likely needed.
 
-    Since scores are normalized by finite-size effects, the same criteria apply regardless of 
-    supercell size:
-
-    - **Score ≈ max achievable**: Excellent random-alloy behavior (only statistical noise present)
-    - **Score within 0.05 of max**: Random structures are adequate (pair SRO negligible)
-    - **Score 0.05-0.15 below max**: Detectable ordering beyond noise; SQS may improve accuracy
-    - **Score > 0.15 below max**: Significant ordering; SQS optimization recommended
-
-    **Practical thresholds**
-
-    For convenience, absolute thresholds can still be used, but interpretation must account for 
-    cell size:
-
-    - **Score > 0.90**: Excellent for any cell size (near statistical limit)
-    - **0.75 < Score ≤ 0.90**: Good for small cells (<80 atoms), moderate for large cells
-    - **Score ≤ 0.75**: Consider SQS, especially for cells >100 atoms
-
-    **Comparing structures**
-
-    When comparing random vs. SQS structures:
-    1. Both are evaluated with the same finite-size correction
-    2. SQS should score **significantly higher** (>0.05-0.10 improvement) to justify the effort
-    3. If random structures already score near the theoretical maximum, SQS provides minimal benefit
+    **Note**: Smaller supercells naturally exhibit larger statistical fluctuations in Warren-Cowley
+    parameters even for truly random configurations. Consider supercell size when interpreting results.
     """)
 
         st.markdown("---")
 
-        st.markdown("### Implementation notes")
-
-        st.markdown("""
-    **Supercell size considerations:**  
-    The analysis assumes the supercell is large enough that all coordination shells fit 
-    within the minimum image convention (typically shells should extend < 40% of the 
-    shortest supercell dimension). If the supercell is too small:
-    - Some coordination shells may be incomplete
-    - Warren–Cowley parameters may not accurately reflect bulk behavior
-    - Finite-size corrections become less reliable
-    - Larger supercells or SQS optimization become necessary
-
-    **Exact stoichiometry:**  
-    Random configurations are generated with exact target stoichiometry (not sampled 
-    probabilistically), ensuring canonical ensemble statistics.
-
-    **Statistical validity:**  
-    The finite-size correction assumes:
-    - Independent random occupation of sites (no correlations)
-    - Large enough sample of neighbors (N_neighbors ≥ 10 recommended)
-    - Binomial statistics apply (valid for random alloys)
-
-    For very small sublattices (<10 atoms) or highly imbalanced concentrations (<10% or >90%), 
-    the correction may be less accurate.
-
-    **Scope of analysis:**  
-    This tool evaluates **pair correlations only**. If SQS optimization is required, tools 
-    like ATAT's `mcsqs` will optimize both pair and higher-order (triplet, quadruplet) 
-    correlations to better approximate random-alloy statistics.
-    """)
-
-    col_config, col_run_it, col_script = st.columns([1,2, 2])
+    col_config, col_run_it, col_script = st.columns([1, 2, 2])
 
     with col_config:
         n_random_structures = st.number_input(
@@ -659,7 +433,8 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
                 data=st.session_state['generated_random_script'],
                 file_name="random_analysis_standalone.sh",
                 mime="text/plain",
-                use_container_width=True
+                use_container_width=True,
+                type = 'primary'
             )
             with st.expander("Script Preview"):
                 st.code(st.session_state['generated_random_script'], language="bash")
@@ -752,7 +527,7 @@ def display_results():
         st.markdown("##### 🔍 Geometry Configuration")
         st.code("\n".join(debug_info), language="text")
 
-    # Statistics
+
     avg_score = df['Overall Score'].mean()
     std_score = df['Overall Score'].std()
     best_score = df['Overall Score'].max()
@@ -764,7 +539,6 @@ def display_results():
     col2.metric("Mean RMSE", f"{avg_rmse:.4f} ± {std_rmse:.4f}")
     col3.metric("Best Score", f"{best_score:.4f}")
 
-    # Status Banner
     status_values = f"Mean Score: {avg_score:.4f} ± {std_score:.4f}"
 
     if avg_score > 0.95:
@@ -829,7 +603,6 @@ def display_results():
     with st.expander("📄 View Detailed Data"):
         st.dataframe(df, use_container_width=True)
 
-    # === DOWNLOAD SECTION (BELOW PLOTS) ===
     st.markdown("---")
     st.markdown("### 📦 Download Best Structures")
 
@@ -870,9 +643,9 @@ def display_results():
 
     sorted_df = df.sort_values(by=sort_column, ascending=False).head(max_download)
 
-    st.markdown(f"**Preview: Top {len(sorted_df)} structures (sorted by {sort_column})**")
+    st.markdown(f"**Preview: Top 3 structures (sorted by {sort_column})**")
     preview_cols = ['ID', 'Overall Score', 'RMSE'] + [k for k in all_sublattice_keys if k in sorted_df.columns]
-    st.dataframe(sorted_df[preview_cols], use_container_width=True)
+    st.dataframe(sorted_df[preview_cols].head(3), use_container_width=True)
 
     if st.button("🔽 Generate Download Package", type="primary", use_container_width=True, key="generate_download_btn"):
         with st.spinner("Creating ZIP package..."):
@@ -893,7 +666,8 @@ def display_results():
             file_name=f"best_{st.session_state['download_count']}_structures.zip",
             mime="application/zip",
             use_container_width=True,
-            key="download_zip_btn"
+            key="download_zip_btn",
+            type = 'primary'
         )
 
 
@@ -918,7 +692,6 @@ def create_filtered_zip(sorted_df, structures_data, full_df, filter_mode, sort_c
 
         zf.writestr("analysis_results_all.csv", full_df.to_csv(index=False))
         zf.writestr("analysis_results_selected.csv", sorted_df.to_csv(index=False))
-
 
         info_text = f"""Download Package Information
 ============================
@@ -1069,10 +842,10 @@ def generate_random_analysis_script_standalone(working_structure, target_concent
         "        act_els = elements[mask]",
         "        unq = np.unique(act_els)",
         "        concs = {e: np.sum(act_els==e)/len(act_els) for e in unq}",
-        "        shell_alphas, shell_expected_sigmas = [], []",
+        "        shell_alphas = []",
         "        for shell_d in data['shells']:",
         "            n_map = data['map'][shell_d]",
-        "            alphas, expected_vars = [], []",
+        "            alphas = []",
         "            for e1 in unq:",
         "                for e2 in unq:",
         "                    obs, tot = 0, 0",
@@ -1081,55 +854,20 @@ def generate_random_analysis_script_standalone(working_structure, target_concent
         "                        if neighs: tot += len(neighs); obs += np.sum(elements[neighs] == e2)",
         "                    if tot > 0 and concs[e2] > 0:",
         "                        alphas.append(1.0 - (obs/tot)/concs[e2])",
-        "                        expected_vars.append((1.0 - concs[e2]) / (concs[e2] * tot))",
         "                    else:",
         "                        alphas.append(0.0)",
-        "                        expected_vars.append(0.0)",
         "            if alphas:",
-        "                shell_rmse_obs = np.sqrt(np.mean(np.array(alphas)**2))",
-        "                shell_rmse_expected = np.sqrt(np.mean(expected_vars))",
-        "                shell_rmse_corrected = max(0.0, shell_rmse_obs - shell_rmse_expected)",
-        "                shell_alphas.append(shell_rmse_corrected)",
-        "                shell_expected_sigmas.append(shell_rmse_expected)",
+        "                shell_rmse = np.sqrt(np.mean(np.array(alphas)**2))",
+        "                shell_alphas.append(shell_rmse)",
         "            else:",
         "                shell_alphas.append(0.0)",
-        "                shell_expected_sigmas.append(0.0)",
         "        sub_rmse = np.mean(shell_alphas) if shell_alphas else 0.0",
-        "        avg_expected_sigma = np.mean(shell_expected_sigmas) if shell_expected_sigmas else 0.0",
-        "        max_possible_score = 1.0 - avg_expected_sigma",
-        "        if max_possible_score > 0:",
-        "            sub_score = max(0.0, max_possible_score - sub_rmse)",
-        "        else:",
-        "            sub_score = 0.0",
+        "        sub_score = max(0.0, 1.0 - sub_rmse)",
         "        total_rmse += sub_rmse; sub_count += 1",
         "        sp_clean = ','.join(sorted([s.split('=')[0] for s in cache.specs[sid].split(',')]))",
         "        breakdown.append(f'S{sub_count}({sp_clean}):{sub_score:.3f}')",
         "    avg_rmse = total_rmse / sub_count if sub_count > 0 else 0.0",
-        "    overall_noise_floor = 0.0",
-        "    for sid, data in cache.sublattice_shells.items():",
-        "        mask = (cache.sub_ids == sid)",
-        "        act_els = elements[mask]",
-        "        unq = np.unique(act_els)",
-        "        concs = {e: np.sum(act_els==e)/len(act_els) for e in unq}",
-        "        shell_noise = []",
-        "        for shell_d in data['shells']:",
-        "            n_map = data['map'][shell_d]",
-        "            pair_vars = []",
-        "            for e1 in unq:",
-        "                for e2 in unq:",
-        "                    tot = 0",
-        "                    for idx in np.where((cache.sub_ids == sid) & (elements == e1))[0]:",
-        "                        neighs = n_map.get(idx, [])",
-        "                        if neighs: tot += len(neighs)",
-        "                    if tot > 0 and concs[e2] > 0:",
-        "                        pair_vars.append((1.0 - concs[e2]) / (concs[e2] * tot))",
-        "            if pair_vars:",
-        "                shell_noise.append(np.sqrt(np.mean(pair_vars)))",
-        "        if shell_noise:",
-        "            overall_noise_floor += np.mean(shell_noise)",
-        "    overall_noise_floor /= max(1, sub_count)",
-        "    max_overall_score = 1.0 - overall_noise_floor",
-        "    final_score = max(0.0, max_overall_score - avg_rmse)",
+        "    final_score = max(0.0, 1.0 - avg_rmse)",
         "    return final_score, avg_rmse, ' | '.join(breakdown)",
         "",
         "def parse_rndstr():",
