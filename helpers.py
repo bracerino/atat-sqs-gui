@@ -358,7 +358,7 @@ def intro_text():
 
     html_img = f"""
     <div style="text-align:center;">
-        <img src="data:image/png;base64,{encoded}" style="width:800px; height:auto;">
+        <img src="data:image/png;base64,{encoded}" style="width:90%; max-width:800px; height:auto;">
     </div>
     """
     components.html(html_img, height=500)
