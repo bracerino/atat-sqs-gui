@@ -408,8 +408,47 @@ This tool provides a **graphical interface** for generating input files
 It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
 
 ---
+""")
+    with open("images_atat_gui/Workflow.png", "rb") as f:
+        import base64
+        data = f.read()
+        encoded = base64.b64encode(data).decode()
 
-### ✨ Key Features
+    html_img = f"""
+    <div style="text-align:center;">
+        <img src="data:image/png;base64,{encoded}" style="width:90%; max-width:800px; height:auto;">
+    </div>
+    """
+    components.html(html_img, height=800)
+
+    components.html("""
+    <style>
+    .glow-underline {
+        width: 800px;              
+        height: 4px;                 
+        margin: 12px auto 24px auto; 
+        border-radius: 999px;
+        background: linear-gradient(90deg,
+            rgba(91, 140, 255, 0) 0%,
+            rgba(91, 140, 255, 0.8) 20%,
+            rgba(91, 140, 255, 1) 50%,
+            rgba(91, 140, 255, 0.8) 80%,
+            rgba(91, 140, 255, 0) 100%);
+        filter: blur(2px);
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scaleX(0.95); opacity: 0.6; }
+        50% { transform: scaleX(1.05); opacity: 1; }
+    }
+    </style>
+
+    <div class="glow-underline"></div>
+    """, height=40)
+
+    st.markdown("""
+    ### ✨ Key Features
 
 #### 🔬 Crystal Structures
 - Upload custom crystal structures (CIF, POSCAR, LMP, XYZ with lattice)
