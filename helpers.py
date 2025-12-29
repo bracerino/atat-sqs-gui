@@ -408,7 +408,8 @@ This tool provides a **graphical interface** for generating input files
 It also enables **automated script generation** for binary alloys and batch execution of mcsqs searches across composition ranges.  
 
 ---
-""")
+""",
+               unsafe_allow_html=True)
     with open("images_atat_gui/Workflow.png", "rb") as f:
         import base64
         data = f.read()
