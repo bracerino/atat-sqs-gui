@@ -480,7 +480,9 @@ def run_live_analysis_logic(working_structure, target_concentrations, transforma
     all_sublattice_keys = set()
 
     for i in range(n_random):
-        seed = random.randint(1, 99999)
+        #seed = random.randint(1, 99999)
+        base_seed = int(time.time()) % (2 ** 31) 
+        seed = (base_seed + i) % (2 ** 32 - 1)
         status_text.text(f"Analyzing structure {i + 1}/{n_random}...")
 
         elements = cache.generate_random_config(seed)
