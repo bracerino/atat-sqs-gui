@@ -734,8 +734,8 @@ def render_sqs_module():
             - [User guide how to compile ATAT mcsqs by Implant team (see also the compilation steps below)](https://implant.fs.cvut.cz/atat-mcsqs/).
             - [Tutorial explaining how to use SQS for disordered materials and generate them using ATAT mcsqs](https://cniu.me/2017/08/05/SQS.html#generate-sqs).
             - [Tutorial explaining how to generate SQS using ATAT mcsqs](https://github.com/CMSLabIITK/SQS_generation).
-            - [User guide for ATAT](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual.pdf).
-            - [User guide specifically for ATAT mcsqs](https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/manual/node48.html).
+            - [User guide for ATAT](https://axelvandewalle.github.io/www-avdw//atat/manual.pdf).
+            - [User guide specifically for ATAT mcsqs](https://axelvandewalle.github.io/www-avdw//atat/manual/node48.html).
             - [ATAT forum](https://matsci.org/c/atat/67).
             - [C++ code for converting bestsqs.out into POSCAR format](https://github.com/c-niu/sqs2poscar). 
             - [Python code for converting bestsqs.out into POSCAR format](https://github.com/JianboHIT/sqs2vasp).
