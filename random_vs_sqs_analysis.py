@@ -8,7 +8,8 @@ import zipfile
 import random
 import time
 from collections import defaultdict
-
+from supercell_size_analysis import render_supercell_size_analysis
+from atat_module import generate_atat_rndstr_content_corrected
 
 def get_mic_distance_matrix(frac_coords, lattice_matrix):
     n = len(frac_coords)
@@ -408,51 +409,69 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
         st.markdown("---")
 
-    col_config, col_run_it, col_script = st.columns([1, 2, 2])
+    tab_analysis, tab_size_analysis = st.tabs(["🎲 Random Quality Check", "📐 Supercell Size Analysis"])
 
-    with col_config:
-        n_random_structures = st.number_input(
-            "Number of random structures:", min_value=5, max_value=500, value=20, step=5,
-            key="n_random_check_live"
-        )
-        nx, ny, nz = int(transformation_matrix[0, 0]), int(transformation_matrix[1, 1]), int(
-            transformation_matrix[2, 2])
-        st.info(f"Supercell: {nx}×{ny}×{nz} | Total Atoms: {total_atoms}")
+    with tab_analysis:
+        col_config, col_run_it, col_script = st.columns([1, 2, 2])
 
-    with col_script:
-        if st.button("📥 Generate Standalone Script", use_container_width=True):
-            script = generate_random_analysis_script_standalone(
+        with col_config:
+            n_random_structures = st.number_input(
+                "Number of random structures:", min_value=5, max_value=500, value=20, step=5,
+                key="n_random_check_live"
+            )
+            nx, ny, nz = int(transformation_matrix[0, 0]), int(transformation_matrix[1, 1]), int(
+                transformation_matrix[2, 2])
+            st.info(f"Supercell: {nx}×{ny}×{nz} | Total Atoms: {total_atoms}")
+
+        with col_script:
+            if st.button("📥 Generate Standalone Script", use_container_width=True):
+                script = generate_random_analysis_script_standalone(
+                    working_structure, target_concentrations, transformation_matrix,
+                    use_sublattice_mode, chem_symbols, n_random_structures
+                )
+                st.session_state['generated_random_script'] = script
+
+            if 'generated_random_script' in st.session_state:
+                st.download_button(
+                    "💾 Download .sh Script",
+                    data=st.session_state['generated_random_script'],
+                    file_name="random_analysis_standalone.sh",
+                    mime="text/plain",
+                    use_container_width=True,
+                    type='primary'
+                )
+                with st.expander("Script Preview"):
+                    st.code(st.session_state['generated_random_script'], language="bash")
+
+        with col_run_it:
+            run_clicked = st.button(
+                "🚀 Run Live Analysis",
+                type="primary",
+                use_container_width=True
+            )
+
+        if run_clicked:
+            run_live_analysis_logic(
                 working_structure, target_concentrations, transformation_matrix,
                 use_sublattice_mode, chem_symbols, n_random_structures
             )
-            st.session_state['generated_random_script'] = script
 
-        if 'generated_random_script' in st.session_state:
-            st.download_button(
-                "💾 Download .sh Script",
-                data=st.session_state['generated_random_script'],
-                file_name="random_analysis_standalone.sh",
-                mime="text/plain",
-                use_container_width=True,
-                type = 'primary'
-            )
-            with st.expander("Script Preview"):
-                st.code(st.session_state['generated_random_script'], language="bash")
+        if 'analysis_results' in st.session_state:
+            display_results()
 
-    with col_run_it:
-        run_clicked = st.button(
-            "🚀 Run Live Analysis",
-            type="primary",
-            use_container_width=True
+    with tab_size_analysis:
+        render_supercell_size_analysis(
+            working_structure=working_structure,
+            target_concentrations=target_concentrations,
+            transformation_matrix=transformation_matrix,
+            use_sublattice_mode=use_sublattice_mode,
+            chem_symbols=chem_symbols,
+            total_atoms=total_atoms,
+            GeometryCacheUI=GeometryCacheUI,
+            perform_live_analysis_rigorous=perform_live_analysis_rigorous,
+            parse_rndstr_content=parse_rndstr_content,
+            generate_atat_rndstr_content_corrected=generate_atat_rndstr_content_corrected
         )
-
-    if run_clicked:
-        run_live_analysis_logic(
-            working_structure, target_concentrations, transformation_matrix,
-            use_sublattice_mode, chem_symbols, n_random_structures
-        )
-    if 'analysis_results' in st.session_state:
-        display_results()
 
 
 def run_live_analysis_logic(working_structure, target_concentrations, transformation_matrix, use_sublattice_mode,
