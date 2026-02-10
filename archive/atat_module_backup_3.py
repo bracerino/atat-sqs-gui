@@ -1494,9 +1494,12 @@ def render_atat_sqs_section():
     else:
         element_list = [2, 2]
         composition_input = []
-        chem_symbols, target_concentrations, otrs = render_site_sublattice_selector_fixed(
-            working_structure, all_sites, unique_sites, supercell_multiplicity
-        )
+        taby, tabx = st.tabs(
+            ["🔵3️⃣ Step 3: Configure Sublattices", "➕🎲 Random Structure Quality Check"])
+        with taby:
+            chem_symbols, target_concentrations, otrs = render_site_sublattice_selector_fixed(
+                working_structure, all_sites, unique_sites, supercell_multiplicity
+            )
 
     if composition_mode == "🔄 Global Composition":
 
@@ -1612,6 +1615,18 @@ def render_atat_sqs_section():
         except Exception as e:
             st.error(f"Error creating concentration preview: {e}")
     else:
+        if len(element_list) >= 2 or (use_sublattice_mode and target_concentrations):
+            with tabx:
+                from random_vs_sqs_analysis import render_random_analysis_standalone
+
+                render_random_analysis_standalone(
+                    working_structure=working_structure,
+                    target_concentrations=target_concentrations,
+                    transformation_matrix=transformation_matrix,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chem_symbols=chem_symbols,
+                    total_atoms=len(supercell_preview)
+                )
         display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
                                          unique_sites)
 
@@ -1731,6 +1746,7 @@ def render_atat_sqs_section():
         st.session_state.atat_config_key = current_config_key
 
     col_button, col_clear = st.columns([3, 1])
+
 
     with col_button:
         if not target_concentrations:
@@ -3682,7 +3698,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     if sublattice_data:
         tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
         tabs = st.tabs(tab_names)
-        
+
         css = '''
         <style>
         .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -4842,7 +4858,7 @@ def render_extended_optimization_analysis_tab():
                     for i, result in enumerate(parallel_results):
                         color = colors[i % len(colors)]
                         line_style = dict(color=color,
-                                          width=3 if result == best_run else 2 if result == worst_run else 1)
+                                          width=4 if result == best_run else 3 if result == worst_run else 2)
 
                         name_suffix = " (Best)" if result == best_run else " (Worst)" if result == worst_run else ""
 
@@ -4867,20 +4883,21 @@ def render_extended_optimization_analysis_tab():
                         legend=dict(
                             yanchor="top",
                             y=0.99,
-                            xanchor="left",
-                            x=0.01,
+                            xanchor="right",
+                            x=0.99,
                             font=dict(size=16)
                         ),
                         font=dict(size=20, family="Arial"),
                         xaxis=dict(
                             title_font=dict(size=20, family="Arial Black"),
-                            tickfont=dict(size=16)
+                            tickfont=dict(size=18, color="black")
                         ),
                         yaxis=dict(
                             title_font=dict(size=20, family="Arial Black"),
-                            tickfont=dict(size=16)
+                            tickfont=dict(size=18, color="black")
                         )
                     )
+
 
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -5600,7 +5617,7 @@ def render_monitor_script_section(results):
     col_download, col_info = st.columns([1, 1])
 
     with col_download:
-        if st.button("🛠️ Generate All-in-One Bash Script for SQS Search", type="tertiary", key="generate_monitor_script"):
+        if st.button("🛠️ Generate All-in-One Bash Script for SQS Search (monitor.sh)", type="tertiary", key="generate_monitor_script"):
             try:
                 script_content = generate_atat_monitor_script(
                     results=results,
