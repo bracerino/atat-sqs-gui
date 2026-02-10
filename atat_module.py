@@ -1639,20 +1639,24 @@ def render_atat_sqs_section():
 
     st.subheader("🔵4️⃣ Step 4: ATAT Cluster Configuration")
 
-    col_nn_btn, col_nn_results = st.columns([1, 3])
+    # Import the histogram function
+    from pair_distance_histogram import render_pair_distance_histogram_tab
 
-    with col_nn_btn:
-        if st.button("🔍 Calculate NN Distances", type="secondary", key="calc_nn_atat"):
+    # Create tabs for NN distances and histogram
+    tab_nn, tab_histogram = st.tabs(["🔍 NN Distance Calculator", "📊 Pair-Distance Histogram"])
+
+    with tab_nn:
+        st.write("**Calculate nearest neighbor distances to help select cluster cutoffs:**")
+
+        if st.button("🔍 Calculate NN Distances", type="primary", key="calc_nn_atat"):
             with st.spinner("Calculating..."):
                 nn_results = calculate_first_six_nn_atat_aware(
                     working_structure,
                     chem_symbols if use_sublattice_mode else None,
                     use_sublattice_mode,
                 )
-
             st.session_state['nn_results'] = nn_results
 
-    with col_nn_results:
         if 'nn_results' in st.session_state and st.session_state['nn_results']:
             nn_data = st.session_state['nn_results']
 
@@ -1673,8 +1677,7 @@ def render_atat_sqs_section():
                         f"**Active sites:** {active_count}/{total_count} ({', '.join(set(active_site_names))} positions)")
 
                 if nn_data['overall']:
-                    st.write(
-                        "**NN Distances Between Active Sites (unit cell normalized to the maximum lattice parameter):**")
+                    st.write("**NN Distances Between Active Sites (normalized to max lattice parameter):**")
                     overall_text = []
                     ordinals = {1: 'st', 2: 'nd', 3: 'rd', 4: 'th', 5: 'th', 6: 'th'}
                     for shell in nn_data['overall']:
@@ -1683,6 +1686,13 @@ def render_atat_sqs_section():
                     st.write(" | ".join(overall_text))
 
                 st.caption("💡 These values can suggest how to set the pair/triplet cut-off distances")
+
+    with tab_histogram:
+        render_pair_distance_histogram_tab(
+            working_structure,
+            chem_symbols,
+            use_sublattice_mode
+        )
 
     col_cut1, col_cut2, col_cut3 = st.columns(3)
     with col_cut1:
