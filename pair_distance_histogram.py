@@ -304,12 +304,6 @@ def suggest_cutoff_distances(histogram_data, num_suggestions=6, use_normalized=F
 
 
 def render_pair_distance_histogram_tab(working_structure, chem_symbols, use_sublattice_mode):
-    st.info("""
-    **Generate a histogram of pair distances** to help select optimal cluster cutoff distances.
-    This shows the number of unique pairs at each distance, revealing natural gaps for setting cutoffs.
-
-    ⚠️ **Uses 5×5×5 supercell** to capture all coordination shells up to ~12 Å.
-    """)
 
     col_prec, col_maxdist, col_btn = st.columns([1, 1, 2])
 
