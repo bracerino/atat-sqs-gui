@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -467,28 +465,22 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
         results = st.session_state['size_analysis_results']
 
 
-        #with st.expander("🔍 Concentration Verification", expanded=False):
-         #   st.markdown("""
-         #   Verify that the target concentrations are correctly maintained across different supercell sizes.
-         #   Larger supercells can achieve concentrations closer to the target due to more atoms.
-         #   """)
+        with st.expander("🔍 Concentration Verification", expanded=False):
 
-         #   conc_data = []
-         #   for r in results:
-         #       if r.get('concentration_check'):
-         #           cc = r['concentration_check']
-         #           conc_str = ", ".join(
-         #               [f"{el}: {cc['actual_counts'][el]} ({cc['actual_concentrations'][el] * 100:.2f}%)"
-         #                for el in sorted(cc['actual_counts'].keys())])
-         #           conc_data.append({
-         #               'Size': r['supercell_dims'],
-         #               'Total Atoms': cc['total_atoms'],
-         #               'Composition': conc_str
-         #           })
-
-        #  if conc_data:
-        #        conc_df = pd.DataFrame(conc_data)
-        #        st.dataframe(conc_df, use_container_width=True, hide_index=True)
+            conc_data = []
+            for r in results:
+                if r.get('concentration_check'):
+                    cc = r['concentration_check']
+                    conc_str = ", ".join(
+                        [f"{el}: {cc['actual_counts'][el]} ({cc['actual_concentrations'][el] * 100:.2f}%)"
+                         for el in sorted(cc['actual_counts'].keys())])
+                    conc_data.append({
+                        'Size': r['supercell_dims'],
+                        'Total Atoms': cc['total_atoms'],
+                        'Composition': conc_str})
+            if conc_data:
+                conc_df = pd.DataFrame(conc_data)
+                st.dataframe(conc_df, use_container_width=True, hide_index=True)
         #        st.caption(
         #            "💡 Concentrations are recalculated for each supercell size to match target as closely as possible with integer atom counts.")
         with st.expander("📊 Detailed Results Table", expanded=False):
