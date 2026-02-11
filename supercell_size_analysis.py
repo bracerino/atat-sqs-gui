@@ -376,7 +376,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
         n_samples = st.number_input(
             "Samples per size:",
             min_value=3,
-            max_value=50,
+            max_value=100,
             value=10,
             step=1,
             help="Number of random structures to generate at each size"
