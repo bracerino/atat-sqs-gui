@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -8,8 +6,41 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
+def identify_sublattices(structure, chem_symbols):
+    sga = SpacegroupAnalyzer(structure)
+    wyckoff_symbols = sga.get_symmetry_dataset().wyckoffs
+
+    mixed_occupancy_sites = []
+    for i, site_elements in enumerate(chem_symbols):
+        if len(site_elements) >= 2:
+            mixed_occupancy_sites.append(i)
+
+    if not mixed_occupancy_sites:
+        return {}
+
+    wyckoff_to_sites = {}
+    for i, ws in enumerate(wyckoff_symbols):
+        if ws not in wyckoff_to_sites:
+            wyckoff_to_sites[ws] = []
+        wyckoff_to_sites[ws].append(i)
+
+    sublattices = {}
+    processed = set()
+    for site_idx in mixed_occupancy_sites:
+        ws = wyckoff_symbols[site_idx]
+        if ws not in processed:
+            sites = [s for s in wyckoff_to_sites[ws] if s in mixed_occupancy_sites]
+            elements = "/".join(sorted(set(str(e) for s in sites for e in chem_symbols[s])))
+            label = f"Wyckoff {ws} ({elements}, {len(sites)} sites)"
+            sublattices[label] = sites
+            processed.add(ws)
+
+    return sublattices
+
+
 def calculate_pair_distances_histogram(structure, chem_symbols=None, use_sublattice_mode=False,
-                                       distance_precision=4, max_distance=12.0):
+                                       distance_precision=4, max_distance=12.0,
+                                       forced_active_sites=None):
     from pymatgen.core.lattice import Lattice
 
     original_lattice = structure.lattice
@@ -26,7 +57,9 @@ def calculate_pair_distances_histogram(structure, chem_symbols=None, use_sublatt
 
     active_sites = []
 
-    if use_sublattice_mode and chem_symbols:
+    if forced_active_sites is not None:
+        active_sites = list(forced_active_sites)
+    elif use_sublattice_mode and chem_symbols:
         sga = SpacegroupAnalyzer(normalized_structure)
         wyckoff_symbols = sga.get_symmetry_dataset().wyckoffs
 
@@ -336,154 +369,222 @@ def render_pair_distance_histogram_tab(working_structure, chem_symbols, use_subl
         )
 
     if calculate_btn:
-        with st.spinner("Calculating pair distances (5×5×5 supercell)..."):
-            histogram_data = calculate_pair_distances_histogram(
-                working_structure,
-                chem_symbols if use_sublattice_mode else None,
-                use_sublattice_mode,
-                distance_precision=distance_precision,
-                max_distance=max_distance
-            )
+        if use_sublattice_mode and chem_symbols:
+            sublattices = identify_sublattices(working_structure, chem_symbols)
 
-        st.session_state['histogram_data'] = histogram_data
+            if not sublattices:
+                st.warning("No mixed-occupancy sites found for histogram generation.")
+                st.session_state['histogram_data'] = None
+                st.session_state['histogram_per_sublattice'] = None
+                return
 
-    if 'histogram_data' in st.session_state and st.session_state['histogram_data']:
-        histogram_data = st.session_state['histogram_data']
+            per_sublattice = {}
 
-        if 'message' in histogram_data and not histogram_data['distances']:
-            st.warning(histogram_data['message'])
-            return
+            with st.spinner("Calculating combined histogram (all sublattices)..."):
+                all_sites = []
+                for sites in sublattices.values():
+                    all_sites.extend(sites)
+                all_sites = sorted(set(all_sites))
 
-        st.success(histogram_data['message'])
+                combined_data = calculate_pair_distances_histogram(
+                    working_structure,
+                    chem_symbols,
+                    use_sublattice_mode=False,
+                    distance_precision=distance_precision,
+                    max_distance=max_distance,
+                    forced_active_sites=all_sites
+                )
+                per_sublattice["All sublattices (combined)"] = combined_data
 
-        if 'active_sites' in histogram_data:
-            active_count = len(histogram_data['active_sites'])
-            total_count = histogram_data['total_sites']
-            a, b, c = histogram_data['lattice_abc']
-            max_param = histogram_data['max_param']
+            for label, sites in sublattices.items():
+                with st.spinner(f"Calculating histogram for {label}..."):
+                    sub_data = calculate_pair_distances_histogram(
+                        working_structure,
+                        chem_symbols,
+                        use_sublattice_mode=False,
+                        distance_precision=distance_precision,
+                        max_distance=max_distance,
+                        forced_active_sites=sites
+                    )
+                    per_sublattice[label] = sub_data
 
-            info_text = f"**Lattice:** a={a:.4f} Å, b={b:.4f} Å, c={c:.4f} Å (max={max_param:.4f} Å)"
-            if use_sublattice_mode:
-                info_text += f" | **Active sites:** {active_count}/{total_count} (mixed-occupancy only)"
-            else:
-                info_text += f" | **All {active_count} sites** considered"
-
-            st.info(info_text)
-
-        st.subheader("📊 Pair-Distance Distribution")
-
-        use_normalized = st.toggle(
-            "Show normalized distances (divide by max lattice parameter)",
-            value=True,
-            help="Toggle between actual distances (Å) and normalized distances",
-            key="use_normalized_distances"
-        )
-
-        col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-
-        with col_stat1:
-            st.metric("Unique Distances", histogram_data['unique_distances'])
-        with col_stat2:
-            st.metric("Total Pairs", histogram_data['total_pairs'])
-        with col_stat3:
-            if use_normalized:
-                st.metric("Min Distance", f"{min(histogram_data['normalized_distances']):.4f}")
-            else:
-                st.metric("Min Distance", f"{min(histogram_data['distances']):.4f} Å")
-        with col_stat4:
-            if use_normalized:
-                st.metric("Max Distance", f"{max(histogram_data['normalized_distances']):.4f}")
-            else:
-                st.metric("Max Distance", f"{max(histogram_data['distances']):.4f} Å")
-
-        fig = create_pair_distance_histogram_plot(histogram_data, use_normalized=use_normalized)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True)
-
-        with st.expander("🔍 First 15 Distance Shells", expanded=False):
-            detail_data = []
-            n_show = min(15, len(histogram_data['distances']))
-
-            for i in range(n_show):
-                if use_normalized:
-                    dist_str = f"{histogram_data['normalized_distances'][i]:.4f}"
-                    angstrom_equiv = f"({histogram_data['distances'][i]:.4f} Å)"
-                else:
-                    dist_str = f"{histogram_data['distances'][i]:.4f} Å"
-                    angstrom_equiv = f"({histogram_data['normalized_distances'][i]:.4f} norm.)"
-
-                detail_data.append({
-                    "Shell": i + 1,
-                    "Distance": dist_str,
-                    "Equivalent": angstrom_equiv,
-                    "Multiplicity": histogram_data['multiplicities'][i],
-                    "Cumulative Pairs": sum(histogram_data['multiplicities'][:i + 1])
-                })
-
-            detail_df = pd.DataFrame(detail_data)
-            st.dataframe(detail_df, use_container_width=True, hide_index=True)
-
-        st.subheader("💡 Suggested Cluster Cutoff Distances")
-        suggestions = suggest_cutoff_distances(histogram_data, num_suggestions=8, use_normalized=use_normalized)
-
-        if suggestions:
-            suggestion_data = []
-            for suggestion in suggestions:
-                if use_normalized:
-                    cutoff_str = f"{suggestion['cutoff']:.4f}"
-                else:
-                    cutoff_str = f"{suggestion['cutoff']:.4f} Å"
-
-                suggestion_data.append({
-                    "Suggested Cutoff": cutoff_str,
-                    "Cumulative Pairs": suggestion['pairs_included']
-                })
-
-            suggestion_df = pd.DataFrame(suggestion_data)
-            st.dataframe(suggestion_df, use_container_width=True, hide_index=True)
+            st.session_state['histogram_per_sublattice'] = per_sublattice
+            st.session_state['histogram_data'] = None
 
         else:
-            st.warning("No significant gaps found in the distance distribution.")
-
-        st.subheader("📥 Download Data")
-
-        col_dl1, col_dl2 = st.columns(2)
-
-        with col_dl1:
-            if use_normalized:
-                csv_data = pd.DataFrame({
-                    'Distance (normalized)': histogram_data['normalized_distances'],
-                    'Distance (Angstrom)': histogram_data['distances'],
-                    'Multiplicity': histogram_data['multiplicities']
-                })
-            else:
-                csv_data = pd.DataFrame({
-                    'Distance (Angstrom)': histogram_data['distances'],
-                    'Distance (normalized)': histogram_data['normalized_distances'],
-                    'Multiplicity': histogram_data['multiplicities']
-                })
-
-            csv_string = csv_data.to_csv(index=False)
-
-            st.download_button(
-                label="📥 Download Histogram CSV",
-                data=csv_string,
-                file_name="pair_distance_histogram.csv",
-                mime="text/csv",
-                key="download_histogram_csv",
-                use_container_width=True,
-                type = "primary"
-            )
-
-        with col_dl2:
-            if suggestions:
-                suggestions_csv = pd.DataFrame(suggestion_data).to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Suggestions CSV",
-                    data=suggestions_csv,
-                    file_name="cutoff_suggestions.csv",
-                    mime="text/csv",
-                    key="download_suggestions_csv",
-                    use_container_width=True,
-                    type="primary"
+            with st.spinner("Calculating pair distances (5×5×5 supercell)..."):
+                histogram_data = calculate_pair_distances_histogram(
+                    working_structure,
+                    chem_symbols if use_sublattice_mode else None,
+                    use_sublattice_mode,
+                    distance_precision=distance_precision,
+                    max_distance=max_distance
                 )
+
+            st.session_state['histogram_data'] = histogram_data
+            st.session_state['histogram_per_sublattice'] = None
+
+    if use_sublattice_mode and st.session_state.get('histogram_per_sublattice'):
+        per_sublattice = st.session_state['histogram_per_sublattice']
+
+        sublattice_labels = list(per_sublattice.keys())
+        selected_label = st.selectbox(
+            "Select sublattice to display:",
+            options=sublattice_labels,
+            index=0,
+            key="sublattice_selector"
+        )
+
+        histogram_data = per_sublattice[selected_label]
+        _display_histogram_results(histogram_data, use_sublattice_mode, selected_label)
+
+    elif 'histogram_data' in st.session_state and st.session_state['histogram_data']:
+        histogram_data = st.session_state['histogram_data']
+        _display_histogram_results(histogram_data, use_sublattice_mode)
+
+
+def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_label=None):
+
+    if 'message' in histogram_data and not histogram_data['distances']:
+        st.warning(histogram_data['message'])
+        return
+
+    st.success(histogram_data['message'])
+
+    if 'active_sites' in histogram_data:
+        active_count = len(histogram_data['active_sites'])
+        total_count = histogram_data['total_sites']
+        a, b, c = histogram_data['lattice_abc']
+        max_param = histogram_data['max_param']
+
+        info_text = f"**Lattice:** a={a:.4f} Å, b={b:.4f} Å, c={c:.4f} Å (max={max_param:.4f} Å)"
+        if use_sublattice_mode and sublattice_label:
+            info_text += f" | **Active sites:** {active_count}/{total_count} ({sublattice_label})"
+        elif use_sublattice_mode:
+            info_text += f" | **Active sites:** {active_count}/{total_count} (mixed-occupancy only)"
+        else:
+            info_text += f" | **All {active_count} sites** considered"
+
+        st.info(info_text)
+
+    st.subheader("📊 Pair-Distance Distribution")
+
+    use_normalized = st.toggle(
+        "Show normalized distances (divide by max lattice parameter)",
+        value=True,
+        help="Toggle between actual distances (Å) and normalized distances",
+        key="use_normalized_distances"
+    )
+
+    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+
+    with col_stat1:
+        st.metric("Unique Distances", histogram_data['unique_distances'])
+    with col_stat2:
+        st.metric("Total Pairs", histogram_data['total_pairs'])
+    with col_stat3:
+        if use_normalized:
+            st.metric("Min Distance", f"{min(histogram_data['normalized_distances']):.4f}")
+        else:
+            st.metric("Min Distance", f"{min(histogram_data['distances']):.4f} Å")
+    with col_stat4:
+        if use_normalized:
+            st.metric("Max Distance", f"{max(histogram_data['normalized_distances']):.4f}")
+        else:
+            st.metric("Max Distance", f"{max(histogram_data['distances']):.4f} Å")
+
+    fig = create_pair_distance_histogram_plot(histogram_data, use_normalized=use_normalized)
+    if fig:
+        st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("🔍 First 15 Distance Shells", expanded=False):
+        detail_data = []
+        n_show = min(15, len(histogram_data['distances']))
+
+        for i in range(n_show):
+            if use_normalized:
+                dist_str = f"{histogram_data['normalized_distances'][i]:.4f}"
+                angstrom_equiv = f"({histogram_data['distances'][i]:.4f} Å)"
+            else:
+                dist_str = f"{histogram_data['distances'][i]:.4f} Å"
+                angstrom_equiv = f"({histogram_data['normalized_distances'][i]:.4f} norm.)"
+
+            detail_data.append({
+                "Shell": i + 1,
+                "Distance": dist_str,
+                "Equivalent": angstrom_equiv,
+                "Multiplicity": histogram_data['multiplicities'][i],
+                "Cumulative Pairs": sum(histogram_data['multiplicities'][:i + 1])
+            })
+
+        detail_df = pd.DataFrame(detail_data)
+        st.dataframe(detail_df, use_container_width=True, hide_index=True)
+
+    st.subheader("💡 Suggested Cluster Cutoff Distances")
+    suggestions = suggest_cutoff_distances(histogram_data, num_suggestions=8, use_normalized=use_normalized)
+
+    if suggestions:
+        suggestion_data = []
+        for suggestion in suggestions:
+            if use_normalized:
+                cutoff_str = f"{suggestion['cutoff']:.4f}"
+            else:
+                cutoff_str = f"{suggestion['cutoff']:.4f} Å"
+
+            suggestion_data.append({
+                "Suggested Cutoff": cutoff_str,
+                "Cumulative Pairs": suggestion['pairs_included']
+            })
+
+        suggestion_df = pd.DataFrame(suggestion_data)
+        st.dataframe(suggestion_df, use_container_width=True, hide_index=True)
+
+    else:
+        st.warning("No significant gaps found in the distance distribution.")
+
+    st.subheader("📥 Download Data")
+
+    col_dl1, col_dl2 = st.columns(2)
+
+    with col_dl1:
+        if use_normalized:
+            csv_data = pd.DataFrame({
+                'Distance (normalized)': histogram_data['normalized_distances'],
+                'Distance (Angstrom)': histogram_data['distances'],
+                'Multiplicity': histogram_data['multiplicities']
+            })
+        else:
+            csv_data = pd.DataFrame({
+                'Distance (Angstrom)': histogram_data['distances'],
+                'Distance (normalized)': histogram_data['normalized_distances'],
+                'Multiplicity': histogram_data['multiplicities']
+            })
+
+        csv_string = csv_data.to_csv(index=False)
+
+        dl_key_suffix = ""
+        if sublattice_label:
+            dl_key_suffix = "_" + sublattice_label.replace(" ", "_").replace("(", "").replace(")", "").replace(",", "").replace("/", "_")
+
+        st.download_button(
+            label="📥 Download Histogram CSV",
+            data=csv_string,
+            file_name="pair_distance_histogram.csv",
+            mime="text/csv",
+            key=f"download_histogram_csv{dl_key_suffix}",
+            use_container_width=True,
+            type = "primary"
+        )
+
+    with col_dl2:
+        if suggestions:
+            suggestions_csv = pd.DataFrame(suggestion_data).to_csv(index=False)
+            st.download_button(
+                label="📥 Download Suggestions CSV",
+                data=suggestions_csv,
+                file_name="cutoff_suggestions.csv",
+                mime="text/csv",
+                key=f"download_suggestions_csv{dl_key_suffix}",
+                use_container_width=True,
+                type="primary"
+            )
