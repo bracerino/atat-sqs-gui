@@ -223,7 +223,7 @@ def create_pair_distance_histogram_plot(histogram_data, use_normalized=False):
         xaxis=dict(
             gridcolor='#e0e0e0',
             gridwidth=2,
-            title_font=dict(size=24, family="Arial Black", color='#1e3a8a'),
+            title_font=dict(size=24, family="Arial", color='#1e3a8a'),
             tickfont=dict(size=20, color='black'),
             zeroline=True,
             zerolinewidth=3,
@@ -237,7 +237,7 @@ def create_pair_distance_histogram_plot(histogram_data, use_normalized=False):
         yaxis=dict(
             gridcolor='#e0e0e0',
             gridwidth=2,
-            title_font=dict(size=24, family="Arial Black", color='#1e3a8a'),
+            title_font=dict(size=24, family="Arial", color='#1e3a8a'),
             tickfont=dict(size=20, color='black'),
             zeroline=True,
             zerolinewidth=3,
