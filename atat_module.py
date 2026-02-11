@@ -964,10 +964,10 @@ def calculate_first_six_nn_atat_aware(structure, chem_symbols=None, use_sublatti
         coords_are_cartesian=False
     )
 
-    active_supercell = active_structure * (3, 3, 3)
+    active_supercell = active_structure * (5, 5, 5)
 
     original_active_sites = len(active_structure)
-    center_cell_start = 13 * original_active_sites
+    center_cell_start = 62 * original_active_sites
     center_cell_end = center_cell_start + original_active_sites
 
     overall_distances = []
