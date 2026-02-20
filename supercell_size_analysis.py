@@ -53,12 +53,14 @@ def analyze_supercell_size_range(working_structure, target_concentrations, use_s
 
             concentration_check = None
 
+            sublattice_scores_accumulated = defaultdict(list)
+
             for sample_idx in range(n_samples_per_size):
                 base_seed = int(time.time()) % (2 ** 31)
                 seed = (base_seed + sample_idx + step_idx * 1000) % (2 ** 32 - 1)
 
                 elements = cache.generate_random_config(seed)
-                score, rmse, _, _ = perform_live_analysis_rigorous(cache, elements)
+                score, rmse, _, sub_scores = perform_live_analysis_rigorous(cache, elements)
 
                 scores_for_this_size.append(score)
                 rmse_for_this_size.append(rmse)
@@ -68,6 +70,9 @@ def analyze_supercell_size_range(working_structure, target_concentrations, use_s
                     'score': score,
                     'sample_id': sample_idx + 1
                 })
+
+                for k, v in sub_scores.items():
+                    sublattice_scores_accumulated[k].append(v)
 
                 if sample_idx == 0:
                     element_counts = Counter(elements)
@@ -99,7 +104,9 @@ def analyze_supercell_size_range(working_structure, target_concentrations, use_s
                 'cache': cache,
                 'nx': nx,
                 'ny': ny,
-                'nz': nz
+                'nz': nz,
+                'per_sublattice_mean': {k: np.mean(v) for k, v in sublattice_scores_accumulated.items()},
+                'per_sublattice_std':  {k: np.std(v)  for k, v in sublattice_scores_accumulated.items()},
             })
 
         except Exception as e:
@@ -114,35 +121,46 @@ def analyze_supercell_size_range(working_structure, target_concentrations, use_s
     return results_by_size
 
 
-def create_size_analysis_plots(results_by_size):
+def create_size_analysis_plots(results_by_size, selected_sublattice="Overall"):
     if not results_by_size:
         return None
 
     fig = make_subplots(
         rows=1, cols=2,
         subplot_titles=(
-            "Mean Randomness Score vs Supercell Size",
+            "Mean Randomness Score vs Supercell Size"
+            + ("" if selected_sublattice == "Overall" else f" — {selected_sublattice}"),
             "Computational Cost (N atoms)"
         ),
         specs=[[{"secondary_y": False}, {"secondary_y": False}]],
         horizontal_spacing=0.12
     )
+    fig.update_annotations(font_size=20)
 
     dims_labels = [r['supercell_dims'] for r in results_by_size]
     dims = [r['supercell_dims'] for r in results_by_size]
     n_atoms = [r['total_atoms'] for r in results_by_size]
-    mean_scores = [r['mean_score'] for r in results_by_size]
-    std_scores = [r['std_score'] for r in results_by_size]
+
+    if selected_sublattice == "Overall":
+        mean_scores = [r['mean_score'] for r in results_by_size]
+        std_scores  = [r['std_score']  for r in results_by_size]
+        trace_name  = "Mean Score (Overall)"
+        trace_color = '#2E86C1'
+    else:
+        mean_scores = [r['per_sublattice_mean'].get(selected_sublattice, float('nan')) for r in results_by_size]
+        std_scores  = [r['per_sublattice_std'].get(selected_sublattice, 0.0)           for r in results_by_size]
+        trace_name  = f"Mean Score ({selected_sublattice})"
+        trace_color = '#C0392B'
 
     fig.add_trace(
         go.Scatter(
             x=dims_labels,
             y=mean_scores,
             mode='lines+markers',
-            name='Mean Score',
-            line=dict(color='#2E86C1', width=2),
+            name=trace_name,
+            line=dict(color=trace_color, width=2),
             marker=dict(size=10),
-            error_y=dict(type='data', array=std_scores, visible=True, color='#2E86C1', thickness=1.5),
+            error_y=dict(type='data', array=std_scores, visible=True, color=trace_color, thickness=1.5),
             customdata=list(zip(dims, n_atoms)),
             hovertemplate='<b style="font-size:22px">Supercell: %{x}</b><br>' +
                           '<b style="font-size:22px">Score: %{y:.4f}</b><br>' +
@@ -333,9 +351,6 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
 
         **Example:** Current 2×2×2 with 3 increments
         - Tests: 2×2×2, 3×3×3, 4×4×4, 5×5×5
-        - NOT: 2×2×2, 4×4×4, 6×6×6, 8×8×8 (multiplicative)
-
-        This incremental approach provides finer resolution and more manageable atom growth.
 
         ### Why this matters
         - **Larger supercells** → Better statistical sampling, lower variance, more random-alloy-like behavior
@@ -500,7 +515,24 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
             st.caption(
                 "💡 Mean Score: Average randomness quality | Std Dev: Statistical fluctuation | Lower RMSE = Better randomness")
 
-        fig = create_size_analysis_plots(results)
+        available_sublattices = []
+        for r in results:
+            for k in r.get('per_sublattice_mean', {}).keys():
+                if k not in available_sublattices:
+                    available_sublattices.append(k)
+
+        if available_sublattices:
+            selected_sublattice = st.radio(
+                "📊 Plot score for:",
+                options=["Overall"] + available_sublattices,
+                index=0,
+                horizontal=True,
+                help="Switch between the aggregate score and an individual sublattice score"
+            )
+        else:
+            selected_sublattice = "Overall"
+
+        fig = create_size_analysis_plots(results, selected_sublattice=selected_sublattice)
         if fig:
             st.plotly_chart(fig, use_container_width=True)
 
