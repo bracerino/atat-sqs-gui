@@ -247,6 +247,8 @@ def create_vasp_content(lattice_matrix, atoms_frac, elements, comment="Random St
     from collections import defaultdict
     grouped = defaultdict(list)
     for frac_pos, elem in zip(atoms_frac, elements):
+        if elem == 'Vac':          # ← skip vacancies
+            continue
         grouped[elem].append(frac_pos)
 
     sorted_elements = sorted(grouped.keys())
