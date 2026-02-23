@@ -3647,7 +3647,6 @@ def integrate_atat_option():
     """)
 
     render_atat_sqs_section()
-
 def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,
                                           stable_key="default"):
     st.markdown(
@@ -3682,6 +3681,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
     unique_wyckoff_groups = {}
+
     for site_info in unique_sites:
         key = (site_info['element'], site_info['wyckoff_letter'])
         if key not in unique_wyckoff_groups:
@@ -3693,6 +3693,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
     for group_key, site_infos in unique_wyckoff_groups.items():
         element, wyckoff_letter = group_key
+
         total_multiplicity = sum(site_info['multiplicity'] for site_info in site_infos)
         all_equivalent_indices = []
         for site_info in site_infos:
@@ -3700,6 +3701,7 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
         if temp_sublattice_index < len(sublattice_letters):
             sublattice_letter = sublattice_letters[temp_sublattice_index]
+
             sublattice_data.append({
                 'sublattice_letter': sublattice_letter,
                 'element': element,
@@ -3709,183 +3711,181 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                 'atoms_per_wyckoff_in_supercell': total_multiplicity * supercell_multiplicity,
                 'min_concentration_step': 1.0 / (total_multiplicity * supercell_multiplicity)
             })
+
             temp_sublattice_index += 1
 
-    if not sublattice_data:
-        return chem_symbols, target_concentrations, None
+    if sublattice_data:
+        tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
+        tabs = st.tabs(tab_names)
 
-    tab_names = [f"Sublattice {data['sublattice_letter']}" for data in sublattice_data]
-    tabs = st.tabs(tab_names)
+        css = '''
+        <style>
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 20px !important;
+        }
+        .stTabs [data-baseweb="tab-list"] button {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important;
+        }
+        .stTabs [data-baseweb="tab-list"] button:focus {
+            outline: none !important;
+        }
+        </style>
+        '''
+        st.markdown(css, unsafe_allow_html=True)
 
-    css = '''
-    <style>
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-size: 1.15rem !important;
-        color: #1e3a8a !important;
-        font-weight: 600 !important;
-        margin: 0 !important;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px !important;
-    }
-    .stTabs [data-baseweb="tab-list"] button {
-        background-color: #f0f4ff !important;
-        border-radius: 12px !important;
-        padding: 8px 16px !important;
-        transition: all 0.3s ease !important;
-        border: none !important;
-        color: #1e3a8a !important;
-    }
-    .stTabs [data-baseweb="tab-list"] button:hover {
-        background-color: #dbe5ff !important;
-        cursor: pointer;
-    }
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #e0e7ff !important;
-        color: #1e3a8a !important;
-        font-weight: 700 !important;
-        box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
-        border-bottom: 4px solid #1e3a8a !important;
-        border-radius: 12px 12px 0 0 !important;
-    }
-    .stTabs [data-baseweb="tab-list"] button:focus {
-        outline: none !important;
-    }
-    </style>
-    '''
-    st.markdown(css, unsafe_allow_html=True)
+        _col_lbl, _col_tog = st.columns([6, 1])
+        with _col_lbl:
+            st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
+        with _col_tog:
+            use_number_inputs = st.toggle(
+                "🔢",
+                value=False,
+                key=f"{stable_key}_conc_input_mode",
+                help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
+            )
 
-    _col_lbl, _col_tog = st.columns([6, 1])
-    with _col_lbl:
-        st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
-    with _col_tog:
-        use_number_inputs = st.toggle(
-            "🔢",
-            value=False,
-            key=f"{stable_key}_conc_input_mode",
-            help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
-        )
+        for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
+            with tab:
+                sublattice_letter = data['sublattice_letter']
+                element = data['element']
+                wyckoff_letter = data['wyckoff_letter']
+                all_equivalent_indices = data['all_equivalent_indices']
+                total_multiplicity = data['total_multiplicity']
+                atoms_per_wyckoff_in_supercell = data['atoms_per_wyckoff_in_supercell']
+                min_concentration_step = data['min_concentration_step']
 
-    for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
-        with tab:
-            sublattice_letter          = data['sublattice_letter']
-            element                    = data['element']
-            wyckoff_letter             = data['wyckoff_letter']
-            all_equivalent_indices     = data['all_equivalent_indices']
-            total_multiplicity         = data['total_multiplicity']
-            atoms_per_wyckoff_in_supercell = data['atoms_per_wyckoff_in_supercell']
-            min_concentration_step     = data['min_concentration_step']
+                st.write(f"### Sublattice {sublattice_letter}: {element} @ {wyckoff_letter} positions")
+                st.write(f"**Multiplicity:** {total_multiplicity} (affects {len(all_equivalent_indices)} sites)")
+                st.write(f"**Atoms per supercell:** {atoms_per_wyckoff_in_supercell}")
 
-            st.write(f"### Sublattice {sublattice_letter}: {element} @ {wyckoff_letter} positions")
-            st.write(f"**Multiplicity:** {total_multiplicity} (affects {len(all_equivalent_indices)} sites)")
-            st.write(f"**Atoms per supercell:** {atoms_per_wyckoff_in_supercell}")
+                st.info(f"**Concentration constraints for this Wyckoff position:**\n"
+                        f"- Total atoms in supercell: {atoms_per_wyckoff_in_supercell}\n"
+                        f"- Minimum concentration step: {min_concentration_step:.6f}\n")
 
-            st.info(f"**Concentration constraints for this Wyckoff position:**\n"
-                    f"- Total atoms in supercell: {atoms_per_wyckoff_in_supercell}\n"
-                    f"- Minimum concentration step: {min_concentration_step:.6f}\n")
+                col_elem, col_conc = st.columns([1, 2])
+                element_key = f"{stable_key}_sublattice_{sublattice_letter}_elements_v2"
 
-            col_elem, col_conc = st.columns([1, 2])
-            element_key = f"{stable_key}_sublattice_{sublattice_letter}_elements_v2"
-
-            with col_elem:
-                current_elements = [element]
-                selected_elements = st.multiselect(
-                    f"Elements for sublattice {sublattice_letter}:",
-                    options=common_elements,
-                    default=current_elements,
-                    key=element_key,
-                    help=f"Select elements that can occupy {wyckoff_letter} positions"
-                )
-                if len(selected_elements) < 1:
-                    st.warning(f"Select at least 1 element for sublattice {sublattice_letter}")
-                    continue
-
-            with col_conc:
-                st.write(f"**Set concentrations for sublattice {sublattice_letter}:**")
-
-                sublattice_concentrations = {}
-                remaining = 1.0
-
-                for i, elem in enumerate(selected_elements[:-1]):
-                    store_key  = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_store_v2"
-                    slider_key = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_frac_v2"
-                    num_key    = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_num_v2"
-
-                    default_val = min(
-                        int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
-                        remaining
+                with col_elem:
+                    current_elements = [element]
+                    selected_elements = st.multiselect(
+                        f"Elements for sublattice {sublattice_letter}:",
+                        options=common_elements,
+                        default=current_elements,
+                        key=element_key,
+                        help=f"Select elements that can occupy {wyckoff_letter} positions"
                     )
+                    if len(selected_elements) < 1:
+                        st.warning(f"Select at least 1 element for sublattice {sublattice_letter}")
+                        continue
 
-                    if store_key not in st.session_state:
-                        st.session_state[store_key] = default_val
+                with col_conc:
+                    st.write(f"**Set concentrations for sublattice {sublattice_letter}:**")
 
-                    if remaining < min_concentration_step - 1e-9:
-                        st.write(f"**{elem}: 0.000000** (no remaining concentration)")
-                        st.session_state[store_key] = 0.0
-                        frac_val = 0.0
+                    sublattice_concentrations = {}
+                    remaining = 1.0
 
-                    elif not use_number_inputs:
-                        frac_val = st.slider(
-                            f"**{elem} fraction:**",
-                            min_value=0.0,
-                            max_value=remaining,
-                            value=min(float(st.session_state[store_key]), remaining),
-                            step=min_concentration_step,
-                            format="%.6f",
-                            key=slider_key
-                        )
-                        st.session_state[store_key] = frac_val
+                    if not use_number_inputs:
+                        for i, elem in enumerate(selected_elements[:-1]):
+                            slider_key = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_frac_v2"
+                            frac_val = st.slider(
+                                f"**{elem} fraction:**",
+                                min_value=0.0,
+                                max_value=remaining,
+                                value=min(
+                                    int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
+                                    remaining),
+                                step=min_concentration_step,
+                                format="%.6f",
+                                key=slider_key
+                            )
+                            sublattice_concentrations[elem] = frac_val
+                            remaining -= frac_val
 
                     else:
-                        snapped = round(
-                            max(0.0, min(remaining,
-                                round(float(st.session_state[store_key]) / min_concentration_step)
-                                * min_concentration_step)),
-                            8
-                        )
-                        st.session_state[num_key] = snapped
+                        for i, elem in enumerate(selected_elements[:-1]):
+                            num_key = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_num_v2"
 
-                        st.number_input(
-                            f"**{elem} fraction:**",
-                            min_value=0.0,
-                            max_value=float(remaining),
-                            step=min_concentration_step,
-                            format="%.6f",
-                            key=num_key,
-                            help=f"Type any value — rounds to nearest {min_concentration_step:.6f} on Enter / Tab."
-                        )
+                            default_val = min(
+                                int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
+                                remaining
+                            )
 
-                        frac_val = round(
-                            max(0.0, min(remaining,
-                                round(float(st.session_state[num_key]) / min_concentration_step)
-                                * min_concentration_step)),
-                            8
-                        )
-                        st.session_state[store_key] = frac_val
+                            if remaining < min_concentration_step - 1e-9:
+                                st.write(f"**{elem}: 0.000000** (no remaining concentration)")
+                                st.session_state[num_key] = 0.0
+                                frac_val = 0.0
+                            else:
+                                raw = float(st.session_state.get(num_key, default_val))
+                                snapped = round(
+                                    max(0.0, min(remaining,
+                                        round(raw / min_concentration_step) * min_concentration_step)),
+                                    8
+                                )
+                                st.session_state[num_key] = snapped  
 
-                    sublattice_concentrations[elem] = frac_val
-                    remaining -= frac_val
+                                st.number_input(
+                                    f"**{elem} fraction:**",
+                                    min_value=0.0,
+                                    max_value=float(remaining),
+                                    step=min_concentration_step,
+                                    format="%.6f",
+                                    key=num_key,
+                                    help=f"Type any value — rounds to nearest {min_concentration_step:.6f} on Enter / Tab."
+                                )
 
-                if selected_elements:
-                    last_elem = selected_elements[-1]
-                    sublattice_concentrations[last_elem] = max(0.0, remaining)
-                    st.write(f"**{last_elem}: {sublattice_concentrations[last_elem]:.6f}** (automatic)")
+                                frac_val = round(
+                                    max(0.0, min(remaining,
+                                        round(float(st.session_state[num_key]) / min_concentration_step)
+                                        * min_concentration_step)),
+                                    8
+                                )
 
-                total_frac = sum(sublattice_concentrations.values())
-                if abs(total_frac - 1.0) > 1e-6:
-                    st.error(f"Total fraction = {total_frac:.6f}, should be 1.0")
-                else:
-                    st.success(f"✅ Total fraction = {total_frac:.6f}")
+                            sublattice_concentrations[elem] = frac_val
+                            remaining -= frac_val
 
-                st.write("**Resulting atom counts:**")
-                for elem, frac in sublattice_concentrations.items():
-                    atom_count = frac * atoms_per_wyckoff_in_supercell
-                    st.write(f"- {elem}: {atom_count:.1f} atoms")
+                    if selected_elements:
+                        last_elem = selected_elements[-1]
+                        sublattice_concentrations[last_elem] = max(0.0, remaining)
+                        st.write(f"**{last_elem}: {sublattice_concentrations[last_elem]:.6f}** (automatic)")
 
-            if len(selected_elements) >= 1:
-                target_concentrations[sublattice_letter] = sublattice_concentrations
-                for site_idx in all_equivalent_indices:
-                    chem_symbols[site_idx] = selected_elements.copy()
+                    total_frac = sum(sublattice_concentrations.values())
+                    if abs(total_frac - 1.0) > 1e-6:
+                        st.error(f"Total fraction = {total_frac:.6f}, should be 1.0")
+                    else:
+                        st.success(f"✅ Total fraction = {total_frac:.6f}")
+
+                    st.write("**Resulting atom counts:**")
+                    for elem, frac in sublattice_concentrations.items():
+                        atom_count = frac * atoms_per_wyckoff_in_supercell
+                        st.write(f"- {elem}: {atom_count:.1f} atoms")
+
+                if len(selected_elements) >= 1:
+                    target_concentrations[sublattice_letter] = sublattice_concentrations
+                    for site_idx in all_equivalent_indices:
+                        chem_symbols[site_idx] = selected_elements.copy()
 
     return chem_symbols, target_concentrations, None
 
