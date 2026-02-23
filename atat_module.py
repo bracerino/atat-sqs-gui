@@ -1281,7 +1281,7 @@ def render_atat_sqs_section():
             "Choose composition specification mode:",
             [
                 "🔄 Global Composition",
-                "🎯 Sublattice-Specific"
+                "🎯 Sublattice-Specific (Recommended)"
             ],
             index=1,
             key="atat_composition_mode_radio",
@@ -3648,7 +3648,6 @@ def integrate_atat_option():
 
     render_atat_sqs_section()
 
-
 def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_sites, supercell_multiplicity,
                                           stable_key="default"):
     st.markdown(
@@ -3696,7 +3695,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     for group_key, site_infos in unique_wyckoff_groups.items():
         element, wyckoff_letter = group_key
 
-        # Calculate total multiplicity for this group
         total_multiplicity = sum(site_info['multiplicity'] for site_info in site_infos)
         all_equivalent_indices = []
         for site_info in site_infos:
@@ -3729,11 +3727,9 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             font-weight: 600 !important;
             margin: 0 !important;
         }
-        
         .stTabs [data-baseweb="tab-list"] {
             gap: 20px !important;
         }
-        
         .stTabs [data-baseweb="tab-list"] button {
             background-color: #f0f4ff !important;
             border-radius: 12px !important;
@@ -3742,31 +3738,37 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
             border: none !important;
             color: #1e3a8a !important;
         }
-        
         .stTabs [data-baseweb="tab-list"] button:hover {
             background-color: #dbe5ff !important;
             cursor: pointer;
         }
-        
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
             background-color: #e0e7ff !important;
             color: #1e3a8a !important;
             font-weight: 700 !important;
             box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
-        
-            /* Added underline (thicker) */
             border-bottom: 4px solid #1e3a8a !important;
-            border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
+            border-radius: 12px 12px 0 0 !important;
         }
-        
         .stTabs [data-baseweb="tab-list"] button:focus {
             outline: none !important;
         }
         </style>
         '''
-
-
         st.markdown(css, unsafe_allow_html=True)
+
+        _col_lbl, _col_tog = st.columns([6, 1])
+        with _col_lbl:
+            st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
+        with _col_tog:
+            use_number_inputs = st.toggle(
+                "🔢",
+                value=False,
+                key=f"{stable_key}_conc_input_mode",
+                help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
+            )
+
+
         for tab_idx, (tab, data) in enumerate(zip(tabs, sublattice_data)):
             with tab:
                 sublattice_letter = data['sublattice_letter']
@@ -3781,15 +3783,15 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
                 st.write(f"**Multiplicity:** {total_multiplicity} (affects {len(all_equivalent_indices)} sites)")
                 st.write(f"**Atoms per supercell:** {atoms_per_wyckoff_in_supercell}")
 
-                # Show constraint information
                 st.info(f"**Concentration constraints for this Wyckoff position:**\n"
                         f"- Total atoms in supercell: {atoms_per_wyckoff_in_supercell}\n"
                         f"- Minimum concentration step: {min_concentration_step:.6f}\n")
+
                 col_elem, col_conc = st.columns([1, 2])
                 element_key = f"{stable_key}_sublattice_{sublattice_letter}_elements_v2"
+
                 with col_elem:
                     current_elements = [element]
-
                     selected_elements = st.multiselect(
                         f"Elements for sublattice {sublattice_letter}:",
                         options=common_elements,
@@ -3809,17 +3811,61 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
                     for i, elem in enumerate(selected_elements[:-1]):
                         slider_key = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_frac_v2"
-                        frac_val = st.slider(
-                            f"**{elem} fraction:**",
-                            min_value=0.0,
-                            max_value=remaining,
-                            value=min(
-                                int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
-                                remaining),
-                            step=min_concentration_step,
-                            format="%.6f",
-                            key=slider_key
+                        num_key    = f"{stable_key}_sublattice_{sublattice_letter}_{elem}_num_v2"
+
+                        default_val = min(
+                            int(atoms_per_wyckoff_in_supercell / len(selected_elements)) * min_concentration_step,
+                            remaining
                         )
+
+                        if remaining < min_concentration_step - 1e-9:
+                            st.write(f"**{elem}: 0.000000** (no remaining concentration)")
+                            st.session_state[slider_key] = 0.0
+                            frac_val = 0.0
+
+                        elif not use_number_inputs:
+                            frac_val = st.slider(
+                                f"**{elem} fraction:**",
+                                min_value=0.0,
+                                max_value=remaining,
+                                value=min(
+                                    float(st.session_state.get(slider_key, default_val)),
+                                    remaining
+                                ),
+                                step=min_concentration_step,
+                                format="%.6f",
+                                key=slider_key
+                            )
+                            st.session_state[num_key] = frac_val
+
+                        else:
+                            raw = float(st.session_state.get(num_key,
+                                        st.session_state.get(slider_key, default_val)))
+                            snapped = round(
+                                max(0.0, min(remaining, round(raw / min_concentration_step) * min_concentration_step)),
+                                8
+                            )
+                            st.session_state[num_key]    = snapped
+                            st.session_state[slider_key] = snapped
+
+                            st.number_input(
+                                f"**{elem} fraction:**",
+                                min_value=0.0,
+                                max_value=float(remaining),
+                                step=min_concentration_step,
+                                format="%.6f",
+                                key=num_key,
+                                help=f"Type any value — rounds to nearest {min_concentration_step:.6f} on Enter / Tab."
+                            )
+
+                            frac_val = round(
+                                max(0.0, min(remaining,
+                                    round(float(st.session_state[num_key]) / min_concentration_step)
+                                    * min_concentration_step)),
+                                8
+                            )
+                            st.session_state[slider_key] = frac_val
+
                         sublattice_concentrations[elem] = frac_val
                         remaining -= frac_val
 
@@ -3841,7 +3887,6 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
                 if len(selected_elements) >= 1:
                     target_concentrations[sublattice_letter] = sublattice_concentrations
-
                     for site_idx in all_equivalent_indices:
                         chem_symbols[site_idx] = selected_elements.copy()
 
@@ -3855,10 +3900,6 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.build import make_supercell
 
-
-# Assuming helpers module contains necessary functions like pymatgen_to_ase, get_unique_sites, get_all_sites, structure_preview, sqs_visualization
-# from helpers import * # Removed the above line as I don't have access to your helpers.py,
-# but the structure_preview and sqs_visualization are critical for context.
 
 
 def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transformation_matrix, working_structure,
