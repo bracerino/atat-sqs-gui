@@ -245,7 +245,8 @@ def render_concentration_sweep_section(chemical_symbols, target_concentrations, 
             time_per_conc,
             max_parallel,
             parallel_runs_per_conc,
-            filtered_target_concentrations,
+            #filtered_target_concentrations,
+            target_concentrations,
             chemical_symbols,
             transformation_matrix,
             primitive_structure,
@@ -637,19 +638,30 @@ def generate_concentration_sweep_script(sweep_element, complement_element, selec
     for i, site in enumerate(primitive_structure):
         coord_str = f"{site.frac_coords[0]:.6f} {site.frac_coords[1]:.6f} {site.frac_coords[2]:.6f}"
 
-        # Check if chemical_symbols is None (global mode) or populated (sublattice mode)
         if chemical_symbols is None:
-            # Global mode: all sites get the sweep elements
             script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
         else:
-            # Sublattice mode: use the chemical_symbols array
             site_elements = chemical_symbols[i]
 
             if isinstance(site_elements, list) and len(site_elements) > 1:
                 if set(site_elements) == {sweep_element, complement_element}:
                     script_lines.append(f"{coord_str} ${{SWEEP_ELEMENT}}=$conc,${{COMPLEMENT_ELEMENT}}=$comp_conc")
                 else:
-                    script_lines.append(f"{coord_str} {','.join(sorted(site_elements))}")
+                    fixed_conc_str = None
+                    if isinstance(target_concentrations, dict):
+                        first_val = next(iter(target_concentrations.values()), None)
+                        if isinstance(first_val, dict):
+                            for sublat_letter, concs in target_concentrations.items():
+                                if isinstance(concs, dict) and set(concs.keys()) == set(site_elements):
+                                    conc_parts = [f"{el}={concs[el]:.6f}" for el in sorted(concs.keys()) if
+                                                  concs[el] > 1e-6]
+                                    fixed_conc_str = ','.join(conc_parts)
+                                    break
+
+                    if fixed_conc_str:
+                        script_lines.append(f"{coord_str} {fixed_conc_str}")
+                    else:
+                        script_lines.append(f"{coord_str} {','.join(sorted(site_elements))}")
             else:
                 element = site_elements[0] if isinstance(site_elements, list) else str(site.specie)
                 script_lines.append(f"{coord_str} {element}")
