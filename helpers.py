@@ -347,7 +347,7 @@ def calculate_achievable_concentrations(target_concentrations, supercell_multipl
 
 
 def intro_text():
-    st.warning(f"Please upload an initial **crystal structure** file (or search for it with the implemented interface within **MP, AFLOW, or "
+    st.warning(f"Please upload an initial **crystal structure** file (or search for it with the implemented interface within **MP, MC3D, or "
                "COD databases**) that will define the base atomic positions for SQS creation.")
     st.markdown("#### Illustrative example:")
 
