@@ -2288,7 +2288,15 @@ def pymatgen_to_ase(structure):
     from ase import Atoms
     import numpy as np
 
-    symbols = [str(site.specie) for site in structure]
+    symbols = []
+    for site in structure:
+        if site.is_ordered:
+            # .symbol strips oxidation state (e.g. 'Mo4+' → 'Mo')
+            symbols.append(site.specie.symbol)
+        else:
+            dominant = max(site.species, key=lambda sp: site.species[sp])
+            symbols.append(dominant.symbol)
+
     positions = [site.coords for site in structure]
     cell = structure.lattice.matrix
 
