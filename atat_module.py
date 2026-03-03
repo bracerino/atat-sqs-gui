@@ -1280,12 +1280,12 @@ def render_atat_sqs_section():
         composition_mode = st.radio(
             "Choose composition specification mode:",
             [
-                "🔄 Global Composition",
+                #"🔄 Global Composition",
                 "🎯 Sublattice-Specific (Recommended)"
             ],
-            index=1,
+            index=0,
             key="atat_composition_mode_radio",
-            help="Global: Specify overall composition. Sublattice: Control each atomic position separately."
+            help="Global: Specify overall composition. Sublattice: Control each Wyckoff position separately."
         )
     with colb2:
         with st.expander("ℹ️ Composition Mode Details", expanded=False):
