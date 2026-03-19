@@ -2038,7 +2038,7 @@ def render_sqs_module():
         st.info("""
             Special Quasirandom Structures (SQS) approximate random alloys by matching the correlation functions 
             of a truly random alloy in a finite supercell.
-            See also our corresponding **[preprint (arXiv)](https://arxiv.org/abs/2510.18020)** for **SimplySQS**.
+            See also our corresponding **[publication](https://doi.org/10.1016/j.jocs.2026.102846)** for **SimplySQS**.
         """)
         intro_text()
 
