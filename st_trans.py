@@ -693,8 +693,18 @@ def render_sqs_module():
 
     st.markdown(
     """
-    <h1 style='text-align: left; color: #1E3D7B;'>
-        🎲 <span style='color:#2E86C1; font-weight:bold;'>SimplySQS</span>
+    <h1 style="display: flex; align-items: center; gap: 10px; color: #1E3D7B;">
+    🎲 
+    <span style="color:#2E86C1; font-weight:bold;">SimplySQS</span>
+    <span style="
+        background-color: #2E86C1;
+        color: white;
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 12px;
+    ">
+        v0.7.0 • 2/11/2026
+    </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
         Generate input and analyze output files for 
