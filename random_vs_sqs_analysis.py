@@ -424,7 +424,7 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
             st.info(f"Supercell: {nx}×{ny}×{nz} | Total Atoms: {total_atoms}")
 
         with col_script:
-            if st.button("📥 Generate Standalone Script", use_container_width=True):
+            if st.button("📥 Generate Standalone Script", width='stretch'):
                 script = generate_random_analysis_script_standalone(
                     working_structure, target_concentrations, transformation_matrix,
                     use_sublattice_mode, chem_symbols, n_random_structures
@@ -437,7 +437,7 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
                     data=st.session_state['generated_random_script'],
                     file_name="random_analysis_standalone.sh",
                     mime="text/plain",
-                    use_container_width=True,
+                    width='stretch',
                     type='primary'
                 )
                 with st.expander("Script Preview"):
@@ -447,7 +447,7 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
             run_clicked = st.button(
                 "🚀 Run Live Analysis",
                 type="primary",
-                use_container_width=True
+                width='stretch'
             )
 
         if run_clicked:
@@ -619,10 +619,10 @@ def display_results():
     fig.update_xaxes(title_text="Structure ID", title_font=dict(size=24), tickfont=dict(size=20), row=1, col=2)
     fig.update_yaxes(title_text="Score", title_font=dict(size=24), tickfont=dict(size=20), row=1, col=2)
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("📄 View Detailed Data"):
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width='stretch')
 
     st.markdown("---")
     st.markdown("### 📦 Download Best Structures")
@@ -666,9 +666,9 @@ def display_results():
 
     st.markdown(f"**Preview: Top 3 structures (sorted by {sort_column})**")
     preview_cols = ['ID', 'Overall Score', 'RMSE'] + [k for k in all_sublattice_keys if k in sorted_df.columns]
-    st.dataframe(sorted_df[preview_cols].head(3), use_container_width=True)
+    st.dataframe(sorted_df[preview_cols].head(3), width='stretch')
 
-    if st.button("🔽 Generate Download Package", type="primary", use_container_width=True, key="generate_download_btn"):
+    if st.button("🔽 Generate Download Package", type="primary", width='stretch', key="generate_download_btn"):
         with st.spinner("Creating ZIP package..."):
             zip_buffer = create_filtered_zip(
                 sorted_df, structures_data, df,
@@ -686,7 +686,7 @@ def display_results():
             data=st.session_state['download_zip'],
             file_name=f"best_{st.session_state['download_count']}_structures.zip",
             mime="application/zip",
-            use_container_width=True,
+            width='stretch',
             key="download_zip_btn",
             type = 'primary'
         )
