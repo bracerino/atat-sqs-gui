@@ -365,7 +365,7 @@ def render_pair_distance_histogram_tab(working_structure, chem_symbols, use_subl
             "📊 Calculate Histogram",
             type="primary",
             key="calc_histogram_atat",
-            use_container_width=True
+            width='stretch'
         )
 
     if calculate_btn:
@@ -495,7 +495,7 @@ def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_l
 
     fig = create_pair_distance_histogram_plot(histogram_data, use_normalized=use_normalized)
     if fig:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     with st.expander("🔍 First 15 Distance Shells", expanded=False):
         detail_data = []
@@ -518,7 +518,7 @@ def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_l
             })
 
         detail_df = pd.DataFrame(detail_data)
-        st.dataframe(detail_df, use_container_width=True, hide_index=True)
+        st.dataframe(detail_df, width='stretch', hide_index=True)
 
     st.subheader("💡 Suggested Cluster Cutoff Distances")
     suggestions = suggest_cutoff_distances(histogram_data, num_suggestions=8, use_normalized=use_normalized)
@@ -537,7 +537,7 @@ def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_l
             })
 
         suggestion_df = pd.DataFrame(suggestion_data)
-        st.dataframe(suggestion_df, use_container_width=True, hide_index=True)
+        st.dataframe(suggestion_df, width='stretch', hide_index=True)
 
     else:
         st.warning("No significant gaps found in the distance distribution.")
@@ -572,7 +572,7 @@ def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_l
             file_name="pair_distance_histogram.csv",
             mime="text/csv",
             key=f"download_histogram_csv{dl_key_suffix}",
-            use_container_width=True,
+            width='stretch',
             type = "primary"
         )
 
@@ -585,6 +585,6 @@ def _display_histogram_results(histogram_data, use_sublattice_mode, sublattice_l
                 file_name="cutoff_suggestions.csv",
                 mime="text/csv",
                 key=f"download_suggestions_csv{dl_key_suffix}",
-                use_container_width=True,
+                width='stretch',
                 type="primary"
             )
