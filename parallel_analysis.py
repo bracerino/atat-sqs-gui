@@ -123,13 +123,13 @@ def render_parallel_csv_analysis_tab():
                     })
 
             comparison_df = pd.DataFrame(comparison_data)
-            st.dataframe(comparison_df, use_container_width=True)
+            st.dataframe(comparison_df, width='stretch')
 
             st.subheader("📈 Optimization Progress Over Time")
 
             fig = create_parallel_progress_plot(minutes, run_data, best_objectives, best_runs, best_run_id,
                                                 worst_run_id)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         except UnicodeDecodeError:
             st.error("Error reading CSV file. Please ensure the file is a text file with UTF-8 encoding.")
