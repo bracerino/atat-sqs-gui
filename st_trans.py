@@ -10,7 +10,6 @@ from pymatgen.core import Structure, Element, Lattice
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.io.cif import CifWriter
 import py3Dmol
-import streamlit.components.v1 as components
 import pandas as pd
 from mp_api.client import MPRester
 import spglib
@@ -269,7 +268,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
 
     if results_data:
         results_df = pd.DataFrame(results_data)
-        st.dataframe(results_df, use_container_width=True)
+        st.dataframe(results_df, width='stretch')
 
     if valid_results:
         best_result = min(valid_results, key=lambda x: x['best_score'])
@@ -412,7 +411,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
                         "Fraction": f"{actual_frac:.4f}"
                     })
                 comp_df = pd.DataFrame(comp_data)
-                st.dataframe(comp_df, use_container_width=True)
+                st.dataframe(comp_df, width='stretch')
 
             with col_info2:
                 st.write("**Lattice Parameters:**")
@@ -429,7 +428,6 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
             try:
                 from io import StringIO
                 import py3Dmol
-                import streamlit.components.v1 as components
                 from pymatgen.io.ase import AseAtomsAdaptor
                 from ase.io import write
                 import numpy as np
@@ -582,7 +580,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
                 view.zoom(1.2)
 
                 html_string = view._make_html()
-                components.html(html_string, height=420, width=620)
+                st.iframe(html_string, height=420, width=620)
 
                 unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
                 legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -703,7 +701,7 @@ def render_sqs_module():
         padding: 4px 8px;
         border-radius: 12px;
     ">
-        v0.7.0 • 2/11/2026
+        v0.7.1 • 4/11/2026
     </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
@@ -1730,7 +1728,7 @@ def render_sqs_module():
 
             # with cols2:
             #     image = Image.open("images/Rabbit2.png")
-            #     st.image(image, use_container_width=True)
+            #     st.image(image, width='stretch')
 
             with cols3:
                 if any(x in st.session_state for x in ['mp_options', 'aflow_options', 'cod_options', 'mc3d_options']):
