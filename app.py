@@ -8,7 +8,6 @@ st.set_page_config(
 
 from pymatgen.core import Structure
 import io
-import streamlit.components.v1 as components
 import os
 import re
 from pymatgen.io.cif import CifWriter
@@ -260,13 +259,13 @@ st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsa
 #    mem_info = process.memory_info()
 #    return mem_info.rss / (1024 ** 2)  # in MB
 
-components.html(
+st.iframe(
     """
     <head>
         <meta name="description" content="ATAT SQS GUI: Create Input Files for Generation of SQS using ATAT mcsqs and Analyse Its Outputs">
     </head>
     """,
-    height=0,
+    height='content',
 )
 
 #memory_usage = get_memory_usage()
