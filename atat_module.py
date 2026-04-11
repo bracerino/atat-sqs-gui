@@ -1302,6 +1302,7 @@ def render_atat_sqs_section():
             - Control which elements can occupy specific crystallographic sites (Wyckoff positions)
             - Set different compositions for different atomic sublattices
             - **Example:** In a perovskite ABO₃, control A-site (Ba/Sr) and B-site (Ti/Zr) compositions independently
+            - Also use this mode to create for instance HEA from a simple bcc-phase (e.g., beta-Ti) and others
 
             ---
             **Global** treats all sites equally, while **Sublattice-Specific** allows site-dependent element distributions.
