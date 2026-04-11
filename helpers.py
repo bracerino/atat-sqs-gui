@@ -361,9 +361,9 @@ def intro_text():
         <img src="data:image/png;base64,{encoded}" style="width:90%; max-width:800px; height:auto;">
     </div>
     """
-    components.html(html_img, height=500)
+    st.iframe(html_img, height=500)
 
-    components.html("""
+    st.iframe("""
     <style>
     .glow-underline {
         width: 800px;              
@@ -420,9 +420,9 @@ It also enables **automated script generation** for binary alloys and batch exec
         <img src="data:image/png;base64,{encoded}" style="width:90%; max-width:800px; height:auto;">
     </div>
     """
-    components.html(html_img, height=800)
+    st.iframe(html_img, height=800)
 
-    components.html("""
+    st.iframe("""
     <style>
     .glow-underline {
         width: 800px;              
@@ -505,7 +505,6 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 
 
-import streamlit.components.v1 as components
 import numpy as np
 import py3Dmol
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -673,7 +672,7 @@ def structure_preview(working_structure):
         view.zoom(1.2)
 
         html_string = view._make_html()
-        components.html(html_string, height=420, width=420)
+        st.iframe(html_string, height=420, width=420)
 
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
         legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -808,7 +807,7 @@ def sqs_visualization(result):
         view.zoom(1.2)
 
         html_string = view._make_html()
-        components.html(html_string, height=420, width=620)
+        st.iframe(html_string, height=420, width=620)
 
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
         legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -881,7 +880,7 @@ def generated_SQS_information(result):
                 "Match": "✅" if abs(actual_frac - target_frac) < 0.01 else "⚠️"
             })
         comp_df = pd.DataFrame(comp_data)
-        st.dataframe(comp_df, use_container_width=True)
+        st.dataframe(comp_df, width='stretch')
 
     with col_info2:
         st.write("**Lattice Parameters:**")
@@ -918,7 +917,7 @@ def generated_SQS_information(result):
 
             if sublattice_data:
                 sublattice_df = pd.DataFrame(sublattice_data)
-                st.dataframe(sublattice_df, use_container_width=True)
+                st.dataframe(sublattice_df, width='stretch')
 
 
 
@@ -1015,7 +1014,7 @@ def render_site_sublattice_selector(working_structure, all_sites):
                 "Coordinates": f"({site_info['coords'][0]:.3f}, {site_info['coords'][1]:.3f}, {site_info['coords'][2]:.3f})"
             })
         site_df = pd.DataFrame(site_data)
-        st.dataframe(site_df, use_container_width=True)
+        st.dataframe(site_df, width='stretch')
 
     assigned_sites = set()
     for assignment_key in st.session_state.site_assignments.keys():
@@ -1145,7 +1144,7 @@ def render_site_sublattice_selector(working_structure, all_sites):
             })
 
         summary_df = pd.DataFrame(summary_data)
-        st.dataframe(summary_df, use_container_width=True)
+        st.dataframe(summary_df, width='stretch')
 
     final_assigned_sites = set()
     for assignment_key in st.session_state.site_assignments.keys():
@@ -1513,7 +1512,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
 
         if sublattice_data:
             sublattice_df = pd.DataFrame(sublattice_data)
-            st.dataframe(sublattice_df, use_container_width=True)
+            st.dataframe(sublattice_df, width='stretch')
 
         global_concentrations = calculate_global_concentrations_from_sublattices(
             target_concentrations, chemical_symbols, transformation_matrix, primitive_structure
@@ -1542,7 +1541,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
 
             if overall_comp_data:
                 overall_comp_df = pd.DataFrame(overall_comp_data)
-                st.dataframe(overall_comp_df, use_container_width=True)
+                st.dataframe(overall_comp_df, width='stretch')
 
                 st.info(f"**Total atoms in supercell:** {total_global_atoms} / {total_sites}")
         else:
@@ -1552,7 +1551,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
         #if adjustment_info:
         #    st.warning("⚠️ **Concentration Adjustments Required:**")
         #    adj_df = pd.DataFrame(adjustment_info)
-        #    st.dataframe(adj_df, use_container_width=True)
+        #    st.dataframe(adj_df, width='stretch')
 
     except Exception as e:
         st.error(f"Error calculating composition preview: {e}")
@@ -1747,7 +1746,7 @@ def thread_for_graph(last_update_time, message_queue, progress_data, progress_pl
                 fig.update_yaxes(title_text="Best Score", secondary_y=False, color='blue')
                 fig.update_yaxes(title_text="Temperature", secondary_y=True, color='red')
 
-                chart_placeholder.plotly_chart(fig, use_container_width=True,
+                chart_placeholder.plotly_chart(fig, width='stretch',
                                                key=f"live_chart_{int(current_time * 1000)}")
 
                 if isinstance(last_update_time, list):
@@ -1837,7 +1836,7 @@ def generate_sqs_with_icet_progress_multi(primitive_structure, target_concentrat
     #            "Atom Count": achievable_counts[element]
     #        })
     #    adj_df = pd.DataFrame(adj_data)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     all_elements = list(achievable_concentrations.keys())
     chemical_symbols = [all_elements for _ in range(len(atoms))]
@@ -2000,7 +1999,7 @@ def generate_sqs_with_icet_progress_multi(primitive_structure, target_concentrat
             )
 
             final_chart_key = f"final_multi_chart_{getattr(st.session_state, 'current_multi_run', 0)}_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
@@ -2107,7 +2106,7 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
                         )
                     )
 
-                    st.plotly_chart(fig_combined, use_container_width=True)
+                    st.plotly_chart(fig_combined, width='stretch')
 
                     import pandas as pd
                     import base64
@@ -2445,7 +2444,7 @@ def thread_for_graph_multi_run(last_update_time, message_queue, progress_data, p
                 )
 
                 chart_key = f"multi_run_chart_{getattr(st.session_state, 'current_multi_run', 0)}_{int(current_time)}"
-                chart_placeholder.plotly_chart(fig, use_container_width=True, key=chart_key)
+                chart_placeholder.plotly_chart(fig, width='stretch', key=chart_key)
 
                 if isinstance(last_update_time, list):
                     last_update_time[0] = current_time
@@ -2523,7 +2522,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
     #    st.warning(
     #        "⚠️ **Sublattice Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
     #    adj_df = pd.DataFrame(adjustment_info)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     try:
         cs = icet.ClusterSpace(atoms, cutoffs, chemical_symbols)
@@ -2547,7 +2546,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
 
     if sublattice_info_data:
         sublattice_df = pd.DataFrame(sublattice_info_data)
-        st.dataframe(sublattice_df, use_container_width=True)
+        st.dataframe(sublattice_df, width='stretch')
 
     if random_seed > 0:
         random.seed(random_seed)
@@ -2655,7 +2654,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
             if final_fig:
                 current_run = getattr(st.session_state, 'current_multi_run', 0)
                 chart_key = f"sqs_sublattice_final_chart_run_{current_run}_{int(time.time() * 1000)}"
-                st.plotly_chart(final_fig, use_container_width=True, key=chart_key)
+                st.plotly_chart(final_fig, width='stretch', key=chart_key)
             else:
                 st.info("Optimization completed - see live chart above for progress details.")
 
@@ -2695,7 +2694,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
     #    st.warning(
     #        "⚠️ **Sublattice Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
     #    adj_df = pd.DataFrame(adjustment_info)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     try:
         cs = icet.ClusterSpace(atoms, cutoffs, chemical_symbols)
@@ -2719,7 +2718,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
     #if sublattice_info_data:
     #    sublattice_df = pd.DataFrame(sublattice_info_data)
-    #    st.dataframe(sublattice_df, use_container_width=True)
+    #    st.dataframe(sublattice_df, width='stretch')
 
     if random_seed > 0:
         random.seed(random_seed)
@@ -2892,7 +2891,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
             current_run = getattr(st.session_state, 'current_multi_run', 0)
             final_chart_key = f"final_sublattice_multi_chart_run_{current_run}_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
