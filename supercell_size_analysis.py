@@ -463,7 +463,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
     run_button = st.button(
         "🚀 Run Supercell Size Analysis",
         type="primary",
-        use_container_width=True,
+        width='stretch',
         disabled=not can_run
     )
 
@@ -497,7 +497,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
                         'Composition': conc_str})
             if conc_data:
                 conc_df = pd.DataFrame(conc_data)
-                st.dataframe(conc_df, use_container_width=True, hide_index=True)
+                st.dataframe(conc_df, width='stretch', hide_index=True)
         #        st.caption(
         #            "💡 Concentrations are recalculated for each supercell size to match target as closely as possible with integer atom counts.")
         with st.expander("📊 Detailed Results Table", expanded=False):
@@ -513,7 +513,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
                 })
 
             results_df = pd.DataFrame(table_data)
-            st.dataframe(results_df, use_container_width=True, hide_index=True)
+            st.dataframe(results_df, width='stretch', hide_index=True)
             st.caption(
                 "💡 Mean Score: Average randomness quality | Std Dev: Statistical fluctuation | Lower RMSE = Better randomness")
 
@@ -536,7 +536,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
 
         fig = create_size_analysis_plots(results, selected_sublattice=selected_sublattice)
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         st.markdown("---")
         st.subheader("📥 Download All Structures")
@@ -558,7 +558,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
             """)
 
         with col_btn:
-            if st.button("🔽 Generate Download Package", type="primary", use_container_width=True):
+            if st.button("🔽 Generate Download Package", type="primary", width='stretch'):
                 with st.spinner("Creating ZIP file..."):
                     zip_data = create_structures_zip(results)
                     st.session_state['structures_zip'] = zip_data
@@ -570,6 +570,6 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
                 data=st.session_state['structures_zip'],
                 file_name="supercell_size_analysis_structures.zip",
                 mime="application/zip",
-                use_container_width=True,
+                width='stretch',
                 type='primary'
             )
