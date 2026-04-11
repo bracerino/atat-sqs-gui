@@ -1158,7 +1158,7 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
                         )
                     )
 
-                    st.plotly_chart(fig_combined, use_container_width=True)
+                    st.plotly_chart(fig_combined, width='stretch')
 
                     import base64
 
@@ -1262,7 +1262,7 @@ def render_atat_sqs_section():
             })
 
         site_df = pd.DataFrame(site_data)
-        st.dataframe(site_df, use_container_width=True)
+        st.dataframe(site_df, width='stretch')
 
     with col2:
         structure_preview(working_structure)
@@ -1537,7 +1537,7 @@ def render_atat_sqs_section():
                     # "Status": status
                 })
             conc_df = pd.DataFrame(conc_data)
-            st.dataframe(conc_df, use_container_width=True)
+            st.dataframe(conc_df, width='stretch')
             st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
 
             preview_data = []
@@ -1557,7 +1557,7 @@ def render_atat_sqs_section():
                 })
 
             preview_df = pd.DataFrame(preview_data)
-            st.dataframe(preview_df, use_container_width=True)
+            st.dataframe(preview_df, width='stretch')
             st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
             st.write("#### **Overall Expected Element Distribution in Supercell:**")
 
@@ -1831,7 +1831,7 @@ def render_atat_sqs_section():
                 st.warning(
                     "⚠️ **Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
                 adj_df = pd.DataFrame(adjustment_info)
-                st.dataframe(adj_df, use_container_width=True)
+                st.dataframe(adj_df, width='stretch')
 
             st.session_state.atat_results = {
                 'structure_name': selected_atat_file,
@@ -2255,7 +2255,7 @@ def render_atat_sqs_section():
                     #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
                     #     for elem, count in sorted(element_counts.items())
                     # ])
-                    # st.dataframe(element_df, use_container_width=True)
+                    # st.dataframe(element_df, width='stretch')
 
                     st.write("#### **Element Distribution:**")
                     cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
@@ -2741,7 +2741,7 @@ def render_batch_structure_converter(working_structure, transformation_matrix):
             })
 
         preview_df = pd.DataFrame(file_preview_data)
-        st.dataframe(preview_df, use_container_width=True)
+        st.dataframe(preview_df, width='stretch')
 
         st.subheader("📋 Output Format Configuration")
 
@@ -3944,7 +3944,7 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
 
         if preview_data:
             preview_df = pd.DataFrame(preview_data)
-            st.dataframe(preview_df, use_container_width=True)
+            st.dataframe(preview_df, width='stretch')
         else:
             st.warning("No mixed sublattices configured yet.")
         pure_sites_data = []
@@ -3969,7 +3969,7 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
         if pure_sites_data:
             st.write("**Pure (Unchanged) Sites:**")
             pure_df = pd.DataFrame(pure_sites_data)
-            st.dataframe(pure_df, use_container_width=True)
+            st.dataframe(pure_df, width='stretch')
 
         st.markdown(
             """
@@ -4596,7 +4596,7 @@ def render_extended_optimization_analysis_tab():
                 st.success(f"✅ Successfully parsed {len(objective_values)} optimization steps!")
 
                 fig = create_optimization_plot(objective_values)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
 
@@ -4650,7 +4650,7 @@ def render_extended_optimization_analysis_tab():
                                                 for i in range(1, len(objective_values))]
                     })
 
-                    st.dataframe(data_df, use_container_width=True)
+                    st.dataframe(data_df, width='stretch')
 
                     csv_data = data_df.to_csv(index=False)
                     st.download_button(
@@ -4692,7 +4692,7 @@ def render_extended_optimization_analysis_tab():
 
                 st.success(f"✅ Successfully parsed {len(objective_values)} data points!")
                 fig = create_optimization_plot_csv(minutes, objective_values, additional_data)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
                 col_stats1, col_stats2, col_stats3 = st.columns(3)
 
@@ -4747,7 +4747,7 @@ def render_extended_optimization_analysis_tab():
                                 data_dict[key] = values
 
                         df_display = pd.DataFrame(data_dict)
-                        st.dataframe(df_display, use_container_width=True)
+                        st.dataframe(df_display, width='stretch')
 
                         csv_data = df_display.to_csv(index=False)
                         st.download_button(
@@ -4770,7 +4770,7 @@ def render_extended_optimization_analysis_tab():
             #             display_data[key] = values
 
             #     df_raw = pd.DataFrame(display_data)
-            #     st.dataframe(df_raw, use_container_width=True)
+            #     st.dataframe(df_raw, width='stretch')
 
             except UnicodeDecodeError:
                 st.error("Error reading CSV file. Please ensure the file is a text file with UTF-8 encoding.")
@@ -4905,7 +4905,7 @@ def render_extended_optimization_analysis_tab():
                         })
 
                     comparison_df = pd.DataFrame(comparison_data)
-                    st.dataframe(comparison_df, use_container_width=True)
+                    st.dataframe(comparison_df, width='stretch')
 
                     st.subheader("📈 Combined Optimization Progress")
 
@@ -4959,7 +4959,7 @@ def render_extended_optimization_analysis_tab():
                     )
 
 
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
 
                     st.subheader("📥 Download Results")
 
@@ -5883,7 +5883,7 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
             preview_data.append({"Property": "Vacancy %", "Value": f"{vacancy_percentage:.1f}%"})
 
             preview_df = pd.DataFrame(preview_data)
-            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+            st.dataframe(preview_df, width='stretch', hide_index=True)
 
     create_vacancies_btn = st.button(
         "🕳️ Create Vacancy Structure",
@@ -5928,7 +5928,7 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 })
 
             removal_df = pd.DataFrame(removal_data)
-            st.dataframe(removal_df, use_container_width=True, hide_index=True)
+            st.dataframe(removal_df, width='stretch', hide_index=True)
 
             st.write("**Composition Comparison:**")
             comp_comparison = pd.DataFrame({
@@ -5936,7 +5936,7 @@ def render_vacancy_creation_section(sqs_pymatgen_structure):
                 "Composition": [removal_info['original_composition'], removal_info['final_composition']],
                 "Total Atoms": [removal_info['original_atom_count'], removal_info['final_atom_count']]
             })
-            st.dataframe(comp_comparison, use_container_width=True, hide_index=True)
+            st.dataframe(comp_comparison, width='stretch', hide_index=True)
 
             st.subheader("🔍 Vacancy Structure Visualization")
             sqs_result_with_vacancies = {'structure': vacancy_structure}
@@ -6128,7 +6128,7 @@ def render_correlation_analysis_tab():
 
             st.subheader("📈 Correlation Analysis")
             correlation_plot = create_correlation_distance_plot(correlation_data)
-            st.plotly_chart(correlation_plot, use_container_width=True)
+            st.plotly_chart(correlation_plot, width='stretch')
 
             col_interpretation1, col_interpretation2 = st.columns(2)
 
@@ -6176,7 +6176,7 @@ def render_correlation_analysis_tab():
 
             correlation_df = correlation_df.round(6)
 
-            st.dataframe(correlation_df, use_container_width=True)
+            st.dataframe(correlation_df, width='stretch')
 
             col_stats1, col_stats2 = st.columns(2)
 
