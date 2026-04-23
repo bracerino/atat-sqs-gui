@@ -1280,7 +1280,7 @@ def render_atat_sqs_section():
         composition_mode = st.radio(
             "Choose composition specification mode:",
             [
-                #"🔄 Global Composition",
+                "🔄 Global Composition",
                 "🎯 Sublattice-Specific (Recommended)"
             ],
             index=0,
