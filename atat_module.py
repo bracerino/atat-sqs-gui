@@ -1283,7 +1283,7 @@ def render_atat_sqs_section():
                 "🔄 Global Composition",
                 "🎯 Sublattice-Specific (Recommended)"
             ],
-            index=0,
+            index=1,
             key="atat_composition_mode_radio",
             help="Global: Specify overall composition. Sublattice: Control each Wyckoff position separately."
         )
