@@ -230,7 +230,15 @@ def create_vasp_content(lattice, atoms_frac, elements, nx, ny, nz, comment="Rand
 def render_random_analysis_standalone(working_structure, target_concentrations, transformation_matrix,
                                       use_sublattice_mode, chem_symbols, total_atoms):
     st.subheader("🎲 Random Structure Quality Check")
+    def is_running_locally():
+        try:
+            host = st.context.headers.get("host", "")
+            return "localhost" in host or "127.0.0.1" in host
+        except:
+            return False
 
+    IS_LOCAL = is_running_locally()
+                                          
     with st.expander("ℹ️ What is this feature?", expanded=False):
 
         st.markdown("""
@@ -416,7 +424,7 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
         with col_config:
             n_random_structures = st.number_input(
-                "Number of random structures:", min_value=5, max_value=500, value=20, step=5,
+                "Number of random structures:", min_value=5, max_value=100000 if IS_LOCAL else 500, value=20, step=5,
                 key="n_random_check_live"
             )
             nx, ny, nz = int(transformation_matrix[0, 0]), int(transformation_matrix[1, 1]), int(
