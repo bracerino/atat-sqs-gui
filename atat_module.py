@@ -3665,6 +3665,21 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
     - For vacancies, use symbol 'Vac'.
     """)
 
+    _col_lbl2, _col_tog2 = st.columns([6, 1])
+    with _col_lbl2:
+        st.caption("**Sublattice grouping** — merge sites with same element+letter, or split by coordinates")
+    with _col_tog2:
+        separate_by_coords = st.toggle(
+            "🔀",
+            value=False,
+            key=f"{stable_key}_separate_by_coords",
+            help=(
+                "OFF (default): sites sharing the same element AND Wyckoff letter are merged.\n\n"
+                "ON: every unique Wyckoff index becomes its own sublattice, even when "
+                "letter and element are identical (e.g. three S@e sites → three tabs)."
+            ),
+        )
+
     common_elements = [
         'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
         'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
@@ -3679,21 +3694,30 @@ def render_site_sublattice_selector_fixed(working_structure, all_sites, unique_s
 
     target_concentrations = {}
     chem_symbols = [[] for _ in range(len(working_structure))]
-    sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    sublattice_letters = (
+            list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
+            [f"{c}{n}" for n in range(1, 10) for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+    )
 
     unique_wyckoff_groups = {}
 
-    for site_info in unique_sites:
-        key = (site_info['element'], site_info['wyckoff_letter'])
-        if key not in unique_wyckoff_groups:
-            unique_wyckoff_groups[key] = []
-        unique_wyckoff_groups[key].append(site_info)
+    if separate_by_coords:
+        for site_info in unique_sites:
+            key = site_info['wyckoff_index']
+            unique_wyckoff_groups[key] = [site_info]
+    else:
+        for site_info in unique_sites:
+            key = (site_info['element'], site_info['wyckoff_letter'])
+            if key not in unique_wyckoff_groups:
+                unique_wyckoff_groups[key] = []
+            unique_wyckoff_groups[key].append(site_info)
 
     sublattice_data = []
     temp_sublattice_index = 0
 
     for group_key, site_infos in unique_wyckoff_groups.items():
-        element, wyckoff_letter = group_key
+        element = site_infos[0]['element']
+        wyckoff_letter = site_infos[0]['wyckoff_letter']
 
         total_multiplicity = sum(site_info['multiplicity'] for site_info in site_infos)
         all_equivalent_indices = []
