@@ -701,7 +701,7 @@ def render_sqs_module():
         padding: 4px 8px;
         border-radius: 12px;
     ">
-        v0.7.1 • 4/11/2026
+        v0.7.2 • 4/29/2026
     </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
