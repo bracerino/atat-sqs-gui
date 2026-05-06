@@ -694,15 +694,6 @@ def render_sqs_module():
     <h1 style="display: flex; align-items: center; gap: 10px; color: #1E3D7B;">
     🎲 
     <span style="color:#2E86C1; font-weight:bold;">SimplySQS</span>
-    <span style="
-        background-color: #2E86C1;
-        color: white;
-        font-size: 12px;
-        padding: 4px 8px;
-        border-radius: 12px;
-    ">
-        v0.7.2 • 4/29/2026
-    </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal;'>
         Generate input and analyze output files for 
@@ -711,6 +702,30 @@ def render_sqs_module():
     </h3>
     """,
     unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div style="
+            display: inline-block;
+            background-color: #ffffff;
+            border-left: 5px solid #2563eb;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-top: -4px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 600;
+        ">
+            <span style="color:#2563eb; font-weight:800;">Release:</span>
+            v0.7.2 &nbsp; | &nbsp;
+            <span style="color:#2563eb; font-weight:800;">Updated:</span>
+            April 29, 2026
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
     st.markdown(
