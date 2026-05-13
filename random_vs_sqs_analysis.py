@@ -209,7 +209,12 @@ def create_vasp_content(lattice, atoms_frac, elements, nx, ny, nz, comment="Rand
     sc_lat = np.array([lattice.matrix[0] * nx, lattice.matrix[1] * ny, lattice.matrix[2] * nz])
     from collections import defaultdict
     grouped = defaultdict(list)
-    for frac_pos, elem in zip(atoms_frac, elements): grouped[elem].append(frac_pos)
+    vac_symbols = {"Vac", "VAC", "vac", "Vacancy", "vacancy", "X"}
+
+    for frac_pos, elem in zip(atoms_frac, elements):
+        if elem in vac_symbols:
+            continue
+        grouped[elem].append(frac_pos)
     sorted_elements = sorted(grouped.keys())
     lines = [comment, "1.0"]
     for vec in sc_lat: lines.append(f" {vec[0]:15.9f} {vec[1]:15.9f} {vec[2]:15.9f}")
