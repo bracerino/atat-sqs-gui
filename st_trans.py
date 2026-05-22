@@ -872,7 +872,14 @@ def render_sqs_module():
            }
 
            div[data-testid="stDataFrameContainer"] table td { font-size: 16px !important; }
-           #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+           #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            [data-testid="stDecoration"] {display: none;}
+            [data-testid="stToolbarActions"] {display: none;}
+            .viewerBadge_link__qRIco {display: none;}
+            [data-testid="stStatusWidget"] {display: none;}
+            [data-testid="stSidebarCollapsedControl"] {visibility: visible !important; display: block !important;}
+            [data-testid="collapsedControl"] {visibility: visible !important; display: block !important;}
            </style>
        """, unsafe_allow_html=True)
 
