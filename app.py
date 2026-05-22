@@ -3,7 +3,8 @@ import streamlit as st
 st.set_page_config(
     page_title="SimplySQS: Create Input Files for Generation of SQS using ATAT mcsqs and Analyse Its Outputs",
     page_icon="🎲",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 from pymatgen.core import Structure
