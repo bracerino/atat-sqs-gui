@@ -1,7 +1,7 @@
 streamlit==1.56.0 # Updated from 1.45.1
 pandas==2.3.0
 numpy==2.2.6
-pymatgen==2026.5.4 # 2025.5.28
+pymatgen==2025.10.7 # 2026.5.4
 ase==3.25.0
 matminer==0.9.3
 plotly==6.1.2
