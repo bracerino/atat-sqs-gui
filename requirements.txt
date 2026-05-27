@@ -3,7 +3,7 @@ pandas==2.3.0
 numpy==2.2.6
 pymatgen==2026.5.4  # 2025.10.7
 ase==3.28.0
-matminer==10.1
+matminer==0.10.1
 plotly==6.1.2
 matplotlib==3.10.3
 mp-api==0.46.1
