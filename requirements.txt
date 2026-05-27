@@ -12,6 +12,6 @@ py3Dmol==2.4.2
 requests==2.32.5
 maggma==0.72.0 
 emmet-core==0.86.4
-#scipy==1.16.1
+scipy==1.17.1 # 1.16.1
 psutil
 gputil
