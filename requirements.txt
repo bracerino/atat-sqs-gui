@@ -2,7 +2,7 @@ streamlit==1.57.0 # Updated from 1.45.1
 pandas==2.3.0
 numpy==2.2.6
 pymatgen==2026.5.4  # 2025.10.7
-ase==3.25.0
+ase==3.28.0
 matminer==0.9.3
 plotly==6.1.2
 matplotlib==3.10.3
@@ -12,6 +12,6 @@ py3Dmol==2.4.2
 requests==2.32.5
 maggma==0.72.0 
 emmet-core==0.86.4
-scipy==1.16.1
+#scipy==1.16.1
 psutil
 gputil
