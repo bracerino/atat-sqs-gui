@@ -373,6 +373,15 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
         - **Optimal size**: Where score plateaus with acceptable variance
         """)
 
+    def is_running_locally():
+        try:
+            host = st.context.headers.get("host", "")
+            return "localhost" in host or "127.0.0.1" in host
+        except:
+            return False
+
+    IS_LOCAL = is_running_locally()
+
     base_nx = int(transformation_matrix[0, 0])
     base_ny = int(transformation_matrix[1, 1])
     base_nz = int(transformation_matrix[2, 2])
@@ -393,10 +402,11 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
         n_samples = st.number_input(
             "Samples per size:",
             min_value=3,
-            max_value=100,
+            max_value=100 if IS_LOCAL else 50,
             value=10,
             step=1,
             help="Number of random structures to generate at each size"
+            + ("" if IS_LOCAL else " (limited to 50 in the online version)")
         )
 
     with col3:
