@@ -429,12 +429,20 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
         with col_config:
             n_random_structures = st.number_input(
-                "Number of random structures:", min_value=5, max_value=100000 if IS_LOCAL else 500, value=20, step=5,
+                "Number of random structures:", min_value=5, max_value=100000 if IS_LOCAL else 100, value=20, step=5,
                 key="n_random_check_live"
             )
             nx, ny, nz = int(transformation_matrix[0, 0]), int(transformation_matrix[1, 1]), int(
                 transformation_matrix[2, 2])
             st.info(f"Supercell: {nx}×{ny}×{nz} | Total Atoms: {total_atoms}")
+
+            ONLINE_ATOM_LIMIT = 10000
+            atoms_exceed_online = (not IS_LOCAL) and total_atoms > ONLINE_ATOM_LIMIT
+            if atoms_exceed_online:
+                st.error(
+                    f"❌ The online version is limited to {ONLINE_ATOM_LIMIT} atoms. This supercell has "
+                    f"{total_atoms} atoms. Please use a smaller supercell or run the standalone script locally."
+                )
 
         with col_script:
             if st.button("📥 Generate Standalone Script", width='stretch'):
@@ -460,7 +468,8 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
             run_clicked = st.button(
                 "🚀 Run Live Analysis",
                 type="primary",
-                width='stretch'
+                width='stretch',
+                disabled=atoms_exceed_online
             )
 
         if run_clicked:
