@@ -250,6 +250,29 @@ st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if upl
 # Render the SQS transformation module
 from st_trans import render_sqs_module, check_sqs_mode
 
+# Block the workflow if any uploaded structure is too large. The supercell is
+# specified later in the workflow, so the uploaded structure should be a small
+# unit cell rather than an already-expanded supercell.
+MAX_UPLOAD_ATOMS = 1000
+oversized_structures = {
+    name: len(structure)
+    for name, structure in st.session_state.full_structures.items()
+    if len(structure) > MAX_UPLOAD_ATOMS
+}
+
+if oversized_structures:
+    details = "\n".join(
+        f"- **{name}**: {n_atoms} atoms" for name, n_atoms in oversized_structures.items()
+    )
+    st.error(
+        f"⚠️ **Uploaded structure is too large (more than {MAX_UPLOAD_ATOMS} atoms).**\n\n"
+        f"{details}\n\n"
+        "This is **not recommended**: the supercell is specified later in the workflow, "
+        "so you should upload the **smaller unit cell** instead of an already-expanded "
+        "supercell. **Please remove the structure(s) listed above from the sidebar to continue.**"
+    )
+    st.stop()
+
 # Call the SQS module
 render_sqs_module()
 
