@@ -54,7 +54,7 @@ Open your terminal console and write the following commands (the **bold text**):
 5) Activate the Python virtual environment (before activating, make sure you are inside the xrdlicious folder):  
       **source atat-sqs_env/bin/activate**
    
-6) Install all the necessary Python packages:
+6) Install all the necessary Python packages:  
      **pip install --upgrade pip**  
      **pip install --no-cache-dir -r requirements.txt**  
 
