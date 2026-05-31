@@ -54,10 +54,11 @@ Open your terminal console and write the following commands (the **bold text**):
 5) Activate the Python virtual environment (before activating, make sure you are inside the xrdlicious folder):  
       **source atat-sqs_env/bin/activate**
    
-6) Install all the necessary Python packages:  
-      **pip install -r requirements.txt**
+6) Install all the necessary Python packages:
+     **pip install --upgrade pip**  
+     **pip install --no-cache-dir -r requirements.txt**  
 
-7) Run the ATAT SQS GUI app (always before running it, make sure to activate its Python virtual environment (Step 4):  
+8) Run the ATAT SQS GUI app (always before running it, make sure to activate its Python virtual environment (Step 4):  
       **streamlit run app.py**
 
 ### Tested Python packages  
