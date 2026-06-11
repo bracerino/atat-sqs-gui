@@ -6,6 +6,17 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.build import make_supercell
 from helpers import *
 from parallel_analysis import *
+from more_funct.prdf import (
+    MAX_PRDF_ATOMS,
+    MAX_PRDF_SPECIES,
+    MAX_PRDF_STRUCTURES,
+    PRDF_COLORS,
+    validate_prdf_structure,
+    get_structure_species,
+    compute_prdf,
+    add_prdf_trace,
+    make_prdf_layout,
+)
 
 
 def render_concentration_sweep_section(chemical_symbols, target_concentrations, transformation_matrix,
@@ -1193,6 +1204,364 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
         return False
 
 
+@st.cache_data(show_spinner=False)
+def _cached_compute_prdf(content_key, cutoff, bin_size, r_min, _struct):
+    """Cached PRDF computation.
+
+    The cache key is ``(content_key, cutoff, bin_size, r_min)`` — ``content_key``
+    is the raw bestsqs.out text, which uniquely identifies the structure. The
+    ``_struct`` argument is underscore-prefixed so Streamlit does not try to hash
+    it; it is reused only on a cache miss. This lets plot-only settings change
+    without recomputing the PRDF.
+    """
+    return compute_prdf(_struct, cutoff=cutoff, bin_size=bin_size, r_min=r_min)
+
+
+def render_prdf_analysis_tab(converted_structures, main_name, working_structure, transformation_matrix, results):
+    """PRDF tab for the Structure Converter.
+
+    Computes the PRDF for every bestsqs.out structure uploaded in the converter
+    (using the matminer-based helper in ``more_funct.prdf``) and overlays them
+    for comparison. ``converted_structures`` maps a file name to a dict that
+    holds at least a ``'structure'`` (pymatgen Structure); ``main_name`` is the
+    currently selected structure, plotted on its own first. Online limits
+    (max atoms / element types / number of structures) are enforced per structure.
+    """
+    import plotly.graph_objects as go
+
+    n_uploaded = len(converted_structures)
+    st.subheader("📊 PRDF Analysis of SQS Structure")
+    st.info(
+        f"⚠️ Online limits: max **{MAX_PRDF_ATOMS} atoms** and max **{MAX_PRDF_SPECIES} element "
+        f"types** per structure, and up to **{MAX_PRDF_STRUCTURES} structures** compared at once. "
+        + (
+            f"All **{n_uploaded} uploaded** bestsqs.out files will be overlaid for comparison."
+            if n_uploaded > 1
+            else "Upload several bestsqs.out files in the converter to overlay their PRDFs for comparison."
+        )
+    )
+
+    # --- Calculation settings ---
+    col_rmin, col_cut, col_bin = st.columns(3)
+    r_min = col_rmin.number_input(
+        "Min cutoff (Å):", min_value=0.0, max_value=49.0, value=0.0, step=0.1,
+        format="%.2f", key="prdf_rmin",
+        help="Distances below this value are excluded from every PRDF/RDF trace.",
+    )
+    cutoff = col_cut.number_input(
+        "Cutoff (Å):", min_value=1.0, max_value=50.0, value=10.0, step=0.5,
+        format="%.1f", key="prdf_cutoff",
+    )
+    bin_size = col_bin.number_input(
+        "Bin size (Å):", min_value=0.005, max_value=2.0, value=0.1, step=0.005,
+        format="%.3f", key="prdf_bin_size",
+    )
+    if r_min >= cutoff:
+        st.warning("Min cutoff must be smaller than Cutoff — Min cutoff will be ignored.")
+        r_min = 0.0
+
+    col_ps, col_sm, col_norm = st.columns(3)
+    plot_style = col_ps.radio(
+        "Plot style", ["Smooth Curve", "Raw Data Points", "Bars (Histogram)"],
+        index=0, key="prdf_plot_style",
+    )
+    # Smoothing only applies to (and is only shown for) the Smooth Curve style.
+    smoothing_method = "Gaussian"
+    if plot_style == "Smooth Curve":
+        smoothing_method = col_sm.radio(
+            "Smoothing method", ["Gaussian", "Savitzky-Golay", "Cubic Spline"],
+            index=0, key="prdf_smoothing",
+        )
+    normalize = col_norm.checkbox(
+        "Normalize each trace to its max", value=False, key="prdf_normalize",
+        help="Divide every trace by its own maximum so shapes share a common [0, 1] scale.",
+    )
+
+    sigma, sg_win, sg_ord, spline_pts, bar_width_factor = (1.5, 11, 3, 300, 0.8)
+    if plot_style == "Smooth Curve":
+        if smoothing_method == "Gaussian":
+            sigma = st.slider("Gaussian σ", 0.5, 5.0, 1.5, 0.1, key="prdf_sigma")
+        elif smoothing_method == "Savitzky-Golay":
+            c1, c2 = st.columns(2)
+            sg_win = c1.slider("Window length (odd)", 5, 21, 11, 2, key="prdf_sgwin")
+            sg_ord = c2.slider("Polynomial order", 2, 5, 3, 1, key="prdf_sgord")
+        else:
+            spline_pts = st.slider("Interpolation points", 100, 600, 300, 50, key="prdf_spline")
+    elif plot_style == "Bars (Histogram)":
+        bar_width_factor = st.slider(
+            "Bar thickness (× bin size)", 0.1, 2.0, 0.30, 0.1, key="prdf_barwidth",
+            help="Width of each histogram bar as a fraction of the bin size.",
+        )
+
+    line_style = "Lines Only"
+    barmode = "overlay" if plot_style == "Bars (Histogram)" else None
+    trace_kwargs = dict(
+        plot_style=plot_style, line_style=line_style, normalize=normalize,
+        bin_size=bin_size, bar_width_factor=bar_width_factor,
+        smoothing_method=smoothing_method, sigma=sigma,
+        sg_win=sg_win, sg_ord=sg_ord, spline_pts=spline_pts,
+    )
+
+    # --- Validate the main (selected) structure against online limits ---
+    main_struct = prepare_structure_for_prdf(converted_structures[main_name]['structure'])
+    ok, reason = validate_prdf_structure(main_struct)
+    if not ok:
+        st.error(f"**{main_name}** cannot be used for online PRDF: {reason}")
+        return
+
+    # First run needs an explicit click; afterwards any setting change recomputes
+    # automatically (the button latches the calculation on via session state).
+    if "prdf_calc_started" not in st.session_state:
+        st.session_state.prdf_calc_started = False
+    if st.button("🔬 Calculate PRDF", type="primary", key="calculate_prdf_btn"):
+        st.session_state.prdf_calc_started = True
+    if not st.session_state.prdf_calc_started:
+        st.info(
+            "Click **🔬 Calculate PRDF** to run the first calculation. After that, changing "
+            "any setting recalculates automatically."
+        )
+        return
+
+    # Gather (name -> ordered structure): selected structure first, then the rest.
+    structures_to_calc = {main_name: main_struct}
+    for name in converted_structures:
+        if name == main_name:
+            continue
+        if len(structures_to_calc) >= MAX_PRDF_STRUCTURES:
+            st.warning(
+                f"⚠️ Reached the online limit of **{MAX_PRDF_STRUCTURES} structures** — "
+                f"remaining uploaded files were skipped."
+            )
+            break
+        try:
+            comp_struct = prepare_structure_for_prdf(converted_structures[name]['structure'])
+            ok_c, reason_c = validate_prdf_structure(comp_struct)
+            if not ok_c:
+                st.warning(f"⚠️ Skipped **{name}**: {reason_c}")
+                continue
+            structures_to_calc[name] = comp_struct
+        except Exception as comp_err:
+            st.warning(f"⚠️ Could not process **{name}**: {comp_err}")
+
+    # --- Compute PRDF for every accepted structure ---
+    # Results are cached on (file content, cutoff, bin size, min cutoff), so the
+    # PRDF recalculates automatically when those change but plot-only settings
+    # (style, smoothing, normalization) reuse the cached values instantly.
+    prdf_results = {}
+    with st.spinner("Calculating PRDF…"):
+        for name, struct in structures_to_calc.items():
+            try:
+                prdf_results[name] = _cached_compute_prdf(
+                    converted_structures[name]['content'], cutoff, bin_size, r_min, struct
+                )
+            except Exception as calc_err:
+                st.error(f"Error calculating PRDF for **{name}**: {calc_err}")
+
+    if not prdf_results:
+        st.error("No PRDF could be calculated.")
+        return
+
+    single_tab, compare_tab, diff_tab = st.tabs(
+        ["📈 Single structure", "🔀 Comparison", "➖ Difference"])
+
+    # === Single structure: pick one structure and show its PRDF ===
+    with single_tab:
+        names = list(prdf_results.keys())
+        default_idx = names.index(main_name) if main_name in names else 0
+        chosen_name = (
+            st.selectbox("Structure:", names, index=default_idx, key="prdf_single_select")
+            if len(names) > 1 else names[0]
+        )
+        res = prdf_results[chosen_name]
+        pairs = sorted(res["prdf_dict"].keys(), key=lambda p: (p[0], p[1]))
+
+        fig_all = go.Figure()
+        for idx, pair in enumerate(pairs):
+            add_prdf_trace(
+                fig_all, res["dist_dict"][pair], res["prdf_dict"][pair],
+                f"{pair[0]}–{pair[1]}", PRDF_COLORS[idx % len(PRDF_COLORS)], **trace_kwargs,
+            )
+        fig_all.update_layout(**make_prdf_layout(
+            f"PRDF (all element pairs) — {chosen_name}", normalize=normalize, barmode=barmode))
+        st.plotly_chart(fig_all, width='stretch')
+
+        st.markdown("**Download PRDF data:**")
+        safe_name = "".join(c if c.isalnum() else "_" for c in chosen_name.rsplit('.', 1)[0])
+        dl_cols = st.columns(min(len(pairs), 4)) if pairs else [st]
+        for idx, pair in enumerate(pairs):
+            df = pd.DataFrame({
+                "Distance (Å)": res["dist_dict"][pair],
+                "PRDF": res["prdf_dict"][pair],
+            })
+            with dl_cols[idx % len(dl_cols)]:
+                st.download_button(
+                    label=f"📥 {pair[0]}–{pair[1]} PRDF",
+                    data=df.to_csv(index=False),
+                    file_name=f"{safe_name}_PRDF_{pair[0]}_{pair[1]}.csv",
+                    mime="text/csv",
+                    key=f"download_prdf_{safe_name}_{pair[0]}_{pair[1]}",
+                )
+
+    # === Comparison: pick element pairs; each adds that pair from every structure ===
+    with compare_tab:
+        all_pairs = sorted(
+            {pair for r in prdf_results.values() for pair in r["prdf_dict"]},
+            key=lambda p: (p[0], p[1]),
+        )
+        pair_labels = [f"{p[0]}–{p[1]}" for p in all_pairs]
+        pair_by_label = dict(zip(pair_labels, all_pairs))
+
+        if not pair_labels:
+            st.info("No PRDF data available to compare.")
+        else:
+            st.caption(
+                "Select element-pair combinations. Each selected pair is plotted for **all** "
+                "uploaded bestsqs structures. All pairs are shown by default — remove any you don't want."
+            )
+            chosen_labels = st.multiselect(
+                "Element-pair combinations to compare:",
+                pair_labels, default=pair_labels, key="prdf_compare_pairs",
+            )
+            if not chosen_labels:
+                st.warning("Select at least one element-pair combination.")
+            else:
+                fig_cmp = go.Figure()
+                t_idx = 0
+                for lbl in chosen_labels:
+                    pair = pair_by_label[lbl]
+                    for name, r in prdf_results.items():
+                        if pair not in r["prdf_dict"]:
+                            continue
+                        short = name if len(name) <= 30 else name[:27] + "…"
+                        add_prdf_trace(
+                            fig_cmp, r["dist_dict"][pair], r["prdf_dict"][pair],
+                            f"{short} | {lbl}", PRDF_COLORS[t_idx % len(PRDF_COLORS)], **trace_kwargs,
+                        )
+                        t_idx += 1
+                fig_cmp.update_layout(**make_prdf_layout(
+                    "PRDF comparison", normalize=normalize, barmode=barmode))
+                st.plotly_chart(fig_cmp, width='stretch')
+
+    # === Difference: g_A(r) - g_B(r) between two structures ===
+    with diff_tab:
+        from more_funct.prdf import _norm as _prdf_norm
+
+        names = list(prdf_results.keys())
+        if len(names) < 2:
+            st.info("Upload at least **2** bestsqs structures to compute a PRDF difference.")
+        else:
+            col_a, col_b = st.columns(2)
+            struct_a = col_a.selectbox("Structure A:", names, index=0, key="prdf_diff_a")
+            struct_b = col_b.selectbox(
+                "Structure B:", names, index=1 if names[1] != struct_a else 0, key="prdf_diff_b")
+
+            if struct_a == struct_b:
+                st.warning("Select two different structures.")
+            else:
+                res_a, res_b = prdf_results[struct_a], prdf_results[struct_b]
+                # quantities available in BOTH structures (Total RDF + shared element pairs)
+                common_pairs = sorted(
+                    set(res_a["prdf_dict"]) & set(res_b["prdf_dict"]), key=lambda p: (p[0], p[1]))
+                quant_labels = ["Total RDF"] + [f"{p[0]}–{p[1]}" for p in common_pairs]
+
+                diff_unit = st.radio(
+                    "Difference unit",
+                    ["Absolute (Δ g(r))", "Percentage (%)"],
+                    horizontal=True, key="prdf_diff_unit",
+                    help="Percentage = (A − B) / peak(B) × 100, i.e. relative to B's maximum value. "
+                         "This stays finite everywhere (unlike a pointwise A/B ratio, which blows up "
+                         "in the zero regions of g(r)).",
+                )
+                as_percent = diff_unit.startswith("Percentage")
+
+                def _ab_for(label):
+                    if label == "Total RDF":
+                        ma = {round(d, 6): v for d, v in res_a["global_rdf"].items()}
+                        mb = {round(d, 6): v for d, v in res_b["global_rdf"].items()}
+                    else:
+                        p = common_pairs[quant_labels.index(label) - 1]
+                        ma = {round(d, 6): v for d, v in zip(res_a["dist_dict"][p], res_a["prdf_dict"][p])}
+                        mb = {round(d, 6): v for d, v in zip(res_b["dist_dict"][p], res_b["prdf_dict"][p])}
+                    xs = sorted(set(ma) & set(mb))
+                    ya = np.array([ma[x] for x in xs], dtype=float)
+                    yb = np.array([mb[x] for x in xs], dtype=float)
+                    if normalize:
+                        ya, yb = _prdf_norm(ya), _prdf_norm(yb)
+                    return xs, ya, yb
+
+                def _display(ya, yb):
+                    if as_percent:
+                        # Relative to the reference peak so it is defined everywhere the
+                        # absolute difference is (no division blow-ups in g(r)'s zero regions).
+                        denom = float(np.nanmax(np.abs(yb))) if yb.size else 0.0
+                        if denom <= 0:
+                            return np.full_like(ya, np.nan)
+                        return (ya - yb) / denom * 100.0
+                    return ya - yb
+
+                # Compute every quantity; keep only those that actually differ
+                # (non-zero test always on the absolute difference).
+                diffs = {}
+                for label in quant_labels:
+                    xs, ya, yb = _ab_for(label)
+                    if len(ya) and np.abs(ya - yb).max() > 1e-9:
+                        diffs[label] = (xs, _display(ya, yb))
+
+                if not diffs:
+                    st.success(
+                        f"**{struct_a}** and **{struct_b}** have identical PRDFs "
+                        "(no non-zero differences to plot)."
+                    )
+                else:
+                    st.caption(
+                        "Element-pair quantities with a non-zero difference are shown by default. "
+                        "Total RDF is available but not shown automatically — add or remove any you want."
+                    )
+                    selectable = list(diffs.keys())
+                    default_quants = [q for q in selectable if q != "Total RDF"]
+                    chosen_quants = st.multiselect(
+                        "Quantities to plot (Δ ≠ 0):",
+                        selectable, default=default_quants, key="prdf_diff_quants",
+                    )
+                    if not chosen_quants:
+                        st.warning("Select at least one quantity.")
+                    else:
+                        fig_diff = go.Figure()
+                        for q_idx, label in enumerate(chosen_quants):
+                            xs, d = diffs[label]
+                            fig_diff.add_trace(go.Scatter(
+                                x=xs, y=d, mode="lines", name=label,
+                                line=dict(color=PRDF_COLORS[q_idx % len(PRDF_COLORS)], width=2),
+                            ))
+                        fig_diff.add_hline(y=0, line=dict(color="gray", width=1, dash="dot"))
+                        layout = make_prdf_layout(
+                            f"PRDF difference: {struct_a} − {struct_b}", normalize=normalize)
+                        layout["yaxis"]["range"] = None  # allow negative values
+                        if as_percent:
+                            ylab = "Difference (%)"
+                        else:
+                            ylab = "Δ g(r)" if not normalize else "Δ normalized intensity"
+                        layout["yaxis"]["title"]["text"] = ylab
+                        fig_diff.update_layout(**layout)
+                        st.plotly_chart(fig_diff, width='stretch')
+
+                        # Combined CSV: one column per plotted quantity (shared distance grid).
+                        col_prefix = "Pct" if as_percent else "Delta"
+                        ref_xs = diffs[chosen_quants[0]][0]
+                        df_cols = {"Distance (Å)": ref_xs}
+                        for label in chosen_quants:
+                            xs, d = diffs[label]
+                            dmap = dict(zip(xs, d))
+                            df_cols[f"{col_prefix}_{label}"] = [dmap.get(x, np.nan) for x in ref_xs]
+                        st.download_button(
+                            label="📥 Download differences (CSV)",
+                            data=pd.DataFrame(df_cols).to_csv(index=False),
+                            file_name=f"PRDF_diff_{struct_a.rsplit('.',1)[0]}_minus_{struct_b.rsplit('.',1)[0]}.csv",
+                            mime="text/csv",
+                            key="download_prdf_diff",
+                        )
+
+
 def render_atat_sqs_section():
     if 'full_structures' not in st.session_state or not st.session_state['full_structures']:
         st.warning("Please upload at least one structure file to use the ATAT SQS tool.")
@@ -2001,361 +2370,356 @@ def render_atat_sqs_section():
 
     with file_tab1:
 
-        converter_mode = st.radio(
-            "Choose conversion mode:",
-            ["Single File Converter", "Batch Converter (Multiple Files)"],
-            key="converter_mode_selector"
+        st.write("**Upload one or more bestsqs.out files to convert and analyze:**")
+        st.caption(
+            "Upload a single file to convert it, or several files to additionally compare "
+            "their PRDFs in the 📊 PRDF tab."
+        )
+        uploaded_bestsqs_files = st.file_uploader(
+            "Upload bestsqs.out file(s):",
+            type=['out', 'txt', 'log'],
+            accept_multiple_files=True,
+            help="Upload one bestsqs.out file generated by ATAT mcsqs, or several for PRDF comparison.",
+            key="bestsqs_uploader"
         )
 
-        if converter_mode == "Single File Converter":
-            st.write("**Upload bestsqs.out file to convert the output format:**")
-            uploaded_bestsqs = st.file_uploader(
-                "Upload bestsqs.out file:",
-                type=['out', 'txt', 'log'],
-                help="Upload the bestsqs.out file generated by ATAT mcsqs command",
-                key="bestsqs_uploader"
-            )
-
-            if uploaded_bestsqs is not None:
+        if uploaded_bestsqs_files:
+            # --- Convert every uploaded bestsqs.out file ---
+            converted_structures = {}
+            for _up in uploaded_bestsqs_files:
                 try:
-                    bestsqs_content = uploaded_bestsqs.read().decode('utf-8')
+                    _content = _up.read().decode('utf-8')
+                except UnicodeDecodeError:
+                    st.error(f"❌ {_up.name}: not a UTF-8 text file — skipped.")
+                    continue
+                _is_valid, _msg = validate_bestsqs_file(_content)
+                if not _is_valid:
+                    st.error(f"❌ {_up.name}: invalid bestsqs.out file ({_msg}) — skipped.")
+                    continue
+                try:
+                    _vasp, _info = convert_bestsqs_to_vasp(
+                        _content, working_structure, transformation_matrix, _up.name
+                    )
+                    _struct = convert_atat_to_pymatgen_structure(
+                        _content, working_structure, transformation_matrix
+                    )
+                except Exception as _conv_err:
+                    st.error(f"❌ {_up.name}: conversion failed ({_conv_err}) — skipped.")
+                    continue
+                converted_structures[_up.name] = {
+                    'content': _content,
+                    'vasp_content': _vasp,
+                    'conversion_info': _info,
+                    'structure': _struct,
+                }
 
-                    if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
-                        results = st.session_state.atat_results
-                    else:
-                        results = {
-                            'structure_name': selected_atat_file,
-                            'supercell_size': f"{nx}×{ny}×{nz}" if 'nx' in locals() else "Unknown",
-                            'total_atoms': len(supercell_preview) if 'supercell_preview' in locals() else 0
+            if not converted_structures:
+                st.warning("No valid bestsqs.out files to process.")
+            else:
+                _names = list(converted_structures.keys())
+                if len(_names) > 1:
+                    st.success(f"✅ {len(_names)} valid bestsqs.out files converted.")
+                    selected_name = st.selectbox(
+                        "Select a structure to visualize / download / edit vacancies:",
+                        _names, key="converter_structure_selector"
+                    )
+                else:
+                    selected_name = _names[0]
+                    st.success("✅ Valid ATAT file detected.")
+
+                _sel = converted_structures[selected_name]
+                bestsqs_content = _sel['content']
+                vasp_content = _sel['vasp_content']
+                conversion_info = _sel['conversion_info']
+                sqs_pymatgen_structure = _sel['structure']
+
+                if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                    results = dict(st.session_state.atat_results)
+                else:
+                    results = {
+                        'supercell_size': f"{nx}×{ny}×{nz}" if 'nx' in locals() else "Unknown",
+                        'total_atoms': len(supercell_preview) if 'supercell_preview' in locals() else 0
+                    }
+                results['structure_name'] = selected_name
+
+                try:
+
+                    viz_tab, prdf_tab, vac_tab = st.tabs(
+                        ["🔬 Visualization & Download", "📊 PRDF", "🕳️ Vacancies"])
+                    with viz_tab:
+                        st.success("✅ Successfully converted bestsqs.out to VASP format!")
+                        col_conv1, col_conv2 = st.columns(2)
+                        with col_conv1:
+                            st.write("#### **Conversion Summary:**")
+                            for key, value in conversion_info.items():
+                                st.write(f"- **{key}:** {value}")
+
+                        with col_conv2:
+                            st.write("#### **VASP POSCAR Preview:**")
+                            preview_lines = vasp_content.split('\n')[:15]
+                            st.code('\n'.join(preview_lines) + '\n...', language="text")
+                        sqs_result = {
+                            'structure': sqs_pymatgen_structure
                         }
 
-                    is_valid, validation_message = validate_bestsqs_file(bestsqs_content)
+                        st.write("#### **3D Structure Visualization:**")
+                        sqs_visualization(sqs_result)
 
-                    if not is_valid:
-                        st.error(f"Invalid bestsqs.out file: {validation_message}")
-                        st.info("Please ensure you upload a valid ATAT bestsqs.out file.")
-                        # return
+                        # Download buttons with multiple format options
+                        # Download buttons with multiple format options
+                        st.write("**Download Converted Structure:**")
+                        col_down1, col_down2, col_down3 = st.columns(3)
 
-                    st.success(f"✅ Valid ATAT file detected: {validation_message}")
-                    vasp_content, conversion_info = convert_bestsqs_to_vasp(
-                        bestsqs_content,
-                        working_structure,
-                        transformation_matrix,
-                        results['structure_name']
-                    )
+                        with col_down1:
+                            # VASP POSCAR download with options
+                            st.markdown("**VASP Options:**")
+                            use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
+                                                         value=True,
+                                                         key="poscar_fractional")
 
-                    sqs_pymatgen_structure = convert_atat_to_pymatgen_structure(
-                        bestsqs_content, working_structure, transformation_matrix
-                    )
+                            from ase.constraints import FixAtoms
+                            use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
+                                                                 value=False, key="poscar_sd")
 
-                    st.success("✅ Successfully converted bestsqs.out to VASP format!")
-                    col_conv1, col_conv2 = st.columns(2)
-                    with col_conv1:
-                        st.write("#### **Conversion Summary:**")
-                        for key, value in conversion_info.items():
-                            st.write(f"- **{key}:** {value}")
-
-                    with col_conv2:
-                        st.write("#### **VASP POSCAR Preview:**")
-                        preview_lines = vasp_content.split('\n')[:15]
-                        st.code('\n'.join(preview_lines) + '\n...', language="text")
-                    sqs_result = {
-                        'structure': sqs_pymatgen_structure
-                    }
-
-                    st.write("#### **3D Structure Visualization:**")
-                    sqs_visualization(sqs_result)
-
-                    # Download buttons with multiple format options
-                    # Download buttons with multiple format options
-                    st.write("**Download Converted Structure:**")
-                    col_down1, col_down2, col_down3 = st.columns(3)
-
-                    with col_down1:
-                        # VASP POSCAR download with options
-                        st.markdown("**VASP Options:**")
-                        use_fractional = st.checkbox("Output POSCAR with fractional coordinates",
-                                                     value=True,
-                                                     key="poscar_fractional")
-
-                        from ase.constraints import FixAtoms
-                        use_selective_dynamics = st.checkbox("Include Selective dynamics (all atoms free)",
-                                                             value=False, key="poscar_sd")
-
-                        try:
-                            from pymatgen.core import Element
-
-                            # Sort species by atomic weight
-                            unique_species = []
-                            for site in sqs_pymatgen_structure:
-                                if site.specie not in unique_species:
-                                    unique_species.append(site.specie)
-
-                            species_weights = {}
-                            for species in unique_species:
-                                try:
-                                    species_weights[species] = Element(species.symbol).atomic_mass
-                                except:
-                                    species_weights[species] = 999.0
-
-                            sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
-
-
-                            new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
-                            for species in sorted_species:
-                                for site in sqs_pymatgen_structure:
-                                    if site.specie == species:
-                                        new_struct.append(
-                                            species=site.species,
-                                            coords=site.frac_coords,
-                                            coords_are_cartesian=False,
-                                        )
-
-                            out = StringIO()
-                            current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
-
-                            if use_selective_dynamics:
-                                constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
-                                current_ase_structure.set_constraint(constraint)
-
-                            write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=False)
-                            vasp_content_with_options = out.getvalue()
-
-                            st.download_button(
-                                label="📥 Download POSCAR",
-                                data=vasp_content_with_options,
-                                file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
-                                mime="text/plain",
-                                type="primary",
-                                key="download_converted_poscar"
-                            )
-                        except Exception as e:
-                            st.error(f"Error generating VASP file: {str(e)}")
-
-                    with col_down2:
-                        # Additional format selector
-                        additional_format = st.selectbox(
-                            "Additional Format:",
-                            ["CIF", "LAMMPS", "XYZ"],
-                            key="additional_format_selector"
-                        )
-
-                        # Show LAMMPS options if LAMMPS is selected
-                        if additional_format == "LAMMPS":
-                            st.markdown("**LAMMPS Export Options**")
-                            atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
-                                                      key="lammps_atom_style")
-                            units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
-                            include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
-                            force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
-
-                    with col_down3:
-                        if st.button("📄 Generate & Download", key="generate_additional_format"):
                             try:
-                                if additional_format == "CIF":
-                                    from pymatgen.io.cif import CifWriter
+                                from pymatgen.core import Element
 
-                                    # Create structure for CIF
-                                    grouped_data = sqs_pymatgen_structure.copy()
-                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                                # Sort species by atomic weight
+                                unique_species = []
+                                for site in sqs_pymatgen_structure:
+                                    if site.specie not in unique_species:
+                                        unique_species.append(site.specie)
 
+                                species_weights = {}
+                                for species in unique_species:
+                                    try:
+                                        species_weights[species] = Element(species.symbol).atomic_mass
+                                    except:
+                                        species_weights[species] = 999.0
+
+                                sorted_species = sorted(unique_species, key=lambda x: species_weights[x])
+
+
+                                new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
+                                for species in sorted_species:
                                     for site in sqs_pymatgen_structure:
-                                        species_dict = {}
-                                        for element, occupancy in site.species.items():
-                                            species_dict[element] = float(occupancy)
+                                        if site.specie == species:
+                                            new_struct.append(
+                                                species=site.species,
+                                                coords=site.frac_coords,
+                                                coords_are_cartesian=False,
+                                            )
 
-                                        new_struct.append(
-                                            species=species_dict,
-                                            coords=site.frac_coords,
-                                            coords_are_cartesian=False,
-                                        )
+                                out = StringIO()
+                                current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
 
-                                    file_content = CifWriter(new_struct, symprec=0.1,
-                                                             write_site_properties=True).__str__()
-                                    download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
-                                    mime_type = "chemical/x-cif"
+                                if use_selective_dynamics:
+                                    constraint = FixAtoms(indices=[])  # No atoms are fixed, so all will be T T T
+                                    current_ase_structure.set_constraint(constraint)
 
-                                elif additional_format == "LAMMPS":
-                                    # Create structure for LAMMPS
-                                    new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
-
-                                    for site in sqs_pymatgen_structure:
-                                        new_struct.append(
-                                            species=site.species,
-                                            coords=site.frac_coords,
-                                            coords_are_cartesian=False,
-                                        )
-
-                                    current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
-                                    out = StringIO()
-                                    write(
-                                        out,
-                                        current_ase_structure,
-                                        format="lammps-data",
-                                        atom_style=atom_style,
-                                        units=units,
-                                        masses=include_masses,
-                                        force_skew=force_skew
-                                    )
-                                    file_content = out.getvalue()
-                                    download_file_name = f"{results['structure_name'].split('.')[0]}.lmp"
-                                    mime_type = "text/plain"
-
-                                elif additional_format == "XYZ":
-                                    # Generate XYZ format (you'll need to implement this)
-                                    additional_content, additional_filename = generate_additional_format(
-                                        sqs_pymatgen_structure, additional_format, results['structure_name']
-                                    )
-                                    file_content = additional_content
-                                    download_file_name = additional_filename
-                                    mime_type = get_mime_type(additional_format)
+                                write(out, current_ase_structure, format="vasp", direct=use_fractional, sort=False)
+                                vasp_content_with_options = out.getvalue()
 
                                 st.download_button(
-                                    label=f"📥 Download {additional_format}",
-                                    data=file_content,
-                                    file_name=download_file_name,
-                                    mime=mime_type,
+                                    label="📥 Download POSCAR",
+                                    data=vasp_content_with_options,
+                                    file_name=f"POSCAR_SQS_{results['structure_name'].split('.')[0]}.vasp",
+                                    mime="text/plain",
                                     type="primary",
-                                    key=f"download_{additional_format.lower()}"
+                                    key="download_converted_poscar"
                                 )
-                                st.success(f"✅ {additional_format} file generated!")
-
                             except Exception as e:
-                                st.error(f"Error generating {additional_format}: {str(e)}")
+                                st.error(f"Error generating VASP file: {str(e)}")
 
-                    st.write("**Complete Package:**")
-                    if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
-                        zip_buffer_complete = create_complete_atat_zip(
-                            st.session_state.atat_results, vasp_content, bestsqs_content
-                        )
+                        with col_down2:
+                            # Additional format selector
+                            additional_format = st.selectbox(
+                                "Additional Format:",
+                                ["CIF", "LAMMPS", "XYZ"],
+                                key="additional_format_selector"
+                            )
 
-                        st.download_button(
-                            label="📦 Download Complete Package",
-                            data=zip_buffer_complete,
-                            file_name=f"ATAT_SQS_Complete_{st.session_state.atat_results['structure_name'].split('.')[0]}.zip",
-                            mime="application/zip",
-                            type="primary",
-                            key="download_complete_package"
-                        )
-                    else:
-                        st.warning(
-                            "⚠️ Complete package not available. Please generate ATAT input files in Step 4 first.")
-                        st.button(
-                            "📦 Complete Package (Unavailable)",
-                            disabled=True,
-                            help="Generate ATAT input files first to enable complete package download"
-                        )
-                    lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
+                            # Show LAMMPS options if LAMMPS is selected
+                            if additional_format == "LAMMPS":
+                                st.markdown("**LAMMPS Export Options**")
+                                atom_style = st.selectbox("Select atom_style", ["atomic", "charge", "full"], index=0,
+                                                          key="lammps_atom_style")
+                                units = st.selectbox("Select units", ["metal", "real", "si"], index=0, key="lammps_units")
+                                include_masses = st.checkbox("Include atomic masses", value=True, key="lammps_masses")
+                                force_skew = st.checkbox("Force triclinic cell (skew)", value=False, key="lammps_skew")
 
-                    element_counts = {}
-                    for _, _, _, element in atoms:
-                        element_counts[element] = element_counts.get(element, 0) + 1
+                        with col_down3:
+                            if st.button("📄 Generate & Download", key="generate_additional_format"):
+                                try:
+                                    if additional_format == "CIF":
+                                        from pymatgen.io.cif import CifWriter
 
-                    # st.write("**Element Distribution:**")
-                    # element_df = pd.DataFrame([
-                    #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
-                    #     for elem, count in sorted(element_counts.items())
-                    # ])
-                    # st.dataframe(element_df, width='stretch')
+                                        # Create structure for CIF
+                                        grouped_data = sqs_pymatgen_structure.copy()
+                                        new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
 
-                    st.write("#### **Element Distribution:**")
-                    cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
-                    for i, (elem, count) in enumerate(sorted(element_counts.items())):
-                        percentage = count / len(atoms) * 100
-                        with cols[i % len(cols)]:
-                            if percentage >= 80:
-                                color = "#2E4057"  # Dark Blue-Gray for very high concentration
-                            elif percentage >= 60:
-                                color = "#4A6741"  # Dark Forest Green for high concentration
-                            elif percentage >= 40:
-                                color = "#6B73FF"  # Purple-Blue for medium-high concentration
-                            elif percentage >= 25:
-                                color = "#FF8C00"  # Dark Orange for medium concentration
-                            elif percentage >= 15:
-                                color = "#4ECDC4"  # Teal for medium-low concentration
-                            elif percentage >= 10:
-                                color = "#45B7D1"  # Blue for low-medium concentration
-                            elif percentage >= 5:
-                                color = "#96CEB4"  # Green for low concentration
-                            elif percentage >= 2:
-                                color = "#FECA57"  # Yellow for very low concentration
-                            elif percentage >= 1:
-                                color = "#DDA0DD"  # Plum for trace concentration
-                            else:
-                                color = "#D3D3D3"  # Light Gray for minimal concentration
+                                        for site in sqs_pymatgen_structure:
+                                            species_dict = {}
+                                            for element, occupancy in site.species.items():
+                                                species_dict[element] = float(occupancy)
 
-                            st.markdown(f"""
-                            <div style="
-                                background: linear-gradient(135deg, {color}, {color}CC);
-                                padding: 20px; 
-                                border-radius: 15px; 
-                                text-align: center; 
-                                margin: 10px 0;
-                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-                                border: 2px solid rgba(255,255,255,0.2);
-                            ">
-                                <h1 style="
-                                    color: white; 
-                                    font-size: 3em; 
-                                    margin: 0; 
-                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
-                                    font-weight: bold;
-                                ">{elem}</h1>
-                                <h2 style="
-                                    color: white; 
-                                    font-size: 2em; 
-                                    margin: 10px 0 0 0;
-                                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-                                ">{percentage:.1f}%</h2>
-                                <p style="
-                                    color: white; 
-                                    font-size: 1.8em; 
-                                    margin: 5px 0 0 0;
-                                    opacity: 0.9;
-                                ">{count} atoms</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                                            new_struct.append(
+                                                species=species_dict,
+                                                coords=site.frac_coords,
+                                                coords_are_cartesian=False,
+                                            )
 
-                    st.markdown("---")
-                    st.subheader("📊 PRDF Analysis of SQS Structure")
+                                        file_content = CifWriter(new_struct, symprec=0.1,
+                                                                 write_site_properties=True).__str__()
+                                        download_file_name = f"{results['structure_name'].split('.')[0]}.cif"
+                                        mime_type = "chemical/x-cif"
 
-                    col_prdf1, col_prdf2, col_prdf3 = st.columns(3)
-                    with col_prdf1:
-                        prdf_cutoff = st.number_input(
-                            "PRDF cutoff distance (Å):",
-                            min_value=1.0,
-                            max_value=20.0,
-                            value=10.0,
-                            step=0.5,
-                            key="prdf_cutoff"
-                        )
-                    with col_prdf2:
-                        prdf_bin_size = st.number_input(
-                            "Bin size (Å):",
-                            min_value=0.01,
-                            max_value=1.0,
-                            value=0.1,
-                            step=0.01,
-                            key="prdf_bin_size"
-                        )
-                    with col_prdf3:
-                        calculate_prdf_btn = st.button(
-                            "🔬 Calculate PRDF",
-                            type="secondary",
-                            key="calculate_prdf_btn"
-                        )
+                                    elif additional_format == "LAMMPS":
+                                        # Create structure for LAMMPS
+                                        new_struct = Structure(sqs_pymatgen_structure.lattice, [], [])
 
-                    if calculate_prdf_btn:
-                        try:
-                            prdf_structure = prepare_structure_for_prdf(sqs_pymatgen_structure)
-                            calculate_and_display_sqs_prdf(prdf_structure, prdf_cutoff, prdf_bin_size)
+                                        for site in sqs_pymatgen_structure:
+                                            new_struct.append(
+                                                species=site.species,
+                                                coords=site.frac_coords,
+                                                coords_are_cartesian=False,
+                                            )
 
-                        except Exception as prdf_error:
-                            st.error(f"Error calculating PRDF: {str(prdf_error)}")
-                            st.info("PRDF calculation requires a valid structure with multiple element types.")
-                            import traceback
-                            st.error(f"Debug: {traceback.format_exc()}")
-                    render_vacancy_creation_section(sqs_pymatgen_structure)
+                                        current_ase_structure = AseAtomsAdaptor.get_atoms(new_struct)
+                                        out = StringIO()
+                                        write(
+                                            out,
+                                            current_ase_structure,
+                                            format="lammps-data",
+                                            atom_style=atom_style,
+                                            units=units,
+                                            masses=include_masses,
+                                            force_skew=force_skew
+                                        )
+                                        file_content = out.getvalue()
+                                        download_file_name = f"{results['structure_name'].split('.')[0]}.lmp"
+                                        mime_type = "text/plain"
+
+                                    elif additional_format == "XYZ":
+                                        # Generate XYZ format (you'll need to implement this)
+                                        additional_content, additional_filename = generate_additional_format(
+                                            sqs_pymatgen_structure, additional_format, results['structure_name']
+                                        )
+                                        file_content = additional_content
+                                        download_file_name = additional_filename
+                                        mime_type = get_mime_type(additional_format)
+
+                                    st.download_button(
+                                        label=f"📥 Download {additional_format}",
+                                        data=file_content,
+                                        file_name=download_file_name,
+                                        mime=mime_type,
+                                        type="primary",
+                                        key=f"download_{additional_format.lower()}"
+                                    )
+                                    st.success(f"✅ {additional_format} file generated!")
+
+                                except Exception as e:
+                                    st.error(f"Error generating {additional_format}: {str(e)}")
+
+                        st.write("**Complete Package:**")
+                        if 'atat_results' in st.session_state and st.session_state.atat_results is not None:
+                            zip_buffer_complete = create_complete_atat_zip(
+                                st.session_state.atat_results, vasp_content, bestsqs_content
+                            )
+
+                            st.download_button(
+                                label="📦 Download Complete Package",
+                                data=zip_buffer_complete,
+                                file_name=f"ATAT_SQS_Complete_{st.session_state.atat_results['structure_name'].split('.')[0]}.zip",
+                                mime="application/zip",
+                                type="primary",
+                                key="download_complete_package"
+                            )
+                        else:
+                            st.warning(
+                                "⚠️ Complete package not available. Please generate ATAT input files in Step 4 first.")
+                            st.button(
+                                "📦 Complete Package (Unavailable)",
+                                disabled=True,
+                                help="Generate ATAT input files first to enable complete package download"
+                            )
+                        lattice1, lattice2, atoms = parse_atat_bestsqs_format(bestsqs_content)
+
+                        element_counts = {}
+                        for _, _, _, element in atoms:
+                            element_counts[element] = element_counts.get(element, 0) + 1
+
+                        # st.write("**Element Distribution:**")
+                        # element_df = pd.DataFrame([
+                        #     {"Element": elem, "Count": count, "Percentage": f"{count / len(atoms) * 100:.1f}%"}
+                        #     for elem, count in sorted(element_counts.items())
+                        # ])
+                        # st.dataframe(element_df, width='stretch')
+
+                        st.write("#### **Element Distribution:**")
+                        cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
+                        for i, (elem, count) in enumerate(sorted(element_counts.items())):
+                            percentage = count / len(atoms) * 100
+                            with cols[i % len(cols)]:
+                                if percentage >= 80:
+                                    color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                                elif percentage >= 60:
+                                    color = "#4A6741"  # Dark Forest Green for high concentration
+                                elif percentage >= 40:
+                                    color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                                elif percentage >= 25:
+                                    color = "#FF8C00"  # Dark Orange for medium concentration
+                                elif percentage >= 15:
+                                    color = "#4ECDC4"  # Teal for medium-low concentration
+                                elif percentage >= 10:
+                                    color = "#45B7D1"  # Blue for low-medium concentration
+                                elif percentage >= 5:
+                                    color = "#96CEB4"  # Green for low concentration
+                                elif percentage >= 2:
+                                    color = "#FECA57"  # Yellow for very low concentration
+                                elif percentage >= 1:
+                                    color = "#DDA0DD"  # Plum for trace concentration
+                                else:
+                                    color = "#D3D3D3"  # Light Gray for minimal concentration
+
+                                st.markdown(f"""
+                                <div style="
+                                    background: linear-gradient(135deg, {color}, {color}CC);
+                                    padding: 20px; 
+                                    border-radius: 15px; 
+                                    text-align: center; 
+                                    margin: 10px 0;
+                                    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                    border: 2px solid rgba(255,255,255,0.2);
+                                ">
+                                    <h1 style="
+                                        color: white; 
+                                        font-size: 3em; 
+                                        margin: 0; 
+                                        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                        font-weight: bold;
+                                    ">{elem}</h1>
+                                    <h2 style="
+                                        color: white; 
+                                        font-size: 2em; 
+                                        margin: 10px 0 0 0;
+                                        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                    ">{percentage:.1f}%</h2>
+                                    <p style="
+                                        color: white; 
+                                        font-size: 1.8em; 
+                                        margin: 5px 0 0 0;
+                                        opacity: 0.9;
+                                    ">{count} atoms</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                    with prdf_tab:
+                        render_prdf_analysis_tab(converted_structures, selected_name, working_structure, transformation_matrix, results)
+
+                    with vac_tab:
+                        render_vacancy_creation_section(sqs_pymatgen_structure)
 
                 except UnicodeDecodeError:
                     st.error("Error reading file. Please ensure the file is a text file with UTF-8 encoding.")
@@ -2364,9 +2728,6 @@ def render_atat_sqs_section():
                     st.error("Please ensure the file is a valid ATAT bestsqs.out format.")
                     import traceback
                     st.error(f"Debug info: {traceback.format_exc()}")
-        else:
-            render_batch_structure_converter(
-                working_structure, transformation_matrix)
     with file_tab2:
         render_extended_optimization_analysis_tab()
 
