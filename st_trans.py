@@ -720,9 +720,9 @@ def render_sqs_module():
             font-weight: 600;
         ">
             <span style="color:#2563eb; font-weight:800;">Release:</span>
-            v0.7.4 &nbsp; | &nbsp;
+            v0.7.5 &nbsp; | &nbsp;
             <span style="color:#2563eb; font-weight:800;">Updated:</span>
-            May 29, 2026
+            June 13, 2026
         </div>
         """,
         unsafe_allow_html=True
