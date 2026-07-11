@@ -6465,7 +6465,13 @@ def render_correlation_analysis_tab():
             st.success(f"✅ Successfully parsed {len(correlation_data)} correlation functions!")
 
             if objective_function is not None:
-                st.metric("Objective Function", f"{objective_function:.6f}")
+                value = (
+                    f"{objective_function:.6f}"
+                    if isinstance(objective_function, (int, float))
+                    else objective_function
+                )
+                
+                st.metric("Objective Function", value)
 
             st.subheader("🎯 SQS Quality Assessment")
 
@@ -6612,7 +6618,15 @@ def parse_bestcorr_file(file_content):
     for line in lines:
         line = line.strip()
         if line.startswith('Objective_function='):
-            objective_function = float(line.split('=')[1].strip())
+            value = line.split('=', 1)[1].strip()
+            if value == "Perfect_match":
+                objective_function = value
+            else:
+                try:
+                    objective_function = float(value)
+                except ValueError:
+                    objective_function = None
+                    
         elif line and not line.startswith('#'):
             parts = line.split()
             if len(parts) >= 4:
