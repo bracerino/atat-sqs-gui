@@ -8,8 +8,8 @@ import zipfile
 import random
 import time
 from collections import defaultdict
-from supercell_size_analysis import render_supercell_size_analysis
-from atat_module import generate_atat_rndstr_content_corrected
+from more_funct.supercell_size_analysis import render_supercell_size_analysis
+from more_funct.atat_module import generate_atat_rndstr_content_corrected
 
 def get_mic_distance_matrix(frac_coords, lattice_matrix):
     n = len(frac_coords)
@@ -498,7 +498,7 @@ def render_random_analysis_standalone(working_structure, target_concentrations, 
 
 def run_live_analysis_logic(working_structure, target_concentrations, transformation_matrix, use_sublattice_mode,
                             chem_symbols, n_random):
-    from atat_module import generate_atat_rndstr_content_corrected
+    from more_funct.atat_module import generate_atat_rndstr_content_corrected
     rndstr_content = generate_atat_rndstr_content_corrected(
         working_structure, target_concentrations, use_sublattice_mode, chem_symbols, transformation_matrix
     )
@@ -520,10 +520,18 @@ def run_live_analysis_logic(working_structure, target_concentrations, transforma
     structures_data = []
     all_sublattice_keys = set()
 
+    # Draw a fresh, high-entropy seed for every structure from the OS CSPRNG, so
+    # each "Run Live Analysis" press produces genuinely different randomized
+    # structures with no overlap between runs. The previous time-based seed
+    # (int(time.time()) + i) repeated structures whenever the button was pressed
+    # within the same second, and overlapped between runs a few seconds apart.
+    seed_source = random.SystemRandom()
+    used_seeds = set()
     for i in range(n_random):
-        #seed = random.randint(1, 99999)
-        base_seed = int(time.time()) % (2 ** 31) 
-        seed = (base_seed + i) % (2 ** 32 - 1)
+        seed = seed_source.randrange(2 ** 32)
+        while seed in used_seeds:  # avoid duplicates within a single run
+            seed = seed_source.randrange(2 ** 32)
+        used_seeds.add(seed)
         status_text.text(f"Analyzing structure {i + 1}/{n_random}...")
 
         elements = cache.generate_random_config(seed)
@@ -776,7 +784,7 @@ def generate_random_analysis_script_standalone(working_structure, target_concent
     nx, ny, nz = int(transformation_matrix[0, 0]), int(transformation_matrix[1, 1]), int(transformation_matrix[2, 2])
     supercell_multiplicity = nx * ny * nz
 
-    from atat_module import generate_atat_rndstr_content_corrected
+    from more_funct.atat_module import generate_atat_rndstr_content_corrected
     rndstr_content = generate_atat_rndstr_content_corrected(
         working_structure, target_concentrations, use_sublattice_mode, chem_symbols, transformation_matrix
     )

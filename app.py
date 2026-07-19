@@ -33,46 +33,6 @@ if 'uploaded_files' not in st.session_state or st.session_state['uploaded_files'
 if 'previous_uploaded_files' not in st.session_state:
     st.session_state['previous_uploaded_files'] = []
 
-def load_structure(file):
-    try:
-        file_content = file.read()
-        file.seek(0)
-
-
-        with open(file.name, "wb") as f:
-            f.write(file_content)
-
-        structure = Structure.from_file(file.name)
-
-        if os.path.exists(file.name):
-            os.remove(file.name)
-
-        return structure
-    except Exception as e:
-        st.error(f"Failed to parse {file.name}: {e}")
-        raise e
-
-def remove_fractional_occupancies_safely(structure):
-    species = []
-    coords = []
-
-    for site in structure:
-        if site.is_ordered:
-            species.append(site.specie)
-        else:
-            dominant_sp = max(site.species.items(), key=lambda x: x[1])[0]
-            species.append(dominant_sp)
-        coords.append(site.frac_coords)
-
-    ordered_structure = Structure(
-        lattice=structure.lattice,
-        species=species,
-        coords=coords,
-        coords_are_cartesian=False
-    )
-
-    return ordered_structure
-
 st.markdown(
     """
     <style>
@@ -234,7 +194,7 @@ def update_file_upload_section():
         for filename in st.session_state.full_structures.keys():
             st.sidebar.text(f"• {filename}")
 
-st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
+st.sidebar.info(f"🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also our XRD application **[XRDlicious](xrdlicious.com)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 **[Tutorial here](https://youtu.be/GGo_9T5wqus?si=xJItv-j0shr8hte_)**. Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
     " If you like the app, please cite [**this publication**](https://doi.org/10.1016/j.jocs.2026.102846). You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-sqs-gui.git)** for better performance."
@@ -248,7 +208,7 @@ st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if upl
 
 
 # Render the SQS transformation module
-from st_trans import render_sqs_module, check_sqs_mode
+from more_funct.st_trans import render_sqs_module, check_sqs_mode
 
 # Block the workflow if any uploaded structure is too large. The supercell is
 # specified later in the workflow, so the uploaded structure should be a small
