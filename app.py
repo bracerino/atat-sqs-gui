@@ -267,3 +267,49 @@ This project uses several open-source tools and datasets. We gratefully acknowle
  **[ASE (Atomic Simulation Environment)](https://gitlab.com/ase/ase)** Licensed under the [GNU Lesser General Public License (LGPL)](https://gitlab.com/ase/ase/-/blob/master/COPYING.LESSER). **[Py3DMol](https://github.com/avirshup/py3dmol/tree/master)** Licensed under the [BSD-style License](https://github.com/avirshup/py3dmol/blob/master/LICENSE.txt). **[Materials Project](https://next-gen.materialsproject.org/)** Data from the Materials Project is made available under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). **[AFLOW](http://aflow.org)** Licensed under the [GNU General Public License (GPL)](https://www.gnu.org/licenses/gpl-3.0.html)
  **[Crystallographic Open Database (COD)](https://www.crystallography.net/cod/)** under the CC0 license.
 """)
+
+
+def record_and_get_pageviews():
+    """Count one page view per user session and return daily view statistics.
+
+    Views are stored in a small JSON file keyed by date. Each browser session is
+    counted only once (tracked via st.session_state). Note: on Streamlit Community
+    Cloud the filesystem is ephemeral, so counts reset when the app reboots.
+    """
+    import os
+    import json
+    from datetime import date
+
+    counts_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pageviews.json")
+    today = date.today().isoformat()
+
+    try:
+        with open(counts_file, "r") as f:
+            counts = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        counts = {}
+
+    if not st.session_state.get("_pageview_counted", False):
+        counts[today] = counts.get(today, 0) + 1
+        try:
+            with open(counts_file, "w") as f:
+                json.dump(counts, f)
+            st.session_state["_pageview_counted"] = True
+        except OSError:
+            pass
+
+    today_views = counts.get(today, 0)
+    total_views = sum(counts.values())
+    num_days = len(counts) if counts else 1
+    avg_per_day = total_views / num_days
+    return today_views, avg_per_day
+
+
+try:
+    today_views, avg_per_day = record_and_get_pageviews()
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        f"📈 Page views today: **{today_views}** "
+        f"(daily average: **{avg_per_day:.1f}**).")
+except Exception:
+    pass
