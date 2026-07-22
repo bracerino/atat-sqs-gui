@@ -299,9 +299,9 @@ def record_and_get_pageviews():
             pass
 
     today_views = counts.get(today, 0)
-    # Show up to the two most recent finished days (dates before today) that
+    # Show up to the three most recent finished days (dates before today) that
     # have recorded views. If there are none yet, nothing extra is shown.
-    finished = sorted(d for d in counts if d < today)[-2:]
+    finished = sorted(d for d in counts if d < today)[-3:]
     previous_days = [
         (f"{date.fromisoformat(d).day}.{date.fromisoformat(d).month}", counts[d])
         for d in finished
