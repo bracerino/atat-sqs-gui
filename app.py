@@ -299,17 +299,23 @@ def record_and_get_pageviews():
             pass
 
     today_views = counts.get(today, 0)
-    total_views = sum(counts.values())
-    num_days = len(counts) if counts else 1
-    avg_per_day = total_views / num_days
-    return today_views, avg_per_day
+    # Show up to the two most recent finished days (dates before today) that
+    # have recorded views. If there are none yet, nothing extra is shown.
+    finished = sorted(d for d in counts if d < today)[-2:]
+    previous_days = [
+        (f"{date.fromisoformat(d).day}.{date.fromisoformat(d).month}", counts[d])
+        for d in finished
+    ]
+    return today_views, previous_days
 
 
 try:
-    today_views, avg_per_day = record_and_get_pageviews()
+    today_views, previous_days = record_and_get_pageviews()
     st.sidebar.markdown("---")
-    st.sidebar.caption(
-        f"📈 Page views today: **{today_views}** "
-        f"(daily average: **{avg_per_day:.1f}**).")
+    caption = f"📈 Page views today: **{today_views}**"
+    if previous_days:
+        caption += " (" + ", ".join(
+            f"{day} - **{views}**" for day, views in previous_days) + ")"
+    st.sidebar.caption(caption + ".")
 except Exception:
     pass
