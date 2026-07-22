@@ -355,8 +355,20 @@ def intro_text():
 
     col_info, col_select, col_button = st.columns([2, 1.5, 1.5])
     with col_info:
-        st.warning(f"Please upload an initial **crystal structure** file (or search for it with the implemented interface within **MP, MC3D, or "
-                   "COD databases**) that will define the base atomic positions for SQS creation.")
+        st.markdown("""
+        <div style="
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(91, 140, 255, 0.35);
+            background: linear-gradient(135deg,
+                rgba(91, 140, 255, 0.10) 0%,
+                rgba(91, 140, 255, 0.18) 100%);
+            line-height: 1.55;">
+            ⬅️ Please upload an initial <b>crystal structure</b> file (or search for it
+            with the implemented interface within <b>MP, MC3D, or COD databases</b>)
+            that will define the base atomic positions for SQS creation.
+        </div>
+        """, unsafe_allow_html=True)
     with col_select:
         render_example_selector()
     with col_button:
