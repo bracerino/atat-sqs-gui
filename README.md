@@ -1,12 +1,12 @@
 # SimplySQS: Interactive interface for ATAT mcsqs input files generation and output analysis 
  Online application for generating and analyzing SQS (Special Quasirandom Structures) using the ATAT mcsqs (Alloy Theoretic Automated Toolkit).  
- 🌐 **Access the application online here: [ATAT SQS GUI](https://atat-sqs.streamlit.app)** (https://simplysqs.com)  
+ 🌐 **Access the application here: [ATAT SQS GUI](https://atat-sqs.streamlit.app)** (https://simplysqs.com)  
  📖 If you like the app, **please cite [this publication](https://doi.org/10.1016/j.jocs.2026.102846)**.  
 
 ### Tutorials 
- 🎥 **Video tutorial about the main features: [YouTube](https://youtu.be/GGo_9T5wqus?si=d3ATtFdfy1NYUCO8)**  
- 🎥 **Video tutorial for running ATAT mcsqs search across concentration range of binary alloys: [YouTube](https://youtu.be/wL5re3Fu1nQ?si=anuqQD88x4xLYmec)**  
- 🎥 **Video tutorial for creating SQS for bcc HEA: [YouTube](https://youtu.be/U6JI2j3BfMg).**  
+ 🎥 **Tutorial about the main features: [YouTube](https://youtu.be/GGo_9T5wqus?si=d3ATtFdfy1NYUCO8)**  
+ 🎥 **Tutorial for running ATAT mcsqs search across concentration range of binary alloys: [YouTube](https://youtu.be/wL5re3Fu1nQ?si=anuqQD88x4xLYmec)**  
+ 🎥 **Tutorial for creating SQS for bcc HEA: [YouTube](https://youtu.be/U6JI2j3BfMg).**  
  
 
 
