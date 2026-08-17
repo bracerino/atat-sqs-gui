@@ -66,24 +66,25 @@ st.markdown(
             background: linear-gradient(to right, #e74c3c, #2ecc71);  /* vivid red → green underline */
         }
 
-        /* The default open/close control is a thin grey chevron that is easy to
-           miss once the sidebar is hidden, so both buttons become a solid
-           blue button that stands out from the page. stExpandSidebarButton is the
-           one shown over the page when the sidebar is collapsed,
+        /* The default open/close control is a thin grey chevron that is easy
+           to miss once the sidebar is hidden, so both buttons carry the same
+           red-to-green gradient as the sidebar itself (the saturated version
+           used by the caption underline). stExpandSidebarButton is the one
+           shown over the page when the sidebar is collapsed,
            stSidebarCollapseButton the one inside the sidebar header. */
         [data-testid="stExpandSidebarButton"],
         [data-testid="stSidebarCollapseButton"] button {
-            background-color: #2f6fd0 !important;
+            background: linear-gradient(135deg, #e74c3c, #2ecc71) !important;
             color: #ffffff !important;
             border: 1px solid #ffffff !important;
             border-radius: 8px !important;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
             opacity: 1 !important;
-            transition: background-color 0.15s ease, transform 0.15s ease;
+            transition: filter 0.15s ease, transform 0.15s ease;
         }
         [data-testid="stExpandSidebarButton"]:hover,
         [data-testid="stSidebarCollapseButton"] button:hover {
-            background-color: #4a8ae8 !important;
+            background: linear-gradient(135deg, #c0392b, #27ae60) !important;
             transform: scale(1.06);
         }
         /* Material icon fonts and inline SVGs both follow the button colour. */
