@@ -489,8 +489,20 @@ It also enables **automated script generation** for binary alloys and batch exec
 
 ---
 
+#### 🎲 Random Structure Quality Check
+- Quick **randomness check** telling whether a randomly occupied supercell is already random enough,
+  or whether an SQS search is worth it
+- Short-range order scored with **Warren–Cowley parameters** over the first three coordination shells,
+  resolved per sublattice
+- Run it **live in the app**, or download a **standalone script** for large supercells
+- 📐 Track randomness quality **as a function of supercell size** (mean score and its scatter vs. number
+  of atoms), to find the smallest supercell that is still random enough
+- 💾 Download the **best generated random structures** as POSCAR files in a ZIP
+
+---
+
 #### 💾 Input File Generation
-- Automatically generate **`rndstr.in`** and **`sqscell.out`** files   
+- Automatically generate **`rndstr.in`** and **`sqscell.out`** files
 
 ---
 

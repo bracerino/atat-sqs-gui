@@ -67,14 +67,14 @@ st.markdown(
         }
 
         /* The default open/close control is a thin grey chevron that is easy
-           to miss once the sidebar is hidden, so both buttons carry the same
-           red-to-green gradient as the sidebar itself (the saturated version
-           used by the caption underline). stExpandSidebarButton is the one
-           shown over the page when the sidebar is collapsed,
-           stSidebarCollapseButton the one inside the sidebar header. */
+           to miss once the sidebar is hidden, so both buttons carry the blue
+           gradient of the SimplySQS header (#2E86C1 → #1E3D7B).
+           stExpandSidebarButton is the one shown over the page when the
+           sidebar is collapsed, stSidebarCollapseButton the one inside the
+           sidebar header. */
         [data-testid="stExpandSidebarButton"],
         [data-testid="stSidebarCollapseButton"] button {
-            background: linear-gradient(135deg, #e74c3c, #2ecc71) !important;
+            background: linear-gradient(135deg, #2E86C1, #1E3D7B) !important;
             color: #ffffff !important;
             border: 1px solid #ffffff !important;
             border-radius: 8px !important;
@@ -84,7 +84,7 @@ st.markdown(
         }
         [data-testid="stExpandSidebarButton"]:hover,
         [data-testid="stSidebarCollapseButton"] button:hover {
-            background: linear-gradient(135deg, #c0392b, #27ae60) !important;
+            background: linear-gradient(135deg, #1E3D7B, #142954) !important;
             transform: scale(1.06);
         }
         /* Material icon fonts and inline SVGs both follow the button colour. */
@@ -94,9 +94,9 @@ st.markdown(
             fill: #ffffff !important;
         }
         [data-testid="stExpandSidebarButton"] {
-            min-height: 34px !important;
-            min-width: 34px !important;
-            padding: 0 6px !important;
+            min-height: 28px !important;
+            min-width: 28px !important;
+            padding: 0 4px !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -233,7 +233,7 @@ def update_file_upload_section():
 st.sidebar.info(f"🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also our XRD application **[XRDlicious](https://xrdlicious.com)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 **[Tutorial here](https://youtu.be/GGo_9T5wqus?si=xJItv-j0shr8hte_)**. Spot a bug or have a feature requests? Let us know at **lebedmi2@cvut.cz**."
-    " If you like the app, please cite [**this publication**](https://doi.org/10.1016/j.jocs.2026.102846). You can consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-sqs-gui.git)** for better performance."
+    " If you like the app, please cite [**this publication**](https://doi.org/10.1016/j.jocs.2026.102846). Consider to compile the app **locally** on your computer from **[GitHub](https://github.com/bracerino/atat-sqs-gui.git)** for better performance."
 )
 
 st.sidebar.markdown("""

@@ -49,41 +49,40 @@ def render_sqs_module():
 
     st.markdown(
     """
-    <h1 style="display: flex; align-items: center; gap: 10px; color: #1E3D7B;">
-    🎲 
-    <span style="color:#2E86C1; font-weight:bold;">SimplySQS</span>
+    <h1 style="display: flex; align-items: center; flex-wrap: wrap; gap: 16px; line-height: 1; color: #1E3D7B;">
+    <span style="line-height: 1;">🎲</span>
+    <span style="
+        color:#2E86C1;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1;
+    ">Simply<span style="color:#1E3D7B;">SQS</span></span>
+    <span style="
+        display: inline-flex;
+        align-items: center;
+        background-color: #f4f7fc;
+        border: 1px solid #dbe3f0;
+        border-radius: 999px;
+        padding: 7px 16px;
+        color: #111827;
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.2;
+    ">
+        <span style="color:#2563eb; font-weight:800;">Release:</span>
+        &nbsp;v0.8.0 &nbsp; | &nbsp;
+        <span style="color:#2563eb; font-weight:800;">Updated:</span>
+        &nbsp;August 18, 2026
+    </span>
     </h1>
-    <h3 style='text-align: left; color: #444444; font-weight: normal;'>
-        Generate input and analyze output files for 
-        <b><span style='color:#1A7F5D;'>ATAT mcsqs</span></b> 
-        to create <b><em>special quasirandom structures (SQS)</em></b>
+    <h3 style='text-align: left; color: #444444; font-weight: normal; margin-bottom: 24px;'>
+        Generate input and analyze output files for
+        <b><span style='color:#1E3D7B;'>ATAT mcsqs</span></b>
+        to create <b><em>special quasirandom structures
+        <span style='color:#1E3D7B;'>(SQS)</span></em></b>
     </h3>
     """,
     unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-        <div style="
-            display: inline-block;
-            background-color: #ffffff;
-            border-left: 5px solid #2563eb;
-            border-radius: 10px;
-            padding: 10px 16px;
-            margin-top: -4px;
-            margin-bottom: 24px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
-            color: #111827;
-            font-size: 0.95rem;
-            font-weight: 600;
-        ">
-            <span style="color:#2563eb; font-weight:800;">Release:</span>
-            v0.7.6 &nbsp; | &nbsp;
-            <span style="color:#2563eb; font-weight:800;">Updated:</span>
-            July 19, 2026
-        </div>
-        """,
-        unsafe_allow_html=True
     )
 
     st.markdown(

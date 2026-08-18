@@ -1591,6 +1591,9 @@ def render_atat_sqs_section():
         target_concentrations = {}
         chem_symbols = None
         otrs = None
+        use_pooled_basis = False
+        global_pool_site_concentrations = None
+        global_pool_orbit_info = None
 
         supercell_multiplicity = nx * ny * nz
         total_supercell_atoms = len(supercell_preview)
@@ -1670,81 +1673,180 @@ def render_atat_sqs_section():
                 unsafe_allow_html=True
             )
 
-            st.subheader("🔵3️⃣ Step 3: Select Elements and Concentrations")
-            element_list = st.multiselect(
-                "Select elements for ATAT SQS",
-                options=all_elements_list,
-                default=sorted(list(structure_elements)),
-                key="atat_composition_global",
-                help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy"
-            )
+            tab_global_main, tab_global_random = st.tabs(
+                ["🔵3️⃣ Step 3: Select Elements and Concentrations",
+                 "➕🎲 Random Structure Quality Check"])
 
-            if len(element_list) == 0:
-                st.error("You must select at least one element.")
-                st.stop()
+            with tab_global_main:
+                element_list = st.multiselect(
+                    "Select elements for ATAT SQS",
+                    options=all_elements_list,
+                    default=sorted(list(structure_elements)),
+                    key="atat_composition_global",
+                    help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy"
+                )
 
-            composition_input = ", ".join(element_list)
+                if len(element_list) == 0:
+                    st.error("You must select at least one element.")
+                    st.stop()
 
-            st.info(f"""
-            **Global Mode Concentration Constraints:**
-            - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
-            - Valid concentrations must be multiples of 1/{supercell_multiplicity}
-            - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
-            - Each concentration applies to ALL atomic sites equally
-            - For vacancies, use symbol 'Vac'
-            """)
+                composition_input = ", ".join(element_list)
 
-            st.write("**Set target composition fractions:**")
-            cols = st.columns(len(element_list))
-            target_concentrations = {}
+                conc_basis = st.radio(
+                    "Concentration basis:",
+                    [
+                        "🧱 Per site (each site repeated in the supercell)",
+                        "🌐 Whole supercell (all atomic spots pooled)",
+                    ],
+                    index=0,
+                    horizontal=True,
+                    key="atat_global_conc_basis",
+                    help="Per site: every site of the unit cell gets the same composition, so the step is "
+                         "1/(supercell multiplicity). Whole supercell: the composition is counted over all "
+                         "atomic spots of the supercell, so the step is 1/(total atoms).",
+                )
+                use_pooled_basis = conc_basis.startswith("🌐")
+                conc_denominator = int(total_supercell_atoms) if use_pooled_basis else int(supercell_multiplicity)
 
-            remaining = 1.0
-            for j, elem in enumerate(element_list[:-1]):
-                with cols[j]:
-                    min_step = 1.0 / supercell_multiplicity
-                    frac_val = st.slider(
-                        f"{elem}:",
-                        min_value=0.0,
-                        max_value=remaining,
-                        value=min(int(supercell_multiplicity / len(element_list)) * min_step, remaining),
-                        step=min_step,
-                        format="%.6f",
-                        key=f"atat_comp_global_{elem}"
+                if use_pooled_basis:
+                    st.info(f"""
+                **Global Mode – Whole-Supercell Basis:**
+                - All {int(total_supercell_atoms)} atomic spots of the {nx}×{ny}×{nz} supercell are pooled
+                - Valid concentrations are multiples of 1/{int(total_supercell_atoms)} = {1 / total_supercell_atoms:.6f}
+                - Concentrations are converted into exact atom counts over the whole supercell
+                - For vacancies, use symbol 'Vac'
+                """)
+                else:
+                    st.info(f"""
+                **Global Mode – Per-Site Basis:**
+                - Supercell multiplicity: {supercell_multiplicity} (={nx}×{ny}×{nz})
+                - Valid concentrations must be multiples of 1/{supercell_multiplicity}
+                - Minimum step: 1/{supercell_multiplicity} = {1 / supercell_multiplicity:.6f}
+                - Each concentration applies to ALL atomic sites equally
+                - For vacancies, use symbol 'Vac'
+                """)
+
+                st.write("**Set target composition fractions:**")
+
+                _col_lbl, _col_tog = st.columns([6, 1])
+                with _col_lbl:
+                    st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
+                with _col_tog:
+                    use_number_inputs_global = st.toggle(
+                        "🔢",
+                        value=False,
+                        key="atat_comp_global_conc_input_mode",
+                        help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
                     )
-                    target_concentrations[elem] = frac_val
-                    remaining -= frac_val
 
-            if element_list:
-                last_elem = element_list[-1]
-                target_concentrations[last_elem] = max(0.0, remaining)
-                with cols[-1]:
-                    st.write(f"**{last_elem}: {target_concentrations[last_elem]:.6f}**")
+                cols = st.columns(len(element_list))
+                target_concentrations = {}
 
-            corrected_concentrations = {}
-            corrections_made = False
+                min_step = 1.0 / conc_denominator
+                remaining = 1.0
+                for j, elem in enumerate(element_list[:-1]):
+                    with cols[j]:
+                        default_val = min(int(conc_denominator / len(element_list)) * min_step, remaining)
 
-            for elem, frac in target_concentrations.items():
-                nearest_step = round(frac * supercell_multiplicity) / supercell_multiplicity
-                corrected_concentrations[elem] = nearest_step
-                if abs(frac - nearest_step) > 1e-6:
-                    corrections_made = True
-                    st.warning(
-                        f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
+                        if not use_number_inputs_global:
+                            frac_val = st.slider(
+                                f"{elem}:",
+                                min_value=0.0,
+                                max_value=remaining,
+                                value=default_val,
+                                step=min_step,
+                                format="%.6f",
+                                key=f"atat_comp_global_{elem}_{conc_denominator}"
+                            )
+                        else:
+                            num_key = f"atat_comp_global_{elem}_num_{conc_denominator}"
 
-            total_corrected = sum(corrected_concentrations.values())
-            if abs(total_corrected - 1.0) > 1e-6:
-                largest_elem = max(corrected_concentrations.keys(), key=lambda x: corrected_concentrations[x])
-                adjustment = 1.0 - total_corrected
-                corrected_concentrations[largest_elem] += adjustment
+                            if remaining < min_step - 1e-9:
+                                st.write(f"**{elem}: 0.000000** (no remaining concentration)")
+                                st.session_state[num_key] = 0.0
+                                frac_val = 0.0
+                            else:
+                                raw = float(st.session_state.get(num_key, default_val))
+                                snapped = round(
+                                    max(0.0, min(remaining, round(raw / min_step) * min_step)),
+                                    8
+                                )
+                                st.session_state[num_key] = snapped
+
+                                st.number_input(
+                                    f"{elem}:",
+                                    min_value=0.0,
+                                    max_value=float(remaining),
+                                    step=min_step,
+                                    format="%.6f",
+                                    key=num_key,
+                                    help=f"Type any value — rounds to nearest {min_step:.6f} on Enter / Tab."
+                                )
+
+                                frac_val = round(
+                                    max(0.0, min(remaining,
+                                        round(float(st.session_state[num_key]) / min_step) * min_step)),
+                                    8
+                                )
+
+                        target_concentrations[elem] = frac_val
+                        remaining -= frac_val
+
+                if element_list:
+                    last_elem = element_list[-1]
+                    target_concentrations[last_elem] = max(0.0, remaining)
+                    with cols[-1]:
+                        st.write(f"**{last_elem}: {target_concentrations[last_elem]:.6f}**")
+
+                corrected_concentrations = {}
+                corrections_made = False
+
+                for elem, frac in target_concentrations.items():
+                    nearest_step = round(frac * conc_denominator) / conc_denominator
+                    corrected_concentrations[elem] = nearest_step
+                    if abs(frac - nearest_step) > 1e-6:
+                        corrections_made = True
+                        st.warning(
+                            f"⚠️ {elem} concentration adjusted from {frac:.6f} to {nearest_step:.6f} (nearest valid value)")
+
+                total_corrected = sum(corrected_concentrations.values())
+                if abs(total_corrected - 1.0) > 1e-6:
+                    largest_elem = max(corrected_concentrations.keys(), key=lambda x: corrected_concentrations[x])
+                    adjustment = 1.0 - total_corrected
+                    corrected_concentrations[largest_elem] += adjustment
+                    if corrections_made:
+                        st.info(
+                            f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
+
+                target_concentrations = corrected_concentrations
+
                 if corrections_made:
-                    st.info(
-                        f"Final adjustment: {largest_elem} = {corrected_concentrations[largest_elem]:.6f} to ensure total = 1.0")
+                    st.success("✅ All concentrations are now valid multiples of 1/{} = {:.6f}".format(
+                        conc_denominator, 1 / conc_denominator))
 
-            target_concentrations = corrected_concentrations
+                global_pool_site_concentrations = None
+                global_pool_orbit_info = None
+                if use_pooled_basis:
+                    (global_pool_site_concentrations, global_pool_orbit_info,
+                     global_pool_counts) = build_global_pool_site_concentrations(
+                        working_structure, target_concentrations, supercell_multiplicity
+                    )
 
-            if corrections_made:
-                st.success("✅ All concentrations are now valid multiples of 1/{} = {:.6f}".format(
-                    supercell_multiplicity, 1 / supercell_multiplicity))
+            with tab_global_random:
+                if len(element_list) >= 2 and target_concentrations:
+                    from more_funct.random_vs_sqs_analysis import render_random_analysis_standalone
+
+                    render_random_analysis_standalone(
+                        working_structure=working_structure,
+                        target_concentrations=target_concentrations,
+                        transformation_matrix=transformation_matrix,
+                        use_sublattice_mode=False,
+                        chem_symbols=None,
+                        total_atoms=len(supercell_preview)
+                    )
+                else:
+                    st.info("Select at least two elements in Step 3 to check how well a randomly "
+                            "occupied supercell would represent the random alloy.")
 
         else:
             element_list = [2, 2]
@@ -1759,8 +1861,14 @@ def render_atat_sqs_section():
         if composition_mode == "🔄 Global Composition":
 
             try:
-                achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
-                    target_concentrations, supercell_multiplicity)
+                if use_pooled_basis:
+                    achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
+                        target_concentrations, total_supercell_atoms)
+                    atoms_per_site_count = 1
+                else:
+                    achievable_concentrations_global, achievable_counts_global = calculate_achievable_concentrations(
+                        target_concentrations, supercell_multiplicity)
+                    atoms_per_site_count = len(working_structure)
 
                 st.write("**Overall Target vs. Achievable Concentrations:**")
                 conc_data = []
@@ -1769,7 +1877,7 @@ def render_atat_sqs_section():
                     achievable_count = achievable_counts_global.get(element, 0)
                     status = "✅ Exact" if abs(target_frac - achievable_frac) < 1e-6 else "⚠️ Rounded"
 
-                    total_element_atoms = achievable_count * len(working_structure)
+                    total_element_atoms = achievable_count * atoms_per_site_count
 
                     conc_data.append({
                         "Element": element,
@@ -1781,32 +1889,60 @@ def render_atat_sqs_section():
                     })
                 conc_df = pd.DataFrame(conc_data)
                 st.dataframe(conc_df, width='stretch')
-                st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
 
-                preview_data = []
-                for site_info in unique_sites:
-                    site_label = f"{site_info['element']} @ {site_info['wyckoff_letter']} (×{site_info['multiplicity']})"
+                if use_pooled_basis and global_pool_orbit_info:
+                    st.write("**Per-Orbit Concentrations (whole-supercell basis):**")
 
-                    conc_parts = []
-                    for element, frac in sorted(achievable_concentrations_global.items()):
-                        if frac > 1e-6:
-                            conc_parts.append(f"{element}={frac:.6f}")
+                    preview_data = []
+                    for orbit_idx, orbit in enumerate(global_pool_orbit_info):
+                        site_labels = []
+                        for site_index in orbit['site_indices']:
+                            site = working_structure[site_index]
+                            label = site.specie.symbol if site.is_ordered else "mixed"
+                            site_labels.append(f"{label}#{site_index}")
 
-                    preview_data.append({
-                        "Wyckoff Position": site_label,
-                        "Supercell Replicas": f"{supercell_multiplicity}",
-                        "Site Concentrations": ", ".join(conc_parts),
-                        "Note": "Same for all sites"
-                    })
+                        conc_parts = [f"{element}={frac:.6f}"
+                                      for element, frac in sorted(orbit['concentrations'].items()) if frac > 1e-6]
+                        count_parts = [f"{element}: {count}"
+                                       for element, count in sorted(orbit['counts'].items()) if count > 0]
 
-                preview_df = pd.DataFrame(preview_data)
-                st.dataframe(preview_df, width='stretch')
-                st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
+                        preview_data.append({
+                            "Orbit": f"{orbit_idx + 1}",
+                            "Original Sites": ", ".join(site_labels),
+                            "Sites in Supercell": f"{orbit['sites_in_supercell']}",
+                            "Site Concentrations": ", ".join(conc_parts),
+                            "Atom Counts": ", ".join(count_parts),
+                        })
+
+                    st.dataframe(pd.DataFrame(preview_data), width='stretch')
+                else:
+                    st.write("**Per-Site Concentrations (All sites identical in Global Mode):**")
+
+                    preview_data = []
+                    for site_info in unique_sites:
+                        site_label = f"{site_info['element']} @ {site_info['wyckoff_letter']} (×{site_info['multiplicity']})"
+
+                        conc_parts = []
+                        for element, frac in sorted(achievable_concentrations_global.items()):
+                            if frac > 1e-6:
+                                conc_parts.append(f"{element}={frac:.6f}")
+
+                        preview_data.append({
+                            "Wyckoff Position": site_label,
+                            "Supercell Replicas": f"{supercell_multiplicity}",
+                            "Site Concentrations": ", ".join(conc_parts),
+                            "Note": "Same for all sites"
+                        })
+
+                    preview_df = pd.DataFrame(preview_data)
+                    st.dataframe(preview_df, width='stretch')
+                    st.info("In Global Mode, all atomic sites receive identical concentration assignments.")
+
                 st.write("#### **Overall Expected Element Distribution in Supercell:**")
 
                 total_element_counts = {}
                 for elem, per_site_count in achievable_counts_global.items():
-                    total_element_counts[elem] = per_site_count * len(working_structure)
+                    total_element_counts[elem] = per_site_count * atoms_per_site_count
 
                 if total_element_counts:
                     cols = st.columns(min(len(total_element_counts), 4))
@@ -2002,7 +2138,7 @@ def render_atat_sqs_section():
         if "atat_results" not in st.session_state:
             st.session_state.atat_results = None
 
-        current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}"
+        current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{use_pooled_basis}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}"
 
         if "atat_config_key" not in st.session_state:
             st.session_state.atat_config_key = current_config_key
@@ -2042,8 +2178,12 @@ def render_atat_sqs_section():
 
             try:
                 if composition_mode == "🔄 Global Composition":
-                    achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
-                        target_concentrations, supercell_multiplicity)
+                    if use_pooled_basis:
+                        achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
+                            target_concentrations, total_supercell_atoms)
+                    else:
+                        achievable_concentrations_for_atat, achievable_counts = calculate_achievable_concentrations(
+                            target_concentrations, supercell_multiplicity)
 
                     use_concentrations = achievable_concentrations_for_atat
                     print(f'Successfully generated ATAT mcsqs input files for: {use_concentrations}')
@@ -2075,7 +2215,8 @@ def render_atat_sqs_section():
                     pair_cutoff,
                     triplet_cutoff,
                     quadruplet_cutoff,
-                    len(supercell_preview))
+                    len(supercell_preview),
+                    global_pool_site_concentrations)
 
                 if adjustment_info and len(adjustment_info) > 0:
                     st.warning(
@@ -3714,6 +3855,139 @@ def calculate_achievable_concentrations_sublattice_fixed(target_concentrations, 
     return achievable_concentrations, adjustment_info
 
 
+def get_atat_global_orbits(structure, symprec=1e-3):
+    """Group the sites of `structure` the way mcsqs does in Global mode.
+
+    mcsqs determines the space group of rndstr.in from the *site types* (the list of
+    allowed species on a site), not from the elements decorating it. In Global mode
+    every site carries the same species list, so the grouping follows the bare
+    geometry and can merge sites that are chemically distinct (e.g. the two sites of
+    B2 CsCl become a single bcc orbit).
+
+    Composition is conserved inside each of these orbits: mcsqs fills every orbit of
+    the supercell with round(n_orbit * concentration) atoms of each species and
+    aborts with "Impossible to match point correlations due to incompatible supercell
+    size" when that product is not an integer.
+
+    Returns a list of lists of site indices, largest orbit first.
+    """
+    try:
+        dummy = Structure(structure.lattice, ["C"] * len(structure), structure.frac_coords)
+        orbits = SpacegroupAnalyzer(dummy, symprec=symprec).get_symmetrized_structure().equivalent_indices
+        orbits = [sorted(int(i) for i in orbit) for orbit in orbits]
+        if sum(len(orbit) for orbit in orbits) == len(structure):
+            return sorted(orbits, key=lambda orbit: (-len(orbit), orbit[0]))
+    except Exception:
+        pass
+    # Safest fallback: every site on its own (strictest integer constraint).
+    return [[i] for i in range(len(structure))]
+
+
+def _apportion_counts(ideal_counts, total, caps=None):
+    """Largest-remainder rounding of `ideal_counts` to integers summing to `total`."""
+    elements = sorted(ideal_counts.keys())
+    if not elements or total <= 0:
+        return {element: 0 for element in elements}
+    if caps is None:
+        caps = {element: total for element in elements}
+
+    counts = {}
+    for element in elements:
+        counts[element] = min(int(np.floor(ideal_counts[element] + 1e-9)), int(caps[element]))
+
+    remaining = total - sum(counts.values())
+    order = sorted(elements,
+                   key=lambda element: (-(ideal_counts[element] - np.floor(ideal_counts[element] + 1e-9)), element))
+    idx = 0
+    while remaining > 0 and idx < len(order) * (total + 1):
+        element = order[idx % len(order)]
+        if counts[element] < caps[element]:
+            counts[element] += 1
+            remaining -= 1
+        idx += 1
+
+    idx = 0
+    order_desc = sorted(elements, key=lambda element: (-counts[element], element))
+    while remaining < 0 and idx < len(order_desc) * (total + 1):
+        element = order_desc[idx % len(order_desc)]
+        if counts[element] > 0:
+            counts[element] -= 1
+            remaining += 1
+        idx += 1
+
+    return counts
+
+
+def distribute_concentrations_over_orbits(target_concentrations, orbit_sizes_in_supercell, total_supercell_atoms):
+    """Turn a whole-supercell composition into integer atom counts per symmetry orbit.
+
+    The requested fractions are first converted to exact integer atom counts over all
+    `total_supercell_atoms` spots, then spread over the orbits as evenly as the integer
+    constraint allows (proportional allocation with largest-remainder rounding), so that
+    every orbit ends up with a composition mcsqs can realise while the totals over the
+    whole supercell stay exactly on target.
+
+    Returns (global_counts, per_orbit_counts).
+    """
+    global_counts = _apportion_counts(
+        {element: frac * total_supercell_atoms for element, frac in target_concentrations.items()},
+        int(total_supercell_atoms)
+    )
+
+    remaining_counts = dict(global_counts)
+    remaining_sites = int(total_supercell_atoms)
+    per_orbit_counts = []
+
+    for orbit_size in orbit_sizes_in_supercell:
+        orbit_size = int(orbit_size)
+        if remaining_sites <= 0:
+            per_orbit_counts.append({element: 0 for element in remaining_counts})
+            continue
+        ideal = {element: remaining_counts[element] * orbit_size / remaining_sites
+                 for element in remaining_counts}
+        counts = _apportion_counts(ideal, orbit_size, caps=remaining_counts)
+        per_orbit_counts.append(counts)
+        for element in counts:
+            remaining_counts[element] -= counts[element]
+        remaining_sites -= orbit_size
+
+    return global_counts, per_orbit_counts
+
+
+def build_global_pool_site_concentrations(structure, target_concentrations, supercell_multiplicity):
+    """Per-site concentrations for Global mode with a whole-supercell (pooled) basis.
+
+    Returns (per_site_concentrations, orbit_info, global_counts) where `per_site_concentrations`
+    has one {element: fraction} dict per site of `structure`, `orbit_info` describes what each
+    symmetry orbit received (for display) and `global_counts` are the atom counts over the whole
+    supercell.
+    """
+    supercell_multiplicity = int(supercell_multiplicity)
+    orbits = get_atat_global_orbits(structure)
+    orbit_sizes = [len(orbit) * supercell_multiplicity for orbit in orbits]
+    total_supercell_atoms = len(structure) * supercell_multiplicity
+
+    global_counts, per_orbit_counts = distribute_concentrations_over_orbits(
+        target_concentrations, orbit_sizes, total_supercell_atoms
+    )
+
+    per_site_concentrations = [None] * len(structure)
+    orbit_info = []
+    for orbit, orbit_size, counts in zip(orbits, orbit_sizes, per_orbit_counts):
+        concentrations = {element: counts[element] / orbit_size for element in counts}
+        for site_index in orbit:
+            per_site_concentrations[site_index] = dict(concentrations)
+        orbit_info.append({
+            'site_indices': orbit,
+            'sites_in_unit_cell': len(orbit),
+            'sites_in_supercell': orbit_size,
+            'counts': counts,
+            'concentrations': concentrations,
+        })
+
+    return per_site_concentrations, orbit_info, global_counts
+
+
 def calculate_achievable_concentrations(target_concentrations, total_atoms):
     achievable_concentrations = {}
     achievable_counts = {}
@@ -3753,7 +4027,7 @@ def calculate_achievable_concentrations(target_concentrations, total_atoms):
 
 
 def generate_atat_rndstr_content_corrected(structure, achievable_concentrations, use_sublattice_mode, chem_symbols,
-                                           transformation_matrix):
+                                           transformation_matrix, per_site_concentrations=None):
     lattice = structure.lattice
     max_param = max(lattice.a, lattice.b, lattice.c) if max(lattice.a, lattice.b, lattice.c) > 0 else 1
     lines = [
@@ -3791,6 +4065,22 @@ def generate_atat_rndstr_content_corrected(structure, achievable_concentrations,
                         if occ > 1e-6:
                             conc_parts.append(f"{sp.symbol}={occ:.6f}")
                     lines.append(f"{coord_str} {','.join(conc_parts)}")
+    elif per_site_concentrations is not None:
+        # Global mode with a whole-supercell (pooled) basis: symmetry orbits can carry
+        # slightly different concentrations so that the totals over all atomic spots
+        # match the request exactly while every orbit still holds an integer number of
+        # atoms of each species.
+        for i, site in enumerate(structure):
+            coords = site.frac_coords
+            coord_str = f"{coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}"
+
+            site_concentrations = per_site_concentrations[i] if i < len(per_site_concentrations) else None
+            if not site_concentrations:
+                site_concentrations = achievable_concentrations
+
+            conc_parts = [f"{element}={conc:.6f}" for element, conc in sorted(site_concentrations.items())
+                          if conc > 1e-6]
+            lines.append(f"{coord_str} {','.join(conc_parts)}")
     else:
         conc_parts = []
         for element, conc in sorted(achievable_concentrations.items()):
@@ -3853,7 +4143,8 @@ def generate_atat_command_sequence(pair_cutoff, triplet_cutoff, quadruplet_cutof
 
 def generate_atat_input_files_corrected(structure, target_concentrations, transformation_matrix,
                                         use_sublattice_mode, chem_symbols, nx, ny, nz,
-                                        pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms):
+                                        pair_cutoff, triplet_cutoff, quadruplet_cutoff, total_atoms,
+                                        per_site_concentrations=None):
     if use_sublattice_mode:
         achievable_concentrations = target_concentrations
         adjustment_info = []
@@ -3873,7 +4164,7 @@ def generate_atat_input_files_corrected(structure, target_concentrations, transf
 
     rndstr_content = generate_atat_rndstr_content_corrected(
         structure, achievable_concentrations, use_sublattice_mode,
-        chem_symbols, transformation_matrix
+        chem_symbols, transformation_matrix, per_site_concentrations
     )
 
     sqscell_content = generate_atat_sqscell_content(nx, ny, nz)
@@ -5281,8 +5572,8 @@ def render_monitor_script_section(results):
                 )
 
                 st.success("✅ Monitor script generated successfully!")
-                # Auto-expand the preview when triggered by the example button.
-                with st.expander("Script Preview", expanded=auto_generate_monitor):
+                # The preview only renders right after the script was generated, so show it open.
+                with st.expander("Script Preview", expanded=True):
                     st.code(script_content, language="bash")
             except Exception as e:
                 st.error(f"Error generating script: {str(e)}")
