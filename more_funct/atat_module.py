@@ -1973,30 +1973,30 @@ def render_atat_sqs_section():
                             st.markdown(f"""
                             <div style="
                                 background: linear-gradient(135deg, {color}, {color}CC);
-                                padding: 20px;
-                                border-radius: 15px;
+                                padding: 12px 10px;
+                                border-radius: 12px;
                                 text-align: center;
-                                margin: 10px 0;
-                                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                margin: 6px 0;
+                                box-shadow: 0 3px 8px rgba(0,0,0,0.12);
                                 border: 2px solid rgba(255,255,255,0.2);
                             ">
                                 <h1 style="
                                     color: white;
                                     font-size: 3em;
                                     margin: 0;
-                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                    text-shadow: 1px 1px 3px rgba(0,0,0,0.35);
                                     font-weight: bold;
                                 ">{elem}</h1>
                                 <h2 style="
                                     color: white;
                                     font-size: 2em;
-                                    margin: 10px 0 0 0;
+                                    margin: 5px 0 0 0;
                                     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
                                 ">{percentage:.1f}%</h2>
                                 <p style="
                                     color: white;
-                                    font-size: 1.8em;
-                                    margin: 5px 0 0 0;
+                                    font-size: 1.6em;
+                                    margin: 3px 0 0 0;
                                     opacity: 0.9;
                                 ">{int(round(count, 0))} atoms</p>
                             </div>
@@ -2146,25 +2146,49 @@ def render_atat_sqs_section():
             st.session_state.atat_results = None
             st.session_state.atat_config_key = current_config_key
 
-        col_button, col_clear = st.columns([3, 1])
+        col_button, col_monitor, col_clear = st.columns([2, 2, 1])
 
+        # Both buttons need the same guard: without a valid composition there is
+        # nothing to write into rndstr.in (and therefore into monitor.sh either).
+        if not target_concentrations:
+            buttons_disabled = True
+            buttons_disabled_help = "Configure at least 1 sublattice concentration first."
+        elif len(element_list) < 2 and composition_mode == "🔄 Global Composition":
+            buttons_disabled = True
+            buttons_disabled_help = "Select at least two elements first."
+        else:
+            buttons_disabled = False
+            buttons_disabled_help = None
 
         with col_button:
             if not target_concentrations:
                 st.warning("Create at least 1 sublattice (with minimum of two elements) first.")
-                generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
-                                                 help="Configure at least 1 sublattice concentration first.")
-            elif len(element_list) < 2 and composition_mode == "🔄 Global Composition":
+            elif buttons_disabled:
                 st.warning(f"Select at least two elements first in Step 4:")
+
+            if buttons_disabled:
                 generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary", disabled=True,
-                                                 help="Select at least two elements first.")
+                                                 help=buttons_disabled_help)
             else:
                 generate_atat_button = st.button("🔧 Generate ATAT Input Files", type="tertiary")
 
+        with col_monitor:
+            # Same generation, but it also opens the monitor.sh panel below, whose
+            # options rebuild the script on every change.
+            generate_monitor_button = st.button(
+                "🛠️ Generate All-in-One Bash Script (monitor.sh)",
+                type="tertiary",
+                disabled=buttons_disabled,
+                key="generate_inputs_and_monitor",
+            )
+            if generate_monitor_button:
+                st.session_state["quick_monitor_panel"] = True
+
         with col_clear:
             if st.session_state.atat_results is not None:
-                if st.button("🗑️ Clear Results", type="secondary", help="Clear current ATAT results"):
+                if st.button("🗑️ Clear Results", type="secondary"):
                     st.session_state.atat_results = None
+                    st.session_state.pop("quick_monitor_panel", None)
                     st.rerun()
 
         # One-shot auto-generation requested by the "Load example alloy" button.
@@ -2174,7 +2198,7 @@ def render_atat_sqs_section():
             "example_auto_generate", False
         )
 
-        if generate_atat_button or auto_generate:
+        if generate_atat_button or auto_generate or generate_monitor_button:
 
             try:
                 if composition_mode == "🔄 Global Composition":
@@ -2244,6 +2268,9 @@ def render_atat_sqs_section():
             except Exception as e:
                 st.error(f"Error generating ATAT input files: {str(e)}")
                 st.exception(e)
+        if st.session_state.get("quick_monitor_panel") and st.session_state.atat_results is not None:
+            render_quick_monitor_script_panel(st.session_state.atat_results)
+
         if st.session_state.atat_results is not None:
             results = st.session_state.atat_results
 
@@ -3762,30 +3789,30 @@ def display_sublattice_preview_fixed(target_concentrations, chem_symbols, transf
                     st.markdown(f"""
                     <div style="
                         background: linear-gradient(135deg, {color}, {color}CC);
-                        padding: 20px;
-                        border-radius: 15px;
+                        padding: 12px 10px;
+                        border-radius: 12px;
                         text-align: center;
-                        margin: 10px 0;
-                        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                        margin: 6px 0;
+                        box-shadow: 0 3px 8px rgba(0,0,0,0.12);
                         border: 2px solid rgba(255,255,255,0.2);
                     ">
                         <h1 style="
                             color: white;
                             font-size: 3em;
                             margin: 0;
-                            text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                            text-shadow: 1px 1px 3px rgba(0,0,0,0.35);
                             font-weight: bold;
                         ">{elem}</h1>
                         <h2 style="
                             color: white;
                             font-size: 2em;
-                            margin: 10px 0 0 0;
+                            margin: 5px 0 0 0;
                             text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
                         ">{percentage:.1f}%</h2>
                         <p style="
                             color: white;
-                            font-size: 1.8em;
-                            margin: 5px 0 0 0;
+                            font-size: 1.6em;
+                            margin: 3px 0 0 0;
                             opacity: 0.9;
                         ">{int(round(count, 0))} atoms</p>
                     </div>
@@ -5070,6 +5097,510 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
         monitor_call = "start_monitoring_process \"$LOG_FILE\" \"$PROGRESS_FILE\" &"
 
+    # Built as a plain string (not an f-string) so the embedded Python keeps its
+    # braces; the only substitution is the number of parallel runs.
+    plot_function = '''generate_objective_plots() {
+   if [ ! -f "$PROGRESS_FILE" ]; then
+       echo "⚠️  No progress file found - skipping objective function plots"
+       return 0
+   fi
+
+   if ! command -v python3 > /dev/null 2>&1; then
+       echo "⚠️  python3 not found - skipping objective function plots"
+       return 0
+   fi
+
+   echo ""
+   echo "=========================================="
+   echo "📈 Plotting objective function vs. time..."
+   echo "=========================================="
+
+   python3 - "$PROGRESS_FILE" "__PARALLEL_RUNS__" "$PLOT_DIR" << 'PLOTEOF'
+import csv
+import os
+import sys
+
+csv_path = sys.argv[1]
+parallel_runs = int(sys.argv[2])
+plot_dir = sys.argv[3]
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except Exception as exc:
+    print("   matplotlib not available (%s) - skipping plots" % exc)
+    sys.exit(0)
+
+PALETTE = ["#2E86C1", "#E67E22", "#27AE60", "#8E44AD", "#C0392B",
+           "#16A085", "#D4AC0D", "#2C3E50", "#CB4335", "#5D6D7E"]
+INK = "#1E3D7B"
+
+plt.rcParams.update({
+    "figure.dpi": 120,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "savefig.pad_inches": 0.05,
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.titlepad": 12,
+    "axes.labelsize": 12,
+    "axes.labelpad": 8,
+    "axes.linewidth": 1.1,
+    "axes.edgecolor": "#4A5568",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "grid.color": "#C8CFDA",
+    "grid.linewidth": 0.7,
+    "grid.alpha": 0.55,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "xtick.major.size": 5,
+    "ytick.major.size": 5,
+    "xtick.major.width": 1.0,
+    "ytick.major.width": 1.0,
+    "xtick.labelsize": 10.5,
+    "ytick.labelsize": 10.5,
+    "legend.frameon": False,
+    "legend.fontsize": 10.5,
+    "lines.antialiased": True,
+    "lines.solid_capstyle": "round",
+    "lines.solid_joinstyle": "round",
+})
+
+try:
+    with open(csv_path) as handle:
+        rows = list(csv.DictReader(handle))
+except Exception as exc:
+    print("   could not read %s (%s) - skipping plots" % (csv_path, exc))
+    sys.exit(0)
+
+if not rows:
+    print("   progress file is empty - nothing to plot")
+    sys.exit(0)
+
+
+def series(value_key):
+    """(minute, objective) pairs, skipping the N/A rows written before a run reports."""
+    xs, ys = [], []
+    for row in rows:
+        try:
+            x = float(row.get("Minute"))
+            y = float(row.get(value_key))
+        except (TypeError, ValueError):
+            continue
+        xs.append(x)
+        ys.append(y)
+    return xs, ys
+
+
+ZOOM_FRACTION = 0.20
+MIN_ZOOM_POINTS = 3
+
+
+def draw(entries, title, filename, legend=False):
+    """entries: (label, xs, ys, color) tuples - one for a single run, many for the overlay."""
+    fig, ax = plt.subplots(figsize=(8.2, 5.0) if legend else (6.8, 4.4))
+    for label, xs, ys, color in entries:
+        ax.plot(xs, ys, linewidth=2.0 if legend else 2.2, color=color, zorder=3, label=label)
+        ax.plot(xs, ys, "o", markersize=4.8 if legend else 5.5, color=color,
+                markeredgecolor="white", markeredgewidth=1.0 if legend else 1.1, zorder=4)
+        if not legend:
+            ax.fill_between(xs, ys, max(ys), color=color, alpha=0.10, linewidth=0, zorder=1)
+    if legend:
+        ax.legend(loc="best", ncol=1)
+    ax.set_title(title, color=INK)
+    ax.set_xlabel("Time (minutes)")
+    ax.set_ylabel("Objective function")
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.margins(x=0.03, y=0.10)
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    out_path = os.path.join(plot_dir, filename)
+    fig.savefig(out_path)
+    plt.close(fig)
+    written.append(out_path)
+
+
+def zoom_start(all_x):
+    """Beginning of the last ZOOM_FRACTION of the monitored time."""
+    if not all_x:
+        return None
+    first, last = min(all_x), max(all_x)
+    if last <= first:
+        return None
+    return last - ZOOM_FRACTION * (last - first)
+
+
+def clip(xs, ys, start):
+    """Keep only the samples inside the zoom window."""
+    pairs = [(x, y) for x, y in zip(xs, ys) if x >= start - 1e-9]
+    if len(pairs) < MIN_ZOOM_POINTS:
+        return [], []
+    return [pair[0] for pair in pairs], [pair[1] for pair in pairs]
+
+
+try:
+    os.makedirs(plot_dir)
+except OSError:
+    pass
+
+written = []
+
+if parallel_runs > 1:
+    collected = []
+    for run in range(1, parallel_runs + 1):
+        xs, ys = series("Run%d_Objective" % run)
+        if not xs:
+            print("   run %d: no objective values recorded - skipped" % run)
+            continue
+        color = PALETTE[(run - 1) % len(PALETTE)]
+        draw([(None, xs, ys, color)],
+             "MCSQS run %d  |  best %.6f" % (run, min(ys)),
+             "run%d_objective.png" % run)
+        collected.append((run, xs, ys, color))
+
+    if collected:
+        entries = [("Run %d  (best %.6f)" % (run, min(ys)), xs, ys, color)
+                   for run, xs, ys, color in collected]
+        draw(entries, "MCSQS objective function - all %d runs" % parallel_runs,
+             "all_runs_objective.png", legend=True)
+
+        every_x = []
+        for run, xs, ys, color in collected:
+            every_x.extend(xs)
+        start = zoom_start(every_x)
+        if start is None:
+            print("   too little data for the zoomed views - skipped")
+        else:
+            zoom_entries = []
+            for run, xs, ys, color in collected:
+                zx, zy = clip(xs, ys, start)
+                if not zx:
+                    continue
+                draw([(None, zx, zy, color)],
+                     "MCSQS run %d - last %d %% of the run" % (run, int(ZOOM_FRACTION * 100)),
+                     "run%d_objective_zoom.png" % run)
+                zoom_entries.append(("Run %d  (best %.6f)" % (run, min(zy)), zx, zy, color))
+            if zoom_entries:
+                draw(zoom_entries,
+                     "MCSQS objective function - all %d runs, last %d %% of the run"
+                     % (parallel_runs, int(ZOOM_FRACTION * 100)),
+                     "all_runs_objective_zoom.png", legend=True)
+            else:
+                print("   too few points in the last %d %% - zoomed views skipped"
+                      % int(ZOOM_FRACTION * 100))
+else:
+    xs, ys = series("Objective_Function")
+    if xs:
+        color = PALETTE[0]
+        draw([(None, xs, ys, color)],
+             "MCSQS objective function  |  best %.6f" % min(ys),
+             "objective_vs_time.png")
+
+        start = zoom_start(xs)
+        zx, zy = clip(xs, ys, start) if start is not None else ([], [])
+        if zx:
+            draw([(None, zx, zy, color)],
+                 "MCSQS objective function - last %d %% of the run" % int(ZOOM_FRACTION * 100),
+                 "objective_vs_time_zoom.png")
+        else:
+            print("   too little data for the zoomed view - skipped")
+
+if written:
+    for out_path in written:
+        print("   ✅ %s" % out_path)
+else:
+    print("   ⚠️  no objective values recorded yet - no plots written")
+PLOTEOF
+}
+
+generate_correlation_plots() {
+   if ! command -v python3 > /dev/null 2>&1; then
+       echo "⚠️  python3 not found - skipping correlation plots"
+       return 0
+   fi
+
+   if ! ls bestcorr*.out > /dev/null 2>&1; then
+       echo "⚠️  No bestcorr*.out files found - skipping correlation plots"
+       return 0
+   fi
+
+   echo ""
+   echo "=========================================="
+   echo "📊 Plotting correlation function matching..."
+   echo "=========================================="
+
+   python3 - "__PARALLEL_RUNS__" "$CORR_PLOT_DIR" << 'CORREOF'
+import os
+import sys
+
+parallel_runs = int(sys.argv[1])
+plot_dir = sys.argv[2]
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except Exception as exc:
+    print("   matplotlib not available (%s) - skipping plots" % exc)
+    sys.exit(0)
+
+PALETTE = ["#2E86C1", "#E67E22", "#27AE60", "#8E44AD", "#C0392B",
+           "#16A085", "#D4AC0D", "#2C3E50", "#CB4335", "#5D6D7E"]
+INK = "#1E3D7B"
+
+plt.rcParams.update({
+    "figure.dpi": 120,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+    "savefig.pad_inches": 0.05,
+    "font.size": 11,
+    "axes.titlesize": 13,
+    "axes.titlepad": 12,
+    "axes.labelsize": 12,
+    "axes.labelpad": 8,
+    "axes.linewidth": 1.1,
+    "axes.edgecolor": "#4A5568",
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "grid.color": "#C8CFDA",
+    "grid.linewidth": 0.7,
+    "grid.alpha": 0.55,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "xtick.major.size": 5,
+    "ytick.major.size": 5,
+    "xtick.major.width": 1.0,
+    "ytick.major.width": 1.0,
+    "xtick.labelsize": 10.5,
+    "ytick.labelsize": 10.5,
+    "legend.frameon": False,
+    "legend.fontsize": 10.5,
+    "lines.antialiased": True,
+    "lines.solid_capstyle": "round",
+    "lines.solid_joinstyle": "round",
+})
+
+MATCH_COLOR = "#2E86C1"
+TARGET_COLOR = "#4A5568"
+POS_COLOR = "#E67E22"
+NEG_COLOR = "#2E86C1"
+
+
+def read_bestcorr(path):
+    """clusters (points, diameter, SQS correlation, target, difference) + objective."""
+    clusters = []
+    objective = None
+    try:
+        with open(path) as handle:
+            lines = handle.readlines()
+    except Exception as exc:
+        print("   could not read %s (%s)" % (path, exc))
+        return clusters, objective
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("Objective_function"):
+            try:
+                objective = float(line.split("=")[1])
+            except (IndexError, ValueError):
+                objective = None
+            continue
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        try:
+            clusters.append({
+                "npts": int(float(parts[0])),
+                "diameter": float(parts[1]),
+                "corr": float(parts[2]),
+                "target": float(parts[3]),
+                "diff": float(parts[4]),
+            })
+        except ValueError:
+            continue
+    return clusters, objective
+
+
+def cluster_ticks(clusters):
+    """Label groups of clusters sharing (points, diameter) instead of every single tick."""
+    groups = []
+    for position, cluster in enumerate(clusters):
+        key = (cluster["npts"], round(cluster["diameter"], 4))
+        if groups and groups[-1][0] == key:
+            groups[-1][2] = position
+        else:
+            groups.append([key, position, position])
+
+    if len(groups) <= 10:
+        positions = [(first + last) / 2.0 + 1 for key, first, last in groups]
+        labels = ["%d-pt\\n%.3f" % key for key, first, last in groups]
+        separators = [first + 0.5 for key, first, last in groups[1:]]
+        return positions, labels, separators
+
+    stride = int(len(clusters) / 10) + 1
+    positions = [i + 1 for i in range(0, len(clusters), stride)]
+    labels = [str(i + 1) for i in range(0, len(clusters), stride)]
+    return positions, labels, []
+
+
+def match_stats(clusters):
+    """RMSE / mean / worst mismatch plus a 0-100 % score.
+
+    Correlations live in [-1, 1], so the RMSE of (SQS - target) is already on that
+    scale and 100 * (1 - RMSE) reads directly as "how well the SQS matches".
+    """
+    diffs = [cluster["diff"] for cluster in clusters]
+    count = len(diffs)
+    rmse = (sum(value * value for value in diffs) / count) ** 0.5
+    mean_abs = sum(abs(value) for value in diffs) / count
+    worst = max(abs(value) for value in diffs)
+    exact = sum(1 for value in diffs if abs(value) < 1e-6)
+    score = max(0.0, min(100.0, 100.0 * (1.0 - rmse)))
+    return rmse, mean_abs, worst, exact, score
+
+
+def plot_one(clusters, objective, title, filename):
+    idx = list(range(1, len(clusters) + 1))
+    corr = [c["corr"] for c in clusters]
+    target = [c["target"] for c in clusters]
+    diff = [c["diff"] for c in clusters]
+
+    fig, (ax_top, ax_bot) = plt.subplots(
+        2, 1, figsize=(7.4, 6.6), sharex=True,
+        gridspec_kw={"height_ratios": [2.0, 1.25], "hspace": 0.10})
+
+    # markers shrink with the number of clusters, otherwise they merge into a band
+    if len(clusters) <= 12:
+        target_size, sqs_size, stem_width = 9.0, 7.5, 1.2
+    elif len(clusters) <= 30:
+        target_size, sqs_size, stem_width = 6.5, 5.5, 1.0
+    else:
+        target_size, sqs_size, stem_width = 5.0, 4.2, 0.9
+
+    for x, sqs_value, target_value in zip(idx, corr, target):
+        ax_top.plot([x, x], [target_value, sqs_value], color="#B7BFCC", linewidth=stem_width, zorder=1)
+    ax_top.axhline(0.0, color="#9AA3B2", linewidth=0.9, linestyle=":", zorder=0)
+    ax_top.plot(idx, target, "s", markersize=target_size, markerfacecolor="none",
+                markeredgecolor=TARGET_COLOR, markeredgewidth=1.5, zorder=3,
+                label="Target (perfectly random)")
+    ax_top.plot(idx, corr, "o", markersize=sqs_size, color=MATCH_COLOR, markeredgecolor="white",
+                markeredgewidth=1.0, zorder=4, label="SQS")
+    ax_top.set_ylabel("Correlation function")
+    ax_top.legend(loc="lower left", bbox_to_anchor=(0.0, 1.01), ncol=2, borderaxespad=0.0)
+    ax_top.set_axisbelow(True)
+    low = min(corr + target)
+    high = max(corr + target)
+    pad = max((high - low) * 0.18, 1e-3)
+    ax_top.set_ylim(low - pad, high + pad)
+    rmse, mean_abs, worst, exact, score = match_stats(clusters)
+    if objective is not None:
+        title = "%s  |  objective %.6f" % (title, objective)
+    title = "%s  |  match score %.2f %%" % (title, score)
+    ax_top.set_title(title, color=INK, pad=34)
+
+    colors = [POS_COLOR if value >= 0 else NEG_COLOR for value in diff]
+    ax_bot.bar(idx, diff, width=0.6, color=colors, edgecolor="white", linewidth=0.8, zorder=3)
+    ax_bot.axhline(0.0, color="#4A5568", linewidth=1.0, zorder=2)
+    span = max([abs(value) for value in diff] + [1e-6]) * 1.35
+    ax_bot.set_ylim(-span, span)
+    ax_bot.set_ylabel("SQS - target")
+    ax_bot.set_xlabel("Cluster (points, diameter)")
+    positions, labels, separators = cluster_ticks(clusters)
+    ax_bot.set_xticks(positions)
+    ax_bot.set_xticklabels(labels)
+    ax_bot.set_axisbelow(True)
+    for boundary in separators:
+        ax_top.axvline(boundary, color="#DDE2EA", linewidth=0.9, zorder=0)
+        ax_bot.axvline(boundary, color="#DDE2EA", linewidth=0.9, zorder=0)
+
+    # tight_layout cannot handle the legend anchored outside the axes; the explicit
+    # margins below plus savefig(bbox="tight") give the same result without warnings.
+    fig.subplots_adjust(left=0.13, right=0.97, top=0.86, bottom=0.19, hspace=0.10)
+    fig.text(0.5, 0.012,
+             "RMSE = %.6f     mean |mismatch| = %.6f     max |mismatch| = %.6f"
+             "     exact matches: %d/%d" % (rmse, mean_abs, worst, exact, len(diff)),
+             ha="center", va="bottom", fontsize=10, color="#4A5568")
+    out_path = os.path.join(plot_dir, filename)
+    fig.savefig(out_path)
+    plt.close(fig)
+    written.append(out_path)
+
+
+try:
+    os.makedirs(plot_dir)
+except OSError:
+    pass
+
+written = []
+
+if parallel_runs > 1:
+    sources = [(run, "bestcorr%d.out" % run) for run in range(1, parallel_runs + 1)]
+else:
+    sources = [(None, "bestcorr.out")]
+
+collected = []
+for run, path in sources:
+    if not os.path.exists(path):
+        print("   %s not found - skipped" % path)
+        continue
+    clusters, objective = read_bestcorr(path)
+    if not clusters:
+        print("   %s holds no correlation rows - skipped" % path)
+        continue
+    if run is None:
+        plot_one(clusters, objective, "Correlation matching", "bestcorr_matching.png")
+    else:
+        plot_one(clusters, objective, "Correlation matching - run %d" % run,
+                 "run%d_correlation.png" % run)
+    collected.append((run, clusters, objective))
+
+if parallel_runs > 1 and collected:
+    reference = collected[0][1]
+    idx = list(range(1, len(reference) + 1))
+    fig, ax = plt.subplots(figsize=(8.2, 5.0))
+    ax.axhline(0.0, color="#4A5568", linewidth=1.0, zorder=2)
+    for position, (run, clusters, objective) in enumerate(collected):
+        if len(clusters) != len(reference):
+            continue
+        color = PALETTE[position % len(PALETTE)]
+        label = "Run %d" % run
+        if objective is not None:
+            label += "  (objective %.6f)" % objective
+        label += "  -  match %.2f %%" % match_stats(clusters)[4]
+        diff = [c["diff"] for c in clusters]
+        ax.plot(idx, diff, linewidth=1.8, color=color, zorder=3, label=label)
+        ax.plot(idx, diff, "o", markersize=5.5, color=color, markeredgecolor="white",
+                markeredgewidth=1.0, zorder=4)
+    ax.set_ylabel("SQS - target")
+    ax.set_xlabel("Cluster (points, diameter)")
+    positions, labels, separators = cluster_ticks(reference)
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels)
+    for boundary in separators:
+        ax.axvline(boundary, color="#DDE2EA", linewidth=0.9, zorder=0)
+    ax.set_title("Correlation mismatch - all %d runs" % parallel_runs, color=INK)
+    ax.legend(loc="best")
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    out_path = os.path.join(plot_dir, "all_runs_correlation.png")
+    fig.savefig(out_path)
+    plt.close(fig)
+    written.append(out_path)
+
+if written:
+    for out_path in written:
+        print("   ✅ %s" % out_path)
+else:
+    print("   ⚠️  no correlation data found - no plots written")
+CORREOF
+}'''.replace("__PARALLEL_RUNS__", str(parallel_runs))
+
     script_content = f'''#!/bin/bash
 
 # ATAT MCSQS Run with Integrated Progress Monitoring
@@ -5079,6 +5610,8 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 # --- Configuration ---
 LOG_FILE="{log_file}"
 PROGRESS_FILE="{progress_file}"
+PLOT_DIR="objective_plots"
+CORR_PLOT_DIR="correlation_plots"
 DEFAULT_MCSQS_ARGS="{mcsqs_base_cmd.split('mcsqs ')[1]}"
 {"TIME_LIMIT_MINUTES=" + str(time_limit_minutes) if time_limit_minutes else "TIME_LIMIT_MINUTES=0"}
 TIME_LIMIT_SECONDS=$((TIME_LIMIT_MINUTES * 60))
@@ -5120,6 +5653,8 @@ is_mcsqs_running() {{
    pgrep -f "mcsqs" > /dev/null
    return $?
 }}
+
+{plot_function}
 
 convert_bestsqs_to_poscar() {{
     local bestsqs_file="$1"
@@ -5315,7 +5850,10 @@ cleanup() {{
        echo "✅ Conversion complete!"
        echo "=========================================="
    fi
-   
+
+   generate_objective_plots
+   generate_correlation_plots
+
    exit 0
 }}
 
@@ -5435,6 +5973,9 @@ else
     fi
 fi
 
+generate_objective_plots
+generate_correlation_plots
+
 echo ""
 echo "================================================"
 echo "              Optimization Complete"
@@ -5451,6 +5992,175 @@ echo "================================================"
 '''
 
     return script_content
+
+
+def render_quick_monitor_script_panel(results):
+    """monitor.sh generator shown right under the "Generate ATAT Input Files" row.
+
+    Unlike the section further down the page, the script here is rebuilt on every
+    rerun, so changing any option immediately updates the download and the preview
+    without pressing the button again.
+    """
+    st.markdown("---")
+    col_title, col_hide = st.columns([4, 1])
+    with col_title:
+        st.subheader("🛠️ All-in-One Bash Script (monitor.sh)")
+        st.caption("Change any option below and the script is regenerated automatically.")
+    with col_hide:
+        if st.button("✖️ Hide script", type="secondary", key="quick_monitor_hide"):
+            st.session_state.pop("quick_monitor_panel", None)
+            st.rerun()
+
+    col_opt1, col_opt2, col_opt3 = st.columns(3)
+
+    with col_opt1:
+        st.write("**MCSQS Execution Mode:**")
+        use_atom_count = st.radio(
+            "Choose execution method:",
+            options=[False, True],
+            format_func=lambda x: "Use supercell (-rc)" if not x else f"Specify atoms (-n {results['total_atoms']})",
+            key="quick_monitor_execution_mode"
+        )
+
+    with col_opt2:
+        st.write("**Parallel Execution:**")
+        enable_parallel = st.checkbox(
+            "Enable parallel execution",
+            value=False,
+            help="Run multiple mcsqs instances simultaneously for faster convergence",
+            key="quick_monitor_enable_parallel"
+        )
+
+        if enable_parallel:
+            parallel_runs = st.number_input(
+                "Number of parallel runs:",
+                min_value=2,
+                max_value=100,
+                value=3,
+                step=1,
+                key="quick_monitor_parallel_count"
+            )
+        else:
+            parallel_runs = 1
+
+    with col_opt3:
+        st.write("**Time Limit:**")
+        enable_time_limit = st.checkbox(
+            "Set automatic time limit",
+            value=False,
+            help="Automatically stop mcsqs after specified time",
+            key="quick_monitor_enable_time_limit"
+        )
+
+        if enable_time_limit:
+            time_limit_minutes = st.number_input(
+                "Time limit (minutes):",
+                min_value=1,
+                max_value=10080,
+                value=30,
+                step=5,
+                key="quick_monitor_time_limit"
+            )
+        else:
+            time_limit_minutes = None
+
+    pair_cutoff = results.get('pair_cutoff', 1.1)
+    triplet_cutoff = results.get('triplet_cutoff', None)
+    quadruplet_cutoff = results.get('quadruplet_cutoff', None)
+
+    cutoff_text = f"Pair cutoff: {round(pair_cutoff, 3)}"
+    if triplet_cutoff:
+        cutoff_text += f" | Triplet cutoff: {triplet_cutoff}"
+    if quadruplet_cutoff:
+        cutoff_text += f" | Quadruplet cutoff: {quadruplet_cutoff}"
+
+    if enable_parallel:
+        cmd_preview = f"mcsqs {'-n ' + str(results['total_atoms']) if use_atom_count else '-rc'} # with {parallel_runs} parallel instances"
+        log_info = "Will monitor mcsqs1.log for parallel execution"
+    else:
+        cmd_preview = f"mcsqs {'-n ' + str(results['total_atoms']) if use_atom_count else '-rc'} # single run"
+        log_info = "Will monitor mcsqs.log for single execution"
+
+    st.write("**Command Preview:**")
+    st.code(cmd_preview, language="bash")
+    st.caption(f"{log_info} · {cutoff_text}")
+
+    try:
+        script_content = generate_atat_monitor_script(
+            results=results,
+            use_atom_count=use_atom_count,
+            parallel_runs=parallel_runs,
+            pair_cutoff=pair_cutoff,
+            triplet_cutoff=triplet_cutoff,
+            quadruplet_cutoff=quadruplet_cutoff,
+            max_param=results.get('max_param', 1.0),
+            time_limit_minutes=time_limit_minutes
+        )
+    except Exception as e:
+        st.error(f"Error generating script: {str(e)}")
+        return
+
+    col_download, col_info = st.columns([1, 1])
+
+    with col_download:
+        st.download_button(
+            label="📥 Download monitor.sh",
+            data=script_content,
+            file_name="monitor.sh",
+            mime="text/plain",
+            type="primary",
+            key="quick_download_monitor_script",
+        )
+
+        with st.expander("Script Preview", expanded=True):
+            st.code(script_content, language="bash")
+
+    with col_info:
+        # This panel only renders after the button was pressed, so open the
+        # instructions right away, like the script preview next to them.
+        with st.expander("📖 How to use monitor.sh", expanded=True):
+            st.markdown(f"""
+            ### Usage Instructions:
+
+            1. **Download the script** (or copy it to clipboard from the script preview)
+               and place it in your ATAT working directory
+
+            2. **Make it executable:**
+               ```bash
+               sudo chmod +x monitor.sh # or 'bash monitor.sh'
+               ```
+
+            3. **Run the script:**
+               ```bash
+               ./monitor.sh
+               ```
+
+            ### What the script does:
+            - 🔧 **Auto-creates** `rndstr.in` and `sqscell.out` 
+            - 🔧 **Runs corrdump** with your cluster settings
+            - 🚀 **Starts mcsqs** in single instance (or in parallel if enabled)
+            - 📊 **Monitors progress** every minute
+            - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
+            - 📁 **Converts bestsqs.out to POSCAR** automatically when stopped
+            - 📈 **Plots the objective function vs. time** into `objective_plots/` when it stops
+              (one plot per run plus a combined one when running in parallel)
+            - 📊 **Plots the correlation matching** of `bestcorr*.out` into `correlation_plots/`
+
+            ### Output files:
+            - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
+            - **{"mcsqs1.log" if enable_parallel else "mcsqs.log"}** - MCSQS log file
+            - **bestsqs.out** - Best SQS structure found
+            - **bestcorr.out** - Correlation functions
+            - **objective_plots/** - PNG plots of the objective function vs. time (full run + a zoom on the last 20 %)
+            - **correlation_plots/** - PNG plots of SQS vs. target correlations and their mismatch
+
+            ### Configuration:
+            - **Execution**: {cmd_preview}
+            - **Monitoring**: Every 1 minute
+            - **Stop the run**: Once user presses Ctrl+C
+
+             **The generated CSV file can be uploaded back to this tool for analysis!**
+            """)
 
 
 def render_monitor_script_section(results):
@@ -5584,7 +6294,8 @@ def render_monitor_script_section(results):
             st.markdown(f"""
             ### Usage Instructions:
 
-            1. **Download the script** and place it in your ATAT working directory
+            1. **Download the script** (or copy it to clipboard from the script preview)
+               and place it in your ATAT working directory
 
             2. **Make it executable:**
                ```bash
@@ -5603,12 +6314,17 @@ def render_monitor_script_section(results):
             - 📊 **Monitors progress** every minute
             - 📁 **Saves additional monitored data** to `mcsqs_progress.csv`
             - 📁 **Converts bestsqs.out to POSCAR** automatically when stopped
+            - 📈 **Plots the objective function vs. time** into `objective_plots/` when it stops
+              (one plot per run plus a combined one when running in parallel)
+            - 📊 **Plots the correlation matching** of `bestcorr*.out` into `correlation_plots/`
 
             ### Output files:
             - **mcsqs_progress.csv** - Time-based progress data (upload this to analyze!)
             - **{"mcsqs1.log" if enable_parallel else "mcsqs.log"}** - MCSQS log file
             - **bestsqs.out** - Best SQS structure found
             - **bestcorr.out** - Correlation functions
+            - **objective_plots/** - PNG plots of the objective function vs. time (full run + a zoom on the last 20 %)
+            - **correlation_plots/** - PNG plots of SQS vs. target correlations and their mismatch
 
             ### Configuration:
             - **Execution**: {cmd_preview}

@@ -70,9 +70,9 @@ def render_sqs_module():
         line-height: 1.2;
     ">
         <span style="color:#2563eb; font-weight:800;">Release:</span>
-        &nbsp;v0.8.0 &nbsp; | &nbsp;
+        &nbsp;v0.8.1 &nbsp; | &nbsp;
         <span style="color:#2563eb; font-weight:800;">Updated:</span>
-        &nbsp;August 18, 2026
+        &nbsp;August 19, 2026
     </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal; margin-bottom: 24px;'>
