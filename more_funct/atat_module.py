@@ -2099,7 +2099,7 @@ def render_atat_sqs_section():
             )
 
         with col_cut2:
-            include_triplets = st.checkbox("Include triplet clusters", value=False, key="atat_include_triplets")
+            include_triplets = st.checkbox("Include triplet clusters", value=True, key="atat_include_triplets")
             if include_triplets:
                 triplet_cutoff = st.number_input(
                     "Triplet cutoff:",
@@ -4921,6 +4921,31 @@ def render_extended_optimization_analysis_tab():
         render_correlation_analysis_tab()
 
 
+def rndstr_concentration_summary(rndstr_content):
+    """Overall composition of an ATAT ``rndstr.in``, as ``{element: at.%}``.
+
+    Every site line carries its own occupancies (``x y z Fe=0.75,Ni=0.25``), so
+    averaging them over all sites gives the concentration of the supercell the
+    run will produce - in sublattice mode as well as in global mode. Elements
+    come back richest first.
+    """
+    totals, n_sites = {}, 0
+    for line in rndstr_content.splitlines():
+        if "=" not in line:
+            continue
+        n_sites += 1
+        for part in line.split()[-1].split(","):
+            element, _, fraction = part.partition("=")
+            try:
+                totals[element] = totals.get(element, 0.0) + float(fraction)
+            except ValueError:
+                continue
+    if not n_sites:
+        return {}
+    percentages = {el: 100.0 * total / n_sites for el, total in totals.items()}
+    return dict(sorted(percentages.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
 def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1, pair_cutoff=1.1, triplet_cutoff=None,
                                  quadruplet_cutoff=None,max_param=1.0,time_limit_minutes=None):
     if use_atom_count:
@@ -5601,11 +5626,16 @@ else:
 CORREOF
 }'''.replace("__PARALLEL_RUNS__", str(parallel_runs))
 
+    concentration_summary = rndstr_concentration_summary(results['rndstr_content'])
+    concentration_line = ", ".join(f"{element} {value:.2f}"
+                                   for element, value in concentration_summary.items()) or "n/a"
+
     script_content = f'''#!/bin/bash
 
 # ATAT MCSQS Run with Integrated Progress Monitoring
 # Auto-generated script with embedded file creation
 # Generated configuration: {results['structure_name']}, {results['supercell_size']}, {results['total_atoms']} atoms
+# Final concentration (at.%): {concentration_line}
 
 # --- Configuration ---
 LOG_FILE="{log_file}"
@@ -6026,7 +6056,7 @@ def render_quick_monitor_script_panel(results):
         st.write("**Parallel Execution:**")
         enable_parallel = st.checkbox(
             "Enable parallel execution",
-            value=False,
+            value=True,
             help="Run multiple mcsqs instances simultaneously for faster convergence",
             key="quick_monitor_enable_parallel"
         )
@@ -6191,7 +6221,7 @@ def render_monitor_script_section(results):
         st.write("**Parallel Execution:**")
         enable_parallel = st.checkbox(
             "Enable parallel execution",
-            value=False,
+            value=True,
             help="Run multiple mcsqs instances simultaneously for faster convergence",
             key="monitor_enable_parallel"
         )

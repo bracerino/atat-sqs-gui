@@ -72,7 +72,6 @@ Python 3.12.3
 - plotly==6.1.2  
 - matplotlib==3.10.3  
 - mp-api==0.45.3  
-- aflow==0.0.11  
 - py3Dmol==2.4.2  
 
 
