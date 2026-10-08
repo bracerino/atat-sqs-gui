@@ -1,7 +1,7 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="SimplySQS: Create Input Files for Generation of SQS using ATAT mcsqs and Analyse Its Outputs",
+    page_title="SimplySQS – SQS Generator & Analyzer for ATAT mcsqs",
     page_icon="🎲",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -319,13 +319,73 @@ st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsa
 #    mem_info = process.memory_info()
 #    return mem_info.rss / (1024 ** 2)  # in MB
 
-st.iframe(
-    """
-    <head>
-        <meta name="description" content="ATAT SQS GUI: Create Input Files for Generation of SQS using ATAT mcsqs and Analyse Its Outputs">
-    </head>
+# SEO metadata: injected into the main document <head> (an st.iframe would only put it
+# into a child document, which search engines ignore). Streamlit Community Cloud prerenders
+# the page for crawlers, so tags added by this script end up in the indexed HTML.
+import json
+
+SEO_DESCRIPTION = (
+    "SimplySQS: free online GUI for generating special quasirandom structures (SQS) with "
+    "ATAT mcsqs. Create rndstr.in and sqscell.out, bash scripts for mcsqs runs and "
+    "concentration sweeps, convert bestsqs.out to VASP POSCAR, CIF, LAMMPS and XYZ, and "
+    "analyse convergence and PRDF."
+)
+SEO_KEYWORDS = (
+    "SQS, special quasirandom structures, ATAT, mcsqs, Alloy Theoretic Automated Toolkit, "
+    "rndstr.in, sqscell.out, bestsqs.out, high-entropy alloys, HEA, disordered alloys, "
+    "random alloy, supercell, VASP, POSCAR, LAMMPS, DFT, pymatgen, SimplySQS"
+)
+SEO_URL = "https://atat-sqs.streamlit.app/"
+SEO_JSON_LD = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "SimplySQS",
+    "alternateName": "ATAT SQS GUI",
+    "url": SEO_URL,
+    "description": SEO_DESCRIPTION,
+    "applicationCategory": "ScientificApplication",
+    "operatingSystem": "Web browser, Linux",
+    "isAccessibleForFree": True,
+    "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+    "license": "https://opensource.org/licenses/MIT",
+    "codeRepository": "https://github.com/bracerino/atat-sqs-gui",
+    "keywords": SEO_KEYWORDS,
+    "author": [
+        {"@type": "Person", "name": n}
+        for n in ["Miroslav Lebeda", "Jan Drahokoupil", "Petr Vlčák", "Šimon Svoboda", "Axel van de Walle"]
+    ],
+    "citation": {
+        "@type": "ScholarlyArticle",
+        "name": "SimplySQS: An automated and reproducible workflow for special quasirandom "
+                "structure generation with ATAT",
+        "sameAs": "https://doi.org/10.1016/j.jocs.2026.102846",
+    },
+}
+
+st.html(
+    f"""
+    <script>
+    (function () {{
+        let head = document.head;
+        try {{ head = window.parent.document.head || head; }} catch (e) {{}}  // cross-origin parent
+        function upsert(selector, tag, attrs) {{
+            let el = head.querySelector(selector);
+            if (!el) {{ el = document.createElement(tag); head.appendChild(el); }}
+            for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+            return el;
+        }}
+        const desc = {json.dumps(SEO_DESCRIPTION)};
+        upsert('meta[name="description"]', 'meta', {{name: 'description', content: desc}});
+        upsert('meta[name="keywords"]', 'meta', {{name: 'keywords', content: {json.dumps(SEO_KEYWORDS)}}});
+        upsert('meta[name="robots"]', 'meta', {{name: 'robots', content: 'index, follow'}});
+        upsert('link[rel="canonical"]', 'link', {{rel: 'canonical', href: {json.dumps(SEO_URL)}}});
+        upsert('meta[property="og:description"]', 'meta', {{property: 'og:description', content: desc}});
+        const ld = upsert('script#simplysqs-jsonld', 'script', {{id: 'simplysqs-jsonld', type: 'application/ld+json'}});
+        ld.textContent = {json.dumps(json.dumps(SEO_JSON_LD, ensure_ascii=False))};
+    }})();
+    </script>
     """,
-    height='content',
+    unsafe_allow_javascript=True,
 )
 
 #memory_usage = get_memory_usage()
