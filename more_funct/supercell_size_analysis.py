@@ -471,7 +471,7 @@ def render_supercell_size_analysis(working_structure, target_concentrations, tra
     can_run = len(size_range) > 0
 
     run_button = st.button(
-        "🚀 Run Supercell Size Analysis",
+        "Run Supercell Size Analysis",
         type="primary",
         width='stretch',
         disabled=not can_run

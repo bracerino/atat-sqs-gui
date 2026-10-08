@@ -160,7 +160,7 @@ def render_example_alloy_button():
     st.button(
         f"🎲 Load example alloy — {kind.upper()} · {formula} (3×3×3)",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key="load_example_alloy_btn",
         on_click=load_example_alloy,
     )

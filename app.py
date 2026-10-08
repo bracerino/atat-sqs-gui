@@ -101,6 +101,54 @@ st.markdown(
             align-items: center !important;
             justify-content: center !important;
         }
+        /* SimplySQS tab style. Defined here, at the very top of the page, so the
+           tabs are styled from their first paint (when it was injected next to the
+           tabs, they flashed in the default style first). The role selectors match
+           both the old BaseWeb tabs and the tabs of Streamlit >= 1.62. */
+        .stTabs [role="tab"] [data-testid="stMarkdownContainer"] p {
+            font-size: 1.15rem !important;
+            color: #1e3a8a !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+        }
+        .stTabs [role="tablist"] {
+            gap: 20px !important;
+        }
+        .stTabs [role="tab"] {
+            background-color: #f0f4ff !important;
+            border-radius: 12px !important;
+            padding: 8px 16px !important;
+            transition: all 0.3s ease !important;
+            border: none !important;
+            color: #1e3a8a !important;
+        }
+        .stTabs [role="tab"]:hover {
+            background-color: #dbe5ff !important;
+            cursor: pointer;
+        }
+        .stTabs [role="tab"][aria-selected="true"] {
+            background-color: #e0e7ff !important;
+            color: #1e3a8a !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+            border-bottom: 4px solid #1e3a8a !important;
+            border-radius: 12px 12px 0 0 !important;
+        }
+        .stTabs [role="tab"]:focus {
+            outline: none !important;
+        }
+
+        /* "Save current settings" is a download button once a structure is loaded;
+           give it the same blue as the primary st.button style in st_trans.py
+           (which only matches div.stButton), so it does not flip to the red theme color. */
+        [data-testid="stSidebar"] div.stDownloadButton button[kind="primary"] {
+            background-color: #0099ff; color: white; font-size: 16px; font-weight: bold;
+            padding: 0.5em 1em; border: none; border-radius: 5px; height: 3em; width: 100%;
+        }
+        [data-testid="stSidebar"] div.stDownloadButton button[kind="primary"]:active,
+        [data-testid="stSidebar"] div.stDownloadButton button[kind="primary"]:focus {
+            background-color: #007acc !important; color: white !important; box-shadow: none !important;
+        }
     </style>
     """,
     unsafe_allow_html=True
@@ -113,11 +161,17 @@ st.sidebar.markdown('<div class="sidebar-caption">SQS ATAT</div>', unsafe_allow_
 
 st.sidebar.subheader("📁 Upload Your Structure Files")
 uploaded_files_user_sidebar = st.sidebar.file_uploader(
-    "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ):",
+    "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ) or a saved SimplySQS settings file (.json):",
     type=None,
     accept_multiple_files=True,
     key="sidebar_uploader"
 )
+
+# A saved settings file can be dropped into the same uploader: it is recognised by
+# its content, applied once, and kept out of the structure files below.
+from more_funct.session_settings import split_settings_files, render_settings_save_load
+uploaded_files_user_sidebar = split_settings_files(uploaded_files_user_sidebar)
+render_settings_save_load()
 
 
 current_file_names = [file.name for file in uploaded_files_user_sidebar] if uploaded_files_user_sidebar else []
