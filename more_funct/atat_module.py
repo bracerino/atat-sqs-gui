@@ -2165,7 +2165,7 @@ def render_atat_sqs_section():
                             target_concentrations, supercell_multiplicity)
 
                     use_concentrations = achievable_concentrations_for_atat
-                    print(f'Successfully generated ATAT mcsqs input files for: {use_concentrations}')
+                    print(f'Successfully generated ATAT mcsqs input files for: {use_concentrations}', flush=True)
                     use_sublattice_mode_final = False
                     use_chem_symbols = None
                 else:
@@ -2179,7 +2179,8 @@ def render_atat_sqs_section():
                               f"Site {site}: " +
                               ", ".join(f"{elem}-{float(val):g}" for elem, val in species.items())
                               for site, species in use_concentrations.items()
-                          )
+                          ),
+                          flush=True,
                           )
                     use_sublattice_mode_final = True
                     use_chem_symbols = chem_symbols
