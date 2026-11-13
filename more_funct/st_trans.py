@@ -67,16 +67,9 @@ def render_sqs_module():
         line-height: 1.2;
     ">
         <span style="color:#2563eb; font-weight:800;">Release:</span>
-        &nbsp;v0.9.0 &nbsp; | &nbsp;
+        &nbsp;v0.9.1 &nbsp; | &nbsp;
         <span style="color:#2563eb; font-weight:800;">Updated:</span>
-        &nbsp;October 8, 2026 &nbsp; | &nbsp;
-        <span style="
-            background-color: #dcfce7;
-            color: #166534;
-            border-radius: 999px;
-            padding: 2px 10px;
-            font-weight: 600;
-        ">✨ New: save &amp; load all settings (💾 sidebar)</span>
+        &nbsp;November 13, 2026
     </span>
     </h1>
     <h3 style='text-align: left; color: #444444; font-weight: normal; margin-bottom: 24px;'>

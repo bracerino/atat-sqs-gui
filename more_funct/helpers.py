@@ -742,176 +742,471 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from ase.io import write
 
 
-def structure_preview(working_structure):
+JMOL_COLORS = {
+    "H": "#FFFFFF",
+    "He": "#D9FFFF",
+    "Li": "#CC80FF",
+    "Be": "#C2FF00",
+    "B": "#FFB5B5",
+    "C": "#909090",
+    "N": "#3050F8",
+    "O": "#FF0D0D",
+    "F": "#90E050",
+    "Ne": "#B3E3F5",
+    "Na": "#AB5CF2",
+    "Mg": "#8AFF00",
+    "Al": "#BFA6A6",
+    "Si": "#F0C8A0",
+    "P": "#FF8000",
+    "S": "#FFFF30",
+    "Cl": "#1FF01F",
+    "Ar": "#80D1E3",
+    "K": "#8F40D4",
+    "Ca": "#3DFF00",
+    "Sc": "#E6E6E6",
+    "Ti": "#BFC2C7",
+    "V": "#A6A6AB",
+    "Cr": "#8A99C7",
+    "Mn": "#9C7AC7",
+    "Fe": "#E06633",
+    "Co": "#F090A0",
+    "Ni": "#50D050",
+    "Cu": "#C88033",
+    "Zn": "#7D80B0",
+    "Ga": "#C28F8F",
+    "Ge": "#668F8F",
+    "As": "#BD80E3",
+    "Se": "#FFA100",
+    "Br": "#A62929",
+    "Kr": "#5CB8D1",
+    "Rb": "#702EB0",
+    "Sr": "#00FF00",
+    "Y": "#94FFFF",
+    "Zr": "#94E0E0",
+    "Nb": "#73C2C9",
+    "Mo": "#54B5B5",
+    "Tc": "#3B9E9E",
+    "Ru": "#248F8F",
+    "Rh": "#0A7D8C",
+    "Pd": "#006985",
+    "Ag": "#C0C0C0",
+    "Cd": "#FFD98F",
+    "In": "#A67573",
+    "Sn": "#668080",
+    "Sb": "#9E63B5",
+    "Te": "#D47A00",
+    "I": "#940094",
+    "Xe": "#429EB0",
+    "Cs": "#57178F",
+    "Ba": "#00C900",
+    "La": "#70D4FF",
+    "Ce": "#FFFFC7",
+    "Pr": "#D9FFC7",
+    "Nd": "#C7FFC7",
+    "Pm": "#A3FFC7",
+    "Sm": "#8FFFC7",
+    "Eu": "#61FFC7",
+    "Gd": "#45FFC7",
+    "Tb": "#30FFC7",
+    "Dy": "#1FFFC7",
+    "Ho": "#00FF9C",
+    "Er": "#00E675",
+    "Tm": "#00D452",
+    "Yb": "#00BF38",
+    "Lu": "#00AB24",
+    "Hf": "#4DC2FF",
+    "Ta": "#4DA6FF",
+    "W": "#2194D6",
+    "Re": "#267DAB",
+    "Os": "#266696",
+    "Ir": "#175487",
+    "Pt": "#D0D0E0",
+    "Au": "#FFD123",
+    "Hg": "#B8B8D0",
+    "Tl": "#A6544D",
+    "Pb": "#575961",
+    "Bi": "#9E4FB5",
+    "Po": "#AB5C00",
+    "At": "#754F45",
+    "Rn": "#428296",
+    "Fr": "#420066",
+    "Ra": "#007D00",
+    "Ac": "#70ABFA",
+    "Th": "#00BAFF",
+    "Pa": "#00A1FF",
+    "U": "#008FFF",
+    "Np": "#0080FF",
+    "Pu": "#006BFF",
+    "Am": "#545CF2",
+    "Cm": "#785CE3",
+    "Bk": "#8A4FE3",
+    "Cf": "#A136D4",
+    "Es": "#B31FD4",
+    "Fm": "#B31FBA",
+    "Md": "#B30DA6",
+    "No": "#BD0D87",
+    "Lr": "#C70066",
+    "Rf": "#CC0059",
+    "Db": "#D1004F",
+    "Sg": "#D90045",
+    "Bh": "#E00038",
+    "Hs": "#E6002E",
+    "Mt": "#EB0026"
+}
+
+
+LATTICE_PARAMS = ("a", "b", "c", "alpha", "beta", "gamma")
+LATTICE_LABELS = {"a": "a (Å)", "b": "b (Å)", "c": "c (Å)",
+                  "alpha": "α (°)", "beta": "β (°)", "gamma": "γ (°)"}
+
+# Independent parameters of the spglib standard conventional cell for each crystal
+# system, and how the remaining ones follow from them (monoclinic: unique axis b;
+# trigonal: hexagonal axes, also for rhombohedral lattices).
+_FREE_PARAMS = {
+    "cubic": ("a",),
+    "tetragonal": ("a", "c"),
+    "trigonal": ("a", "c"),
+    "hexagonal": ("a", "c"),
+    "orthorhombic": ("a", "b", "c"),
+    "monoclinic": ("a", "b", "c", "beta"),
+    "triclinic": LATTICE_PARAMS,
+}
+_CONSTRAINT_TEXT = {
+    "cubic": "b = c = a, α = β = γ = 90°",
+    "tetragonal": "b = a, α = β = γ = 90°",
+    "trigonal": "b = a, α = β = 90°, γ = 120° (hexagonal axes)",
+    "hexagonal": "b = a, α = β = 90°, γ = 120°",
+    "orthorhombic": "α = β = γ = 90°",
+    "monoclinic": "α = γ = 90° (unique axis b)",
+    "triclinic": "no constraints",
+}
+
+
+def _crystal_system(sg_number):
+    for limit, name in ((2, "triclinic"), (15, "monoclinic"), (74, "orthorhombic"),
+                        (142, "tetragonal"), (167, "trigonal"), (194, "hexagonal")):
+        if sg_number <= limit:
+            return name
+    return "cubic"
+
+
+def _constrained_parameters(crystal_system, free):
+    """Full (a, b, c, alpha, beta, gamma) from the free parameters of a crystal system."""
+    a = free["a"]
+    b = free.get("b", a)
+    c = free.get("c", a)
+    alpha, beta, gamma = 90.0, 90.0, 90.0
+    if crystal_system in ("trigonal", "hexagonal"):
+        gamma = 120.0
+    elif crystal_system == "monoclinic":
+        beta = free["beta"]
+    elif crystal_system == "triclinic":
+        alpha, beta, gamma = free["alpha"], free["beta"], free["gamma"]
+    return a, b, c, alpha, beta, gamma
+
+
+def get_lattice_symmetry_info(structure, symprec=0.01):
+    """Space group and conventional cell of a structure, expressed in its own frame.
+
+    Returns None when the symmetry cannot be determined. ``P`` is spglib's
+    transformation matrix: conventional rows = inv(P).T @ input rows.
+    """
+    try:
+        species = [site.species_string for site in structure]
+        numbers = [sorted(set(species)).index(s) for s in species]
+        ds = spglib.get_symmetry_dataset(
+            (structure.lattice.matrix, structure.frac_coords, numbers), symprec=symprec)
+        if ds is None:
+            return None
+        get = (lambda k: getattr(ds, k)) if hasattr(ds, "number") else (lambda k: ds[k])
+        P = np.array(get("transformation_matrix"), dtype=float)
+        conv_rows = np.linalg.inv(P).T @ structure.lattice.matrix
+        from pymatgen.core import Lattice
+        sg_number = int(get("number"))
+        return {
+            "sg_number": sg_number,
+            "sg_symbol": get("international"),
+            "crystal_system": _crystal_system(sg_number),
+            "P": P,
+            "conv_rows": conv_rows,
+            "conv_params": Lattice(conv_rows).parameters,
+            "is_conventional": np.allclose(P, np.eye(3), atol=1e-6),
+        }
+    except Exception:
+        return None
+
+
+def _symmetric_lattice_matrix(info, new_params):
+    """Input-cell lattice matrix after setting the conventional cell to ``new_params``.
+
+    The new conventional cell keeps the orientation of the old one, and the uploaded
+    cell keeps its relation to the conventional cell (so the space group is kept).
+    """
+    from pymatgen.core import Lattice
+    old_std = Lattice.from_parameters(*info["conv_params"]).matrix
+    new_std = Lattice.from_parameters(*new_params).matrix
+    rotation = np.linalg.inv(old_std) @ info["conv_rows"]
+    return info["P"].T @ (new_std @ rotation)
+
+
+def _apply_lattice_edit(structure_name, form_key, info):
+    """Replace the lattice of a loaded structure, keeping the fractional coordinates.
+
+    With ``info`` (symmetry-preserving mode) only the free parameters of the
+    conventional cell are read from the form; otherwise all six of the uploaded cell.
+    """
+    from pymatgen.core import Lattice, Structure
+
+    ss = st.session_state
+    structure = ss.full_structures[structure_name]
+    try:
+        if info is not None:
+            free = {p: ss[f"{form_key}_{p}"] for p in _FREE_PARAMS[info["crystal_system"]]}
+            params = _constrained_parameters(info["crystal_system"], free)
+            Lattice.from_parameters(*params)  # validates the angles
+            new_lattice = Lattice(_symmetric_lattice_matrix(info, params))
+        else:
+            new_lattice = Lattice.from_parameters(*[ss[f"{form_key}_{p}"] for p in LATTICE_PARAMS])
+        # Some angle combinations do not form a real cell (NaN / zero volume).
+        if not np.isfinite(new_lattice.matrix).all() or new_lattice.volume <= 1e-6:
+            raise ValueError("the angles do not form a valid unit cell")
+    except Exception as e:
+        ss["lattice_edit_message"] = ("error", f"Invalid lattice parameters: {e}")
+        return
+    ss.setdefault("original_lattices", {}).setdefault(structure_name, structure.lattice)
+    new_structure = Structure(
+        new_lattice, structure.species_and_occu, structure.frac_coords,
+        coords_are_cartesian=False, site_properties=structure.site_properties,
+    )
+    ss.full_structures[structure_name] = new_structure
+
+    old_sg = info["sg_number"] if info else None
+    new_info = get_lattice_symmetry_info(new_structure)
+    if old_sg is None:
+        old_info = get_lattice_symmetry_info(structure)
+        old_sg = old_info["sg_number"] if old_info else None
+    if new_info and old_sg is not None and new_info["sg_number"] != old_sg:
+        ss["lattice_edit_message"] = (
+            "warning",
+            f"Lattice parameters updated. The space group changed from #{old_sg} to "
+            f"{new_info['sg_symbol']} (#{new_info['sg_number']}).")
+    else:
+        ss["lattice_edit_message"] = ("success", "Lattice parameters updated, symmetry kept.")
+
+
+def _reset_lattice_edit(structure_name):
+    from pymatgen.core import Structure
+
+    ss = st.session_state
+    original = ss.get("original_lattices", {}).pop(structure_name, None)
+    if original is None:
+        return
+    structure = ss.full_structures[structure_name]
+    ss.full_structures[structure_name] = Structure(
+        original, structure.species_and_occu, structure.frac_coords,
+        coords_are_cartesian=False, site_properties=structure.site_properties,
+    )
+    ss["lattice_edit_message"] = ("success", "Original lattice parameters restored.")
+
+
+@st.fragment
+def render_lattice_parameters(working_structure, structure_name=None):
+    """Show the lattice parameters; editable when the structure's name in full_structures is given.
+
+    By default only the parameters allowed by the crystal system can be changed, so the
+    space group of the uploaded structure is kept. A checkbox unlocks all six.
+    """
+    lattice = working_structure.lattice
+    if structure_name is None or structure_name not in st.session_state.get("full_structures", {}):
+        st.markdown(
+            f"**Lattice parameters:** a = {lattice.a:.4f}, b = {lattice.b:.4f}, c = {lattice.c:.4f} Å, "
+            f"α = {lattice.alpha:.2f}, β = {lattice.beta:.2f}, γ = {lattice.gamma:.2f}°"
+        )
+        return
+
+    safe_name = re.sub(r"\W", "_", structure_name)
+    info = get_lattice_symmetry_info(working_structure)
+    head_col, unlock_col = st.columns([1, 1], vertical_alignment="center")
+    head_col.markdown("**Lattice parameters**")
+    allow_free = unlock_col.checkbox(
+        "🔓 Unlock all (may break symmetry)",
+        value=info is None, disabled=info is None, key=f"lattice_free_edit_{safe_name}",
+    )
+    if allow_free:
+        info = None
+
+    notes = []
+    if info is not None:
+        editable = _FREE_PARAMS[info["crystal_system"]]
+        values = dict(zip(LATTICE_PARAMS, info["conv_params"]))
+        notes.append(f"{info['sg_symbol']} (#{info['sg_number']}), {info['crystal_system']}: "
+                     f"{_CONSTRAINT_TEXT[info['crystal_system']]}.")
+        if not info["is_conventional"]:
+            notes.append(
+                f"Conventional cell shown; uploaded cell (a = {lattice.a:.4f}, b = {lattice.b:.4f}, "
+                f"c = {lattice.c:.4f} Å, α = {lattice.alpha:.2f}, β = {lattice.beta:.2f}, "
+                f"γ = {lattice.gamma:.2f}°) is scaled accordingly.")
+    else:
+        editable = LATTICE_PARAMS
+        values = dict(zip(LATTICE_PARAMS, lattice.parameters))
+    if notes:
+        st.caption(" ".join(notes))
+
+    # The key includes the current lattice and the mode, so the inputs are refilled
+    # after every change (and when another structure is selected).
+    form_key = (f"lattice_edit_{safe_name}_{'free' if info is None else 'sym'}_"
+                + "_".join(f"{x:.6f}" for x in lattice.parameters).replace(".", "p"))
+    # Rows of up to three inputs; the Apply button (shown only once a value was
+    # changed) sits at the end of the last row.
+    rows = [editable[i:i + 3] for i in range(0, len(editable), 3)]
+    changed = False
+    for r, row in enumerate(rows):
+        cols = st.columns(4, vertical_alignment="bottom")
+        for col, param in zip(cols, row):
+            is_angle = param in ("alpha", "beta", "gamma")
+            new_value = col.number_input(
+                LATTICE_LABELS[param], value=float(values[param]),
+                min_value=1.0 if is_angle else 0.1, max_value=179.0 if is_angle else None,
+                step=1.0 if is_angle else 0.01, format="%.4f",
+                key=f"{form_key}_{param}",
+            )
+            changed |= abs(new_value - float(values[param])) > 1e-9
+        if r == len(rows) - 1 and changed:
+            with cols[3]:
+                if st.button("✅ Apply", type="tertiary", width="stretch", key=f"{form_key}_apply"):
+                    _apply_lattice_edit(structure_name, form_key, info)
+                    st.rerun()  # full app rerun, so everything uses the new lattice
+    if structure_name in st.session_state.get("original_lattices", {}):
+        orig = st.session_state["original_lattices"][structure_name]
+        note_col, reset_col = st.columns([3, 1], vertical_alignment="center")
+        note_col.caption(
+            f"Modified. Original: a = {orig.a:.4f}, b = {orig.b:.4f}, c = {orig.c:.4f} Å, "
+            f"α = {orig.alpha:.2f}, β = {orig.beta:.2f}, γ = {orig.gamma:.2f}°"
+        )
+        if reset_col.button("↩️ Restore", width="stretch", key=f"lattice_reset_{safe_name}"):
+            _reset_lattice_edit(structure_name)
+            st.rerun()
+    message = st.session_state.pop("lattice_edit_message", None)
+    if message:
+        getattr(st, message[0])(message[1])
+
+
+def _rotation_to_view_along(direction):
+    """Rotation matrix (acting on row vectors) that turns ``direction`` towards the viewer (+z)."""
+    d = np.asarray(direction, dtype=float)
+    d = d / np.linalg.norm(d)
+    z = np.array([0.0, 0.0, 1.0])
+    v = np.cross(d, z)
+    s, c = np.linalg.norm(v), float(np.dot(d, z))
+    if s < 1e-9:
+        R = np.eye(3) if c > 0 else np.diag([1.0, -1.0, -1.0])
+    else:
+        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+        R = np.eye(3) + vx + vx @ vx * ((1 - c) / s ** 2)
+    return R.T  # row vectors: x_rot = x @ R.T
+
+
+def _add_cell_and_axes(view, cell, show_cell=True, show_axes=True):
+    """Unit-cell box and labelled lattice vectors a (red), b (green), c (blue) from the origin."""
+    if show_cell:
+        corners = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+                            [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]]) @ cell
+        for i, j in [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4],
+                     [0, 4], [1, 5], [2, 6], [3, 7]]:
+            view.addCylinder({
+                'start': dict(zip("xyz", map(float, corners[i]))),
+                'end': dict(zip("xyz", map(float, corners[j]))),
+                'radius': 0.04, 'color': '#444444', 'fromCap': 1, 'toCap': 1,
+            })
+    if show_axes:
+        for vec, name, color in zip(cell, ("a", "b", "c"), ("#d62728", "#2ca02c", "#1f77b4")):
+            length = float(np.linalg.norm(vec))
+            view.addArrow({
+                'start': {'x': 0, 'y': 0, 'z': 0},
+                'end': dict(zip("xyz", map(float, vec))),
+                'radius': 0.08, 'radiusRatio': 2.2, 'mid': 0.85, 'color': color,
+            })
+            view.addLabel(f"{name} = {length:.3f} Å", {
+                'position': dict(zip("xyz", map(float, vec * 1.08))),
+                'backgroundColor': color, 'backgroundOpacity': 0.85,
+                'fontColor': 'white', 'fontSize': 12, 'inFront': True,
+            })
+
+
+def _with_boundary_images(frac, symbols, tol=1e-3):
+    """Add periodic images of atoms that lie on cell faces, edges and corners."""
+    frac = np.mod(np.asarray(frac, dtype=float), 1.0)
+    frac[np.isclose(frac, 1.0, atol=tol)] = 0.0
+    out_frac, out_sym = [], []
+    for f, sym in zip(frac, symbols):
+        shifts = [[0.0] + ([1.0] if abs(x) < tol else []) for x in f]
+        for dx in shifts[0]:
+            for dy in shifts[1]:
+                for dz in shifts[2]:
+                    out_frac.append(f + [dx, dy, dz])
+                    out_sym.append(sym)
+    return np.array(out_frac), out_sym
+
+
+def structure_preview(working_structure, structure_name=None):
     #st.subheader("Structure Preview")
 
-    lattice = working_structure.lattice
-    st.write(f"**Lattice parameters:**")
-    st.write(f"a = {lattice.a:.4f} Å, b = {lattice.b:.4f} Å, c = {lattice.c:.4f} Å")
-    st.write(f"α = {lattice.alpha:.2f}°, β = {lattice.beta:.2f}°, γ = {lattice.gamma:.2f}°")
-
-    st.write("**Structure visualization:**")
+    render_lattice_parameters(working_structure, structure_name)
 
     try:
-        from io import StringIO
-
-        jmol_colors = {
-            "H": "#FFFFFF",
-            "He": "#D9FFFF",
-            "Li": "#CC80FF",
-            "Be": "#C2FF00",
-            "B": "#FFB5B5",
-            "C": "#909090",
-            "N": "#3050F8",
-            "O": "#FF0D0D",
-            "F": "#90E050",
-            "Ne": "#B3E3F5",
-            "Na": "#AB5CF2",
-            "Mg": "#8AFF00",
-            "Al": "#BFA6A6",
-            "Si": "#F0C8A0",
-            "P": "#FF8000",
-            "S": "#FFFF30",
-            "Cl": "#1FF01F",
-            "Ar": "#80D1E3",
-            "K": "#8F40D4",
-            "Ca": "#3DFF00",
-            "Sc": "#E6E6E6",
-            "Ti": "#BFC2C7",
-            "V": "#A6A6AB",
-            "Cr": "#8A99C7",
-            "Mn": "#9C7AC7",
-            "Fe": "#E06633",
-            "Co": "#F090A0",
-            "Ni": "#50D050",
-            "Cu": "#C88033",
-            "Zn": "#7D80B0",
-            "Ga": "#C28F8F",
-            "Ge": "#668F8F",
-            "As": "#BD80E3",
-            "Se": "#FFA100",
-            "Br": "#A62929",
-            "Kr": "#5CB8D1",
-            "Rb": "#702EB0",
-            "Sr": "#00FF00",
-            "Y": "#94FFFF",
-            "Zr": "#94E0E0",
-            "Nb": "#73C2C9",
-            "Mo": "#54B5B5",
-            "Tc": "#3B9E9E",
-            "Ru": "#248F8F",
-            "Rh": "#0A7D8C",
-            "Pd": "#006985",
-            "Ag": "#C0C0C0",
-            "Cd": "#FFD98F",
-            "In": "#A67573",
-            "Sn": "#668080",
-            "Sb": "#9E63B5",
-            "Te": "#D47A00",
-            "I": "#940094",
-            "Xe": "#429EB0",
-            "Cs": "#57178F",
-            "Ba": "#00C900",
-            "La": "#70D4FF",
-            "Ce": "#FFFFC7",
-            "Pr": "#D9FFC7",
-            "Nd": "#C7FFC7",
-            "Pm": "#A3FFC7",
-            "Sm": "#8FFFC7",
-            "Eu": "#61FFC7",
-            "Gd": "#45FFC7",
-            "Tb": "#30FFC7",
-            "Dy": "#1FFFC7",
-            "Ho": "#00FF9C",
-            "Er": "#00E675",
-            "Tm": "#00D452",
-            "Yb": "#00BF38",
-            "Lu": "#00AB24",
-            "Hf": "#4DC2FF",
-            "Ta": "#4DA6FF",
-            "W": "#2194D6",
-            "Re": "#267DAB",
-            "Os": "#266696",
-            "Ir": "#175487",
-            "Pt": "#D0D0E0",
-            "Au": "#FFD123",
-            "Hg": "#B8B8D0",
-            "Tl": "#A6544D",
-            "Pb": "#575961",
-            "Bi": "#9E4FB5",
-            "Po": "#AB5C00",
-            "At": "#754F45",
-            "Rn": "#428296",
-            "Fr": "#420066",
-            "Ra": "#007D00",
-            "Ac": "#70ABFA",
-            "Th": "#00BAFF",
-            "Pa": "#00A1FF",
-            "U": "#008FFF",
-            "Np": "#0080FF",
-            "Pu": "#006BFF",
-            "Am": "#545CF2",
-            "Cm": "#785CE3",
-            "Bk": "#8A4FE3",
-            "Cf": "#A136D4",
-            "Es": "#B31FD4",
-            "Fm": "#B31FBA",
-            "Md": "#B30DA6",
-            "No": "#BD0D87",
-            "Lr": "#C70066",
-            "Rf": "#CC0059",
-            "Db": "#D1004F",
-            "Sg": "#D90045",
-            "Bh": "#E00038",
-            "Hs": "#E6002E",
-            "Mt": "#EB0026"
-        }
-
-        def add_box(view, cell, color='black', linewidth=2):
-            vertices = np.array([
-                [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
-                [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]
-            ])
-            edges = [
-                [0, 1], [1, 2], [2, 3], [3, 0],
-                [4, 5], [5, 6], [6, 7], [7, 4],
-                [0, 4], [1, 5], [2, 6], [3, 7]
-            ]
-            cart_vertices = np.dot(vertices, cell)
-            for edge in edges:
-                start, end = cart_vertices[edge[0]], cart_vertices[edge[1]]
-                view.addCylinder({
-                    'start': {'x': start[0], 'y': start[1], 'z': start[2]},
-                    'end': {'x': end[0], 'y': end[1], 'z': end[2]},
-                    'radius': 0.05,
-                    'color': color
-                })
+        opt1, opt2, opt3 = st.columns([1.3, 1.3, 0.6], vertical_alignment="bottom")
+        view_along = opt1.selectbox(
+            "View along", ["Free rotation", "a", "b", "c", "a*", "b*", "c*"],
+            key="preview_view_along",
+        )
+        atom_scale = opt2.slider("Atom size", 0.1, 1.0, 0.4, 0.05, key="preview_atom_size")
+        with opt3.popover("⚙️", width="stretch"):
+            show_axes = st.checkbox("Lattice vectors", value=True, key="preview_show_axes")
+            show_cell = st.checkbox("Unit cell", value=True, key="preview_show_cell")
+            show_images = st.checkbox("Boundary atoms", value=True, key="preview_show_images")
 
         structure_ase = AseAtomsAdaptor.get_atoms(working_structure)
-        xyz_io = StringIO()
-        write(xyz_io, structure_ase, format="xyz")
-        xyz_str = xyz_io.getvalue()
+        cell = np.array(structure_ase.get_cell())
+        symbols = structure_ase.get_chemical_symbols()
+        frac = structure_ase.get_scaled_positions(wrap=True)
+        if show_images:
+            frac, symbols = _with_boundary_images(frac, symbols)
 
-        view = py3Dmol.view(width=400, height=400)
+        if view_along != "Free rotation":
+            if view_along.endswith("*"):
+                direction = np.linalg.inv(cell).T["abc".index(view_along[0])]
+            else:
+                direction = cell["abc".index(view_along)]
+            # Rotate the whole scene so the chosen direction points at the viewer.
+            cell = cell @ _rotation_to_view_along(direction)
+        cart = frac @ cell
+
+        xyz_str = f"{len(symbols)}\n\n" + "".join(
+            f"{s} {x:.6f} {y:.6f} {z:.6f}\n" for s, (x, y, z) in zip(symbols, cart))
+
+        view = py3Dmol.view(width=400, height=330)
         view.addModel(xyz_str, "xyz")
-        view.setStyle({'model': 0}, {"sphere": {"radius": 0.4, "colorscheme": "Jmol"}})
-
-        cell = structure_ase.get_cell()
-        add_box(view, cell, color='black', linewidth=2)
-
+        view.setStyle({'model': 0}, {"sphere": {"radius": atom_scale, "colorscheme": "Jmol"}})
+        if abs(np.linalg.det(cell)) > 1e-6:
+            _add_cell_and_axes(view, cell, show_cell=show_cell, show_axes=show_axes)
+        view.setBackgroundColor("white")
         view.zoomTo()
-        view.zoom(1.2)
+        view.zoom(1.1)
+        if view_along == "Free rotation":
+            # A slightly tilted start so all three lattice directions are visible.
+            view.rotate(-60, {'x': 1, 'y': 0, 'z': 0})
+            view.rotate(-30, {'x': 0, 'y': 1, 'z': 0})
 
         html_string = view._make_html()
-        st.iframe(html_string, height=420, width=420)
+        st.iframe(html_string, height=345, width=420)
 
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
-        legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
+        legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: -8px;'>"
         for elem in unique_elements:
-            color = jmol_colors.get(elem, "#CCCCCC")
+            color = JMOL_COLORS.get(elem, "#CCCCCC")
             legend_html += (
-                f"<div style='margin-right: 15px; display: flex; align-items: center;'>"
-                f"<div style='width: 20px; height: 20px; background-color: {color}; margin-right: 5px; border: 1px solid black; border-radius: 50%;'></div>"
+                f"<div style='margin-right: 12px; display: flex; align-items: center;'>"
+                f"<div style='width: 14px; height: 14px; background-color: {color}; margin-right: 4px; border: 1px solid black; border-radius: 50%;'></div>"
                 f"<span style='font-weight: bold;'>{elem}</span></div>"
             )
         legend_html += "</div>"
@@ -920,6 +1215,7 @@ def structure_preview(working_structure):
     except Exception as e:
         st.error(f"Error visualizing structure: {e}")
         st.info("3D visualization is not available, but you can still generate the SQS structure.")
+
 
 
 def sqs_visualization(result):

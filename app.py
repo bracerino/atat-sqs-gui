@@ -160,17 +160,42 @@ st.sidebar.markdown('<div class="sidebar-caption">SQS ATAT</div>', unsafe_allow_
 
 
 st.sidebar.subheader("📁 Upload Your Structure Files")
-uploaded_files_user_sidebar = st.sidebar.file_uploader(
-    "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ) or a saved SimplySQS settings file (.json):",
-    type=None,
-    accept_multiple_files=True,
-    key="sidebar_uploader"
+structure_input_mode = st.sidebar.radio(
+    "Structure input",
+    ["📁 Upload files", "📝 Paste content"],
+    horizontal=True,
+    key="structure_input_mode",
+    label_visibility="collapsed",
 )
+# Both inputs are always rendered and the inactive one is only hidden with CSS, so
+# switching does not reset the widgets (uploaded files and pasted structures stay loaded).
+hidden_input_box = "paste_input_box" if structure_input_mode == "📁 Upload files" else "upload_input_box"
+# st.html with only a <style> tag is not given a layout slot, so it adds no empty gap.
+# The keyed container sits inside a layout wrapper that still takes a flex-gap slot,
+# so hide the wrapper too.
+st.sidebar.html(
+    f"<style>"
+    f".st-key-{hidden_input_box}, "
+    f"[data-testid='stLayoutWrapper']:has(> .st-key-{hidden_input_box}) {{display: none;}}"
+    f"</style>"
+)
+with st.sidebar.container(key="upload_input_box"):
+    uploaded_files_user_sidebar = st.file_uploader(
+        "Upload Structure Files (CIF, POSCAR, LMP, extended XYZ) or a saved SimplySQS settings file (.json):",
+        type=None,
+        accept_multiple_files=True,
+        key="sidebar_uploader"
+    )
+with st.sidebar.container(key="paste_input_box"):
+    from more_funct.pasted_structures import render_paste_structure_input, get_pasted_structure_files
+    render_paste_structure_input()
 
 # A saved settings file can be dropped into the same uploader: it is recognised by
 # its content, applied once, and kept out of the structure files below.
 from more_funct.session_settings import split_settings_files, render_settings_save_load
 uploaded_files_user_sidebar = split_settings_files(uploaded_files_user_sidebar)
+# Structures pasted as text are handled exactly like uploaded files from here on.
+uploaded_files_user_sidebar = list(uploaded_files_user_sidebar or []) + get_pasted_structure_files()
 render_settings_save_load()
 
 

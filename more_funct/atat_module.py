@@ -1507,7 +1507,12 @@ def render_atat_sqs_section():
             st.dataframe(site_df, width='stretch')
 
         with col2:
-            structure_preview(working_structure)
+            # Lattice parameters are editable for the loaded structure itself; the
+            # derived primitive cell is shown read-only.
+            structure_preview(working_structure,
+                              None if reduce_to_primitive else selected_atat_file)
+            if reduce_to_primitive:
+                st.caption("To edit the lattice parameters, turn off the primitive-cell conversion.")
 
         st.markdown(
             """
@@ -2093,7 +2098,10 @@ def render_atat_sqs_section():
         if "atat_results" not in st.session_state:
             st.session_state.atat_results = None
 
-        current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{use_pooled_basis}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}"
+        # The lattice is part of the key: rndstr.in and the scale in the generated
+        # scripts (max_param) must be regenerated after the lattice parameters change.
+        lattice_key = "_".join(f"{x:.6f}" for x in working_structure.lattice.parameters)
+        current_config_key = f"{selected_atat_file}_{reduce_to_primitive}_{nx}_{ny}_{nz}_{str(target_concentrations)}_{composition_mode}_{use_pooled_basis}_{pair_cutoff}_{triplet_cutoff}_{quadruplet_cutoff}_{lattice_key}"
 
         if "atat_config_key" not in st.session_state:
             st.session_state.atat_config_key = current_config_key

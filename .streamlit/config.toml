@@ -1,2 +1,7 @@
 [server]
 maxUploadSize = 5
+
+[global]
+# Widget values are preset through st.session_state on purpose (loading a saved
+# settings file, "Load example alloy") while the widgets keep their own defaults.
+disableWidgetStateDuplicationWarning = true
