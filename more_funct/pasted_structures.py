@@ -101,7 +101,7 @@ def render_paste_structure_input():
     col_format.selectbox("Format", list(FORMATS), key="paste_structure_format")
     col_name.text_input("Name (optional)", key="paste_structure_name")
     st.button("➕ Add structure", on_click=_add_pasted_structure,
-              key="paste_structure_add", use_container_width=True)
+              key="paste_structure_add", width="stretch")
 
     message = st.session_state.pop("paste_structure_message", None)
     if message:
