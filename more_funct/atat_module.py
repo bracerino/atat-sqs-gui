@@ -4916,6 +4916,7 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
    echo "----------------------------------------"
    echo "Monitoring {parallel_runs} parallel MCSQS runs every minute"
    echo "Log files: mcsqs1.log, mcsqs2.log, ..., mcsqs{parallel_runs}.log"
+   echo "Each line: current objective of every run (R<i>* = that run has stopped) and the overall best"
    echo "----------------------------------------"
 
    while true; do
@@ -4926,6 +4927,7 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
        best_objective=""
        best_run=""
        any_running=false
+       run_summary=""
 
        for i in $(seq 1 {parallel_runs}); do
            local log_file="mcsqs${{i}}.log"
@@ -4947,6 +4949,11 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
            row_data="$row_data,$step_count,$objective,$status"
 
+           # Per-run objective for the console line ("*" marks a run that has stopped)
+           local run_mark=""
+           [ "$status" = "STOPPED" ] && run_mark="*"
+           run_summary="$run_summary R${{i}}${{run_mark}}: $objective |"
+
            if [ "$objective" != "N/A" ] && [ -n "$objective" ]; then
                if [ -z "$best_objective" ] || awk "BEGIN {{exit !($objective < $best_objective)}}" 2>/dev/null; then
                    best_objective="$objective"
@@ -4961,15 +4968,7 @@ def generate_atat_monitor_script(results, use_atom_count=False, parallel_runs=1,
 
        echo "$row_data" >> "$output_file"
 
-       printf "Minute %3d | Active runs: " "$minute"
-        for i in $(seq 1 {parallel_runs}); do
-            if pgrep -f "mcsqs.*-ip=${{i}}" > /dev/null; then
-                printf "R%d " "$i"
-            else
-                printf "%s " "--"  
-            fi
-        done
-        printf "| Best: %s (%s)\\n" "$best_objective" "$best_run"
+       printf "Minute %3d |%s Best: %s\\n" "$minute" "$run_summary" "$best_run"
 
        if [ "$any_running" = false ]; then
            echo "All parallel runs stopped. Collecting final data..."
@@ -5760,11 +5759,14 @@ cleanup() {{
        {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
    fi
    
+   POSCAR_DIR="structures_poscars"
+   mkdir -p "$POSCAR_DIR"
+
    for outfile in bestsqs*.out; do
        if [ -f "$outfile" ]; then
            found_files=1
            basename="${{outfile%.out}}"
-           poscar_file="${{basename}}_POSCAR"
+           poscar_file="$POSCAR_DIR/${{basename}}_POSCAR"
            
            if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
                echo "  ✅ $outfile → $poscar_file"
@@ -5779,15 +5781,15 @@ cleanup() {{
    else
        if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
            if [ {parallel_runs} -gt 1 ]; then
-               best_poscar="bestsqs${{best_run}}_POSCAR"
+               best_poscar="$POSCAR_DIR/bestsqs${{best_run}}_POSCAR"
            else
-               best_poscar="bestsqs_POSCAR"
+               best_poscar="$POSCAR_DIR/bestsqs_POSCAR"
            fi
            
            if [ -f "$best_poscar" ]; then
-               cp "$best_poscar" "POSCAR_best_overall"
+               cp "$best_poscar" "$POSCAR_DIR/POSCAR_best_overall"
                echo ""
-               echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+               echo "🏆 Best structure (objective: $best_objective) saved as $POSCAR_DIR/POSCAR_best_overall"
                if [ {parallel_runs} -gt 1 ]; then
                    echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
                else
@@ -5887,11 +5889,14 @@ if [ -f "$PROGRESS_FILE" ]; then
     {"best_run=$(echo \"$last_line\" | cut -d',' -f$((4 + 3 * " + str(parallel_runs) + ")) | sed 's/Run//')" if parallel_runs > 1 else "best_run=\"1\""}
 fi
 
+POSCAR_DIR="structures_poscars"
+mkdir -p "$POSCAR_DIR"
+
 for outfile in bestsqs*.out; do
     if [ -f "$outfile" ]; then
         found_files=1
         basename="${{outfile%.out}}"
-        poscar_file="${{basename}}_POSCAR"
+        poscar_file="$POSCAR_DIR/${{basename}}_POSCAR"
         
         if convert_bestsqs_to_poscar "$outfile" "$poscar_file"; then
             echo "  ✅ $outfile → $poscar_file"
@@ -5906,15 +5911,15 @@ if [ $found_files -eq 0 ]; then
 else
     if [ -n "$best_run" ] && [ -n "$best_objective" ]; then
         if [ {parallel_runs} -gt 1 ]; then
-            best_poscar="bestsqs${{best_run}}_POSCAR"
+            best_poscar="$POSCAR_DIR/bestsqs${{best_run}}_POSCAR"
         else
-            best_poscar="bestsqs_POSCAR"
+            best_poscar="$POSCAR_DIR/bestsqs_POSCAR"
         fi
         
         if [ -f "$best_poscar" ]; then
-            cp "$best_poscar" "POSCAR_best_overall"
+            cp "$best_poscar" "$POSCAR_DIR/POSCAR_best_overall"
             echo ""
-            echo "🏆 Best structure (objective: $best_objective) saved as POSCAR_best_overall"
+            echo "🏆 Best structure (objective: $best_objective) saved as $POSCAR_DIR/POSCAR_best_overall"
             if [ {parallel_runs} -gt 1 ]; then
                 echo "    Source: Run $best_run (bestsqs${{best_run}}.out)"
             else

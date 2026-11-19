@@ -118,7 +118,20 @@ def render_sqs_module():
             - [Python code for converting bestsqs.out into POSCAR format](https://github.com/JianboHIT/sqs2vasp).
 
             ### 🛠️ ATAT Installation Tutorial
-            
+
+            #### ⚡ Automatic installation (Linux / WSL2)
+
+            Download the script below, place it in the folder where ATAT should be installed,
+            and run it there with `bash install_atat.sh` (optionally
+            `bash install_atat.sh /path/to/atat` for a custom location). It installs the
+            prerequisites, downloads the newest ATAT, compiles it into `./atat3_52`, adds it to
+            your `PATH`, tests that `mcsqs` runs, and writes the all-in-one `monitor.sh` that this
+            app generates for the example alloy selected next to the *Load example alloy* button
+            into `./atat_sqs_example` — run it with `cd atat_sqs_example && bash monitor.sh`.
+            """)
+            from more_funct.atat_installer import render_atat_install_script_button
+            render_atat_install_script_button(key="atat_install_script_tutorial")
+            st.markdown("""
             #### 🎥 Video Tutorial
             
             **Watch the complete compilation process:** [ATAT Compilation Video Tutorial](https://youtu.be/d5PceJoL1tw?si=akSMQ76_hKHaTKcB)
@@ -139,12 +152,12 @@ def render_sqs_module():
             
             1. **Download ATAT toolkit:**
             ```bash
-            wget http://alum.mit.edu/www/avdw/atat/atat3_36.tar.gz
+            wget https://axelvandewalle.github.io/www-avdw/atat/atat3_52.tar.gz
             ```
             
             2. **Extract and prepare build directory:**
             ```bash
-            tar xvzf atat3_36.tar.gz
+            tar xvzf atat3_52.tar.gz
             cd atat
             mkdir build
             ```

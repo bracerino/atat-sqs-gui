@@ -571,6 +571,8 @@ def intro_text():
         render_example_selector()
     with col_button:
         render_example_alloy_button()
+        from more_funct.atat_installer import render_atat_install_script_button
+        render_atat_install_script_button(key="atat_install_script_intro")
 
     st.markdown("#### Illustrative example:")
 
